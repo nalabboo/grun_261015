@@ -696,9 +696,6 @@ const MOSS_RECTS = Object.fromEntries(
   MOSS_INSTANCE_IDS.map((id) => [id, createMossRect(id)]),
 ) as Record<MossInstanceId, ReturnType<typeof createMossRect>>;
 
-/** Baked 3D shading strength for the moss sprites. */
-const MOSS_RELIEF = 0.55;
-
 const MOSS_FILES: Record<MossInstanceId, { b: string; g: string }> = {
   moss1_b: { b: IMAGE_SIZES.moss1_b.file, g: IMAGE_SIZES.moss1_g.file },
   "moss2_b-left": { b: IMAGE_SIZES.moss2_b.file, g: IMAGE_SIZES.moss2_g.file },
@@ -773,7 +770,6 @@ export default function WebGLWorld({
                 id={id}
                 bFile={MOSS_FILES[id].b}
                 gFile={MOSS_FILES[id].g}
-                relief={MOSS_RELIEF}
                 phase={mossPhases[id]}
                 onRevealComplete={mossCompleteHandlers[id]}
                 metrics={metrics}
