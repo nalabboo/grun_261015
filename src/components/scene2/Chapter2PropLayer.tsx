@@ -5,14 +5,17 @@ import {
   chapter2PropAssetUrl,
   type Chapter2PropConfig,
 } from "@/constants/chapter2ObjectsConfig";
-import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
+import {
+  resolveChapter2PropBlurRatio,
+  type Chapter2PropEdit,
+} from "@/constants/chapter2ObjectsConfig";
 import type { EditorMode } from "@/components/canvas/worldView";
 type Props = {
   prop: Chapter2PropConfig;
   viewportHeight: number;
   shiftX: number;
   shiftY: number;
-  layout: Chapter2BergEditTransform;
+  layout: Chapter2PropEdit;
   editorActive?: boolean;
   isSelected?: boolean;
   editMode?: EditorMode;
@@ -43,7 +46,10 @@ export default function Chapter2PropLayer({
     .filter(Boolean)
     .join(" ");
 
-  const blurPx = getChapter2BergViewportBlurPx(viewportHeight, prop.blurRatio);
+  const blurPx = getChapter2BergViewportBlurPx(
+    viewportHeight,
+    resolveChapter2PropBlurRatio(prop, layout),
+  );
   const filterParts = [`brightness(${prop.brightness})`];
   if (blurPx >= 0.4) {
     filterParts.push(`blur(${blurPx.toFixed(2)}px)`);

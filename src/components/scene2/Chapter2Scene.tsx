@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { EditorMode } from "@/components/canvas/worldView";
 import { SCENE_PERSPECTIVE_RATIO, SCENE_REFERENCE_HEIGHT } from "@/constants/sceneConfig";
 import {
@@ -14,10 +14,12 @@ import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2PropEditorPanel from "@/components/scene2/Chapter2PropEditorPanel";
 import {
   CHAPTER2_PROPS,
-  getChapter2PropDefaultLayout,
-  sanitizeChapter2PropLayout,
+  getChapter2PropDefaultEdit,
+  isChapter2PropTunable,
+  sanitizeChapter2PropEdit,
   withChapter2PropUniformScale,
-  type Chapter2PropId,
+  type Chapter2PropConfig,
+  type Chapter2PropEdit,
 } from "@/constants/chapter2ObjectsConfig";
 import {
   DEFAULT_CHAPTER2_BERG_EDIT,
@@ -33,6 +35,7 @@ import {
   loadChapter2PropEdits,
   saveChapter2PropEdits,
   type Chapter2PropEditorState,
+  type Chapter2TunablePropId,
 } from "@/constants/chapter2PropLayout";
 
 type Point = { x: number; y: number };
@@ -40,11 +43,11 @@ type Point = { x: number; y: number };
 const SMOOTH = 0.07;
 
 type PropDragState = {
-  id: Chapter2PropId;
+  id: Chapter2TunablePropId;
   mode: EditorMode;
   startClientX: number;
   startClientY: number;
-  base: Chapter2BergEditTransform;
+  base: Chapter2PropEdit;
 };
 
 function getChapter2DepthFactor(viewportHeight: number, depthRatio: number) {
@@ -64,7 +67,7 @@ export default function Chapter2Scene() {
 
   const [editor, setEditor] = useState<Chapter2PropEditorState>({
     enabled: false,
-    selectedId: "spore2_0",
+    selectedId: "spore4",
     mode: "translate",
   });
   const [propEdits, setPropEdits] = useState(defaultChapter2PropEdits);
@@ -83,11 +86,15 @@ export default function Chapter2Scene() {
   }, []);
 
   const patchProp = useCallback(
-    (id: Chapter2PropId, patch: Partial<Chapter2BergEditTransform>) => {
+    (id: Chapter2TunablePropId, patch: Partial<Chapter2PropEdit>) => {
       setPropEdits((prev) => {
-        const merged = sanitizeChapter2PropLayout(
-          { ...prev[id], ...withChapter2PropUniformScale(patch, prev[id]) },
-          getChapter2PropDefaultLayout(id),
+        const merged = sanitizeChapter2PropEdit(
+          {
+            ...prev[id],
+            ...withChapter2PropUniformScale(patch, prev[id]),
+            ...(patch.blurRatio !== undefined ? { blurRatio: patch.blurRatio } : {}),
+          },
+          getChapter2PropDefaultEdit(id),
         );
         const next = { ...prev, [id]: merged };
         saveChapter2PropEdits(next);
@@ -165,7 +172,7 @@ export default function Chapter2Scene() {
   }, [editor.enabled, patchProp]);
 
   const handlePropDragStart = useCallback(
-    (id: Chapter2PropId, clientX: number, clientY: number) => {
+    (id: Chapter2TunablePropId, clientX: number, clientY: number) => {
       if (!editor.enabled) return;
       setEditor((prev) => ({ ...prev, selectedId: id }));
       propDragRef.current = {
@@ -198,6 +205,37 @@ export default function Chapter2Scene() {
   const maxForegroundScale = Math.max(...foregroundScales, 1);
 
   const berg4Layer = CHAPTER2_BERG_LAYERS.find((layer) => layer.id === "berg4");
+  const foregroundProps = CHAPTER2_PROPS.filter((prop) => prop.stack === "foreground");
+  const behindBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "behindBerg2");
+
+  const renderPropLayer = (prop: Chapter2PropConfig) => {
+    const shiftX = smooth.x * prop.parallax;
+    const shiftY = smooth.y * prop.parallax * 0.65;
+    const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultEdit(prop.id);
+    const tunable = isChapter2PropTunable(prop.id);
+    const isSelected = tunable && editor.selectedId === prop.id;
+    return (
+      <Chapter2PropLayer
+        key={prop.id}
+        prop={prop}
+        viewportHeight={viewportHeight}
+        shiftX={shiftX}
+        shiftY={shiftY}
+        layout={layout}
+        editorActive={editor.enabled && tunable}
+        isSelected={isSelected}
+        editMode={editor.mode}
+        onSelect={() => {
+          if (!tunable) return;
+          setEditor((prev) => ({ ...prev, selectedId: prop.id as Chapter2TunablePropId }));
+        }}
+        onDragStart={(x, y) => {
+          if (!tunable) return;
+          handlePropDragStart(prop.id as Chapter2TunablePropId, x, y);
+        }}
+      />
+    );
+  };
 
   return (
     <div
@@ -235,39 +273,21 @@ export default function Chapter2Scene() {
           ? tunableEdits[tunableId]
           : DEFAULT_CHAPTER2_BERG_EDIT;
         return (
-          <Chapter2BergLayer
-            key={layer.id}
-            layer={layer}
-            viewportHeight={viewportHeight}
-            shiftX={shiftX}
-            shiftY={shiftY}
-            scale={scale}
-            edit={edit}
-          />
+          <Fragment key={layer.id}>
+            {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
+            <Chapter2BergLayer
+              layer={layer}
+              viewportHeight={viewportHeight}
+              shiftX={shiftX}
+              shiftY={shiftY}
+              scale={scale}
+              edit={edit}
+            />
+          </Fragment>
         );
       })}
 
-      {CHAPTER2_PROPS.map((prop) => {
-        const shiftX = smooth.x * prop.parallax;
-        const shiftY = smooth.y * prop.parallax * 0.65;
-        const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultLayout(prop.id);
-        const isSelected = editor.selectedId === prop.id;
-        return (
-          <Chapter2PropLayer
-            key={prop.id}
-            prop={prop}
-            viewportHeight={viewportHeight}
-            shiftX={shiftX}
-            shiftY={shiftY}
-            layout={layout}
-            editorActive={editor.enabled}
-            isSelected={isSelected}
-            editMode={editor.mode}
-            onSelect={() => setEditor((prev) => ({ ...prev, selectedId: prop.id }))}
-            onDragStart={(x, y) => handlePropDragStart(prop.id, x, y)}
-          />
-        );
-      })}
+      {foregroundProps.map((prop) => renderPropLayer(prop))}
 
       <div
         className="chapter2-synesthesia-veil"
@@ -280,7 +300,7 @@ export default function Chapter2Scene() {
       {DEV_CHAPTER2_PROP_EDITOR && (
         <Chapter2PropEditorPanel
           editor={editor}
-          edits={propEdits}
+          edits={propEdits as Record<Chapter2TunablePropId, Chapter2PropEdit>}
           onToggle={() => setEditor((prev) => ({ ...prev, enabled: !prev.enabled }))}
           onSelect={(selectedId) => setEditor((prev) => ({ ...prev, selectedId }))}
           onModeChange={(mode) => setEditor((prev) => ({ ...prev, mode }))}
@@ -288,15 +308,17 @@ export default function Chapter2Scene() {
           onResetSelected={() => {
             setPropEdits((prev) => {
               const id = editor.selectedId;
-              const next = { ...prev, [id]: getChapter2PropDefaultLayout(id) };
+              const next = { ...prev, [id]: getChapter2PropDefaultEdit(id) };
               saveChapter2PropEdits(next);
               return next;
             });
           }}
           onResetAll={() => {
-            const next = defaultChapter2PropEdits();
-            setPropEdits(next);
-            saveChapter2PropEdits(next);
+            setPropEdits((prev) => {
+              const next = { ...prev, spore4: getChapter2PropDefaultEdit("spore4") };
+              saveChapter2PropEdits(next);
+              return next;
+            });
           }}
         />
       )}

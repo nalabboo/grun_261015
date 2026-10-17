@@ -11,7 +11,7 @@ import {
 export const CHAPTER2_ID = "scene2";
 
 /** Bump when `public/scene2/` berg PNGs change (cache bust). */
-export const CHAPTER2_ASSET_VERSION = "20261018-scene2-bg-berg-1600";
+export const CHAPTER2_ASSET_VERSION = "20261018-scene2-spore4";
 
 /** Base fit scale (contain + parallax headroom). Transform depth is normalized on top. */
 export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
@@ -165,6 +165,7 @@ export function preloadChapter2BergAssets(): Promise<void> {
     ...CHAPTER2_BERG_LAYERS.map((layer) => chapter2LayerAssetUrl(layer)),
     chapter2AssetUrl("grun objekt/spore2.png"),
     chapter2AssetUrl("grun objekt/spore3.png"),
+    chapter2AssetUrl("grun objekt/spore4.png"),
   ];
   return Promise.all(urls.map((src) => loadImage(src))).then(() => undefined);
 }

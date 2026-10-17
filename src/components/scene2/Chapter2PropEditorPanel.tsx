@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import type { EditorMode } from "@/components/canvas/worldView";
-import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
 import {
-  CHAPTER2_PROP_IDS,
+  CHAPTER2_TUNABLE_PROP_IDS,
   withChapter2PropUniformScale,
-  type Chapter2PropId,
+  type Chapter2PropEdit,
+  type Chapter2TunablePropId,
 } from "@/constants/chapter2ObjectsConfig";
 import {
   formatChapter2PropLayout,
@@ -15,11 +15,11 @@ import {
 
 type Props = {
   editor: Chapter2PropEditorState;
-  edits: Record<Chapter2PropId, Chapter2BergEditTransform>;
+  edits: Record<Chapter2TunablePropId, Chapter2PropEdit>;
   onToggle: () => void;
-  onSelect: (id: Chapter2PropId) => void;
+  onSelect: (id: Chapter2TunablePropId) => void;
   onModeChange: (mode: EditorMode) => void;
-  onPatch: (id: Chapter2PropId, patch: Partial<Chapter2BergEditTransform>) => void;
+  onPatch: (id: Chapter2TunablePropId, patch: Partial<Chapter2PropEdit>) => void;
   onResetSelected: () => void;
   onResetAll: () => void;
 };
@@ -96,24 +96,26 @@ export default function Chapter2PropEditorPanel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [editor.enabled, onModeChange]);
 
-  const patch = (partial: Partial<Chapter2BergEditTransform>) => {
-    onPatch(selectedId, withChapter2PropUniformScale(partial, selected));
+  const patch = (partial: Partial<Chapter2PropEdit>) => {
+    onPatch(selectedId, { ...withChapter2PropUniformScale(partial, selected), ...partial });
   };
 
   const copyLayout = async () => {
-    const text = formatChapter2PropLayout({ ...edits });
+    const text = formatChapter2PropLayout(edits);
     try {
       await navigator.clipboard.writeText(text);
-      console.log("[Chapter2 prop layout]", text);
+      console.log("[Chapter2 spore4]", text);
     } catch {
-      console.log("[Chapter2 prop layout]\n", text);
+      console.log("[Chapter2 spore4]\n", text);
     }
   };
+
+  const blurValue = Number.isFinite(selected.blurRatio) ? selected.blurRatio! : 0;
 
   return (
     <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
       <button type="button" style={buttonStyle(editor.enabled)} onClick={onToggle}>
-        Ch2 prop edit: {editor.enabled ? "ON" : "OFF"}
+        Ch2 spore4 edit: {editor.enabled ? "ON" : "OFF"}
       </button>
 
       {editor.enabled && (
@@ -133,7 +135,7 @@ export default function Chapter2PropEditorPanel({
           </div>
 
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {CHAPTER2_PROP_IDS.map((id) => (
+            {CHAPTER2_TUNABLE_PROP_IDS.map((id) => (
               <button
                 key={id}
                 type="button"
@@ -184,6 +186,21 @@ export default function Chapter2PropEditorPanel({
             </label>
           ))}
 
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 96, fontSize: 10, opacity: 0.85 }}>blurRatio</span>
+            <input
+              type="number"
+              step={0.0001}
+              min={0}
+              style={fieldStyle}
+              value={blurValue}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                patch({ blurRatio: Number.isFinite(next) ? Math.max(0, next) : 0 });
+              }}
+            />
+          </label>
+
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             <button type="button" style={buttonStyle(false)} onClick={copyLayout}>
               Copy JSON
@@ -197,7 +214,8 @@ export default function Chapter2PropEditorPanel({
           </div>
 
           <div style={{ opacity: 0.72, lineHeight: 1.45 }}>
-            spore2 ×2 + spore3: select prop, drag canvas (Move / Scale). Copy JSON → chapter2ObjectsConfig.
+            spore4 (berg2 뒤): Move / Scale on canvas. Copy JSON → CHAPTER2_PROP_FIXED_LAYOUTS.spore4 +
+            CHAPTER2_PROP_FIXED_BLUR.
           </div>
         </>
       )}
