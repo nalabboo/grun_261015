@@ -1,6 +1,9 @@
-import { IMAGE_SIZES, assetUrl } from "@/constants/sceneConfig";
+import { GRUN_WALK, IMAGE_SIZES, assetUrl, grunWalkFrameUrl } from "@/constants/sceneConfig";
 
-const SCENE_IMAGE_URLS = Object.values(IMAGE_SIZES).map(({ file }) => assetUrl(file));
+const SCENE_IMAGE_URLS = [
+  ...Object.values(IMAGE_SIZES).map(({ file }) => assetUrl(file)),
+  ...Array.from({ length: GRUN_WALK.frames }, (_, index) => grunWalkFrameUrl(index)),
+];
 
 function loadImage(url: string): Promise<void> {
   return new Promise((resolve, reject) => {

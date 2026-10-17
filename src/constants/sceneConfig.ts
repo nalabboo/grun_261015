@@ -4,30 +4,74 @@ export const SCENE_REFERENCE_HEIGHT = 1080;
 /** Virtual camera distance (as a ratio of stage height) used for berg layer depth. */
 export const SCENE_PERSPECTIVE_RATIO = 1.111;
 
-/** Bump when public/#1 assets are replaced to bust browser cache. */
-export const ASSET_VERSION = "20260809-v17";
+/** Active scene folder under `public/` (was `#1`). */
+export const SCENE_ID = "scene1";
 
-export function assetUrl(filename: string) {
-  return `/%231/${filename}?v=${ASSET_VERSION}`;
+/** Bump when scene assets change to bust browser cache. */
+export const ASSET_VERSION = "20261017c-scene1";
+
+/** URL for a file under `public/scene1/` (path is relative to that folder). */
+export function assetUrl(relativePath: string) {
+  return `/${SCENE_ID}/${relativePath}?v=${ASSET_VERSION}`;
 }
 
-/** Source pixel sizes for public/#1 assets. */
+/**
+ * Pixel sizes for textures the WebGL scene loads.
+ * Files live under `public/scene1/{berg|character|landmark}/`.
+ */
 export const IMAGE_SIZES = {
-  berg1: { file: "berg1_3.png", width: 6568, height: 540 },
-  berg2: { file: "berg2_4.png", width: 5760, height: 1080 },
-  berg3: { file: "berg3_3.png", width: 5760, height: 1304 },
-  berg4: { file: "berg4_3.png", width: 5760, height: 1305 },
-  stein: { file: "stein.png", width: 794, height: 518 },
-  moss1_b: { file: "moss1_b.png", width: 426, height: 242 },
-  moss1_g: { file: "moss1_g.png", width: 426, height: 242 },
-  moss2_b: { file: "moss2_b.png", width: 278, height: 144 },
-  moss2_g: { file: "moss2_g.png", width: 278, height: 144 },
-  frosch_b: { file: "frosch_b.png", width: 279, height: 313 },
-  frosch_g: { file: "frosch_g.png", width: 279, height: 313 },
-  kind_sw: { file: "kind_sw.png", width: 509, height: 678 },
-  kind_g: { file: "kind_g.png", width: 509, height: 678 },
-  grun_t: { file: "grun_t.gif", width: 1000, height: 1080 },
+  // berg/
+  berg1: { file: "berg/berg1_3.png", width: 6568, height: 540 },
+  berg2: { file: "berg/berg2_4.png", width: 5760, height: 1080 },
+  berg3: { file: "berg/berg3_3.png", width: 5760, height: 1304 },
+  berg4: { file: "berg/berg4_3.png", width: 5760, height: 1305 },
+  // character/
+  kind_sw: { file: "character/kind_sw.png", width: 509, height: 678 },
+  kind_g: { file: "character/kind_g.png", width: 509, height: 678 },
+  // landmark/
+  worm_b: { file: "landmark/worm_b.png", width: 604, height: 700 },
+  worm_g: { file: "landmark/worm_g.png", width: 604, height: 700 },
+  ampel_b: { file: "landmark/ampel_b.png", width: 821, height: 1000 },
+  ampel_g: { file: "landmark/ampel_g.png", width: 821, height: 1000 },
+  spore1: { file: "landmark/spore1.png", width: 180, height: 693 },
+  spore2: { file: "landmark/spore2.png", width: 236, height: 854 },
+  spore3: { file: "landmark/spore3.png", width: 182, height: 645 },
+  stein: { file: "landmark/stein.png", width: 700, height: 637 },
+  moss1_b: { file: "landmark/moss1_b.png", width: 426, height: 242 },
+  moss1_g: { file: "landmark/moss1_g.png", width: 426, height: 242 },
+  moss2_b: { file: "landmark/moss2_b.png", width: 278, height: 144 },
+  moss2_g: { file: "landmark/moss2_g.png", width: 278, height: 144 },
 } as const;
+
+/**
+ * Grun walk cycle: PNG frames extracted from the Kling-made grun_t.gif by
+ * `scripts/extract_grun_walk.py` (every 3rd frame, watermark removed).
+ * Each frame is the region `crop` of a logical `width` x `height` frame, so layout stays as before.
+ */
+export const GRUN_WALK = {
+  dir: "character/grun_walk",
+  frames: 29,
+  width: 1000,
+  height: 1080,
+  cropX: 110,
+  cropY: 20,
+  loopMs: 1720,
+} as const;
+
+export function grunWalkFrameUrl(index: number) {
+  return assetUrl(`${GRUN_WALK.dir}/frame_${String(index).padStart(2, "0")}.png`);
+}
+
+/** Preload / runtime keys grouped by asset folder (same entries as `IMAGE_SIZES`). */
+export const SCENE_ASSET_GROUPS = {
+  berg: ["berg1", "berg2", "berg3", "berg4"],
+  character: ["kind_sw", "kind_g"],
+  landmark: [
+    "stein", "worm_b", "worm_g", "ampel_b", "ampel_g",
+    "spore1", "spore2", "spore3",
+    "moss1_b", "moss1_g", "moss2_b", "moss2_g",
+  ],
+} as const satisfies Record<string, readonly (keyof typeof IMAGE_SIZES)[]>;
 
 export const BERG_WIDTH_RATIO = IMAGE_SIZES.berg2.width / SCENE_REFERENCE_HEIGHT;
 export const BERG1_WIDTH_RATIO = (IMAGE_SIZES.berg1.width / SCENE_REFERENCE_HEIGHT) * 1.22;
@@ -42,26 +86,37 @@ export const WORLD_TOTAL_WIDTH = 18500;
 
 export const GRUN_FOLLOW_RATIO = 0.32;
 
+/** World scroll so grun sits at `GRUN_FOLLOW_RATIO` across the viewport. */
+export function getGrunFollowScroll(
+  metrics: SceneMetrics,
+  grunWorldX: number,
+  maxScroll: number,
+) {
+  const followMargin = metrics.width * GRUN_FOLLOW_RATIO;
+
+  return Math.max(0, Math.min(grunWorldX - followMargin, maxScroll));
+}
+
 /** Grun walk speed (px/s at reference height 1080). */
 export const GRUN_WALK_SPEED_BASE = 280;
 
-/** Camera pan speed when focusing on stein/frosch (px/s at reference height). */
+/** Camera pan speed when focusing on stein/worm (px/s at reference height). */
 export const LANDMARK_CAMERA_PAN_SPEED = 160;
 
-/** Start landmark camera when grun is within this distance of frosch (viewport width ratio). */
+/** Start landmark camera when grun is within this distance of worm (viewport width ratio). */
 export const LANDMARK_GRUN_PROXIMITY_RATIO = 0.55;
 
-/** Scroll lead before frosch enters view where white fade begins (viewport width ratio). */
-export const FROSCH_BACKGROUND_FADE_LEAD_RATIO = 0.34;
+/** Scroll lead before worm enters view where white fade begins (viewport width ratio). */
+export const WORM_BACKGROUND_FADE_LEAD_RATIO = 0.34;
 
 /** Scroll span until background is fully white after fade begins (viewport width ratio). */
-export const FROSCH_BACKGROUND_FADE_SPAN_RATIO = 1.55;
+export const WORM_BACKGROUND_FADE_SPAN_RATIO = 1.55;
 
 export const GRUN_START_RATIO = 0.1;
 export const GRUN_SCALE = 0.85;
 export const GRUN_OFFSET_Y_RATIO = 10 / SCENE_REFERENCE_HEIGHT;
-/** Full playback duration of grun_t.gif walk loop (ms). */
-export const GRUN_WALK_LOOP_MS = 1720;
+/** Full playback duration of one walk cycle (ms). */
+export const GRUN_WALK_LOOP_MS = GRUN_WALK.loopMs;
 
 export function getRemainingWalkLoopMs(walkPlayStartMs: number, now = Date.now()) {
   if (walkPlayStartMs <= 0) return GRUN_WALK_LOOP_MS;
@@ -73,7 +128,7 @@ export function getRemainingWalkLoopMs(walkPlayStartMs: number, now = Date.now()
   return remaining;
 }
 
-/** Set false to hide stein/frosch while tuning the scene. */
+/** Set false to hide stein/worm while tuning the scene. */
 export const SHOW_LANDMARKS = true;
 
 /** Depth (px at 1080p) that is perfectly sharp; layers away from it blur. */
@@ -173,43 +228,44 @@ export const SCENE_LAYERS = {
 
 export const STEIN_HEIGHT_RATIO = IMAGE_SIZES.stein.height / SCENE_REFERENCE_HEIGHT;
 export const STEIN_WIDTH_RATIO = IMAGE_SIZES.stein.width / SCENE_REFERENCE_HEIGHT;
-export const KIND_HEIGHT_RATIO = IMAGE_SIZES.kind_sw.height / SCENE_REFERENCE_HEIGHT;
-export const KIND_WIDTH_RATIO = IMAGE_SIZES.kind_sw.width / SCENE_REFERENCE_HEIGHT;
+const KIND_SCALE = 0.58;
+export const KIND_HEIGHT_RATIO = (IMAGE_SIZES.kind_sw.height / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
+export const KIND_WIDTH_RATIO = (IMAGE_SIZES.kind_sw.width / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
 /** Gap between stein right edge and kind_sw left edge (reference px at 1080p). */
-export const KIND_STEIN_GAP_PX = 40;
+export const KIND_STEIN_GAP_PX = -100;
 /** Extra rightward offset for kind_sw (reference px at 1080p). */
-export const KIND_OFFSET_X_PX = 40;
+export const KIND_OFFSET_X_PX = 0;
 /** Upward screen offset for kind_sw (reference px at 1080p). */
 export const KIND_OFFSET_Y_PX = 40;
 /** How far left of kind center grun stops after auto-walk (reference px at 1080p). */
 export const GRUN_KIND_STAND_LEFT_OFFSET_PX = 56;
 
-/** Grun stop anchor into stein width after frosch/moss reveal (0 = stein left edge). */
+/** Grun stop anchor into stein width after worm/moss reveal (0 = stein left edge). */
 export const GRUN_POST_REVEAL_STEIN_X_RATIO = 0.22;
-/** Extra rightward offset after frosch/moss reveal (reference px at 1080p). */
+/** Extra rightward offset after worm/moss reveal (reference px at 1080p). */
 export const GRUN_POST_REVEAL_OFFSET_X_PX = 700;
 /** Extra rightward offset after kind reveal (reference px at 1080p). */
 export const GRUN_POST_KIND_REVEAL_OFFSET_X_PX = 100;
-export const FROSCH_HEIGHT_RATIO = IMAGE_SIZES.frosch_b.height / SCENE_REFERENCE_HEIGHT;
-export const FROSCH_WIDTH_RATIO = IMAGE_SIZES.frosch_b.width / SCENE_REFERENCE_HEIGHT;
-export const FROSCH_SCALE = 0.72;
-/** Downward screen offset for frosch_b (reference px at 1080p). */
-export const FROSCH_OFFSET_Y_PX = 30;
-/** Peak landing surface on stein where frosch sits (source px from image bottom). */
-export const STEIN_LANDING_SURFACE_FROM_BOTTOM_PX = 462;
+export const WORM_HEIGHT_RATIO = IMAGE_SIZES.worm_b.height / SCENE_REFERENCE_HEIGHT;
+export const WORM_WIDTH_RATIO = IMAGE_SIZES.worm_b.width / SCENE_REFERENCE_HEIGHT;
+export const WORM_SCALE = 0.42;
+/** Downward screen offset for worm_b (reference px at 1080p). */
+export const WORM_OFFSET_Y_PX = 0;
+/** Peak landing surface on stein where worm sits (source px from image bottom). */
+export const STEIN_LANDING_SURFACE_FROM_BOTTOM_PX = 268;
 /** Horizontal center of stein peak in source image (ratio of stein width). */
-export const STEIN_PEAK_CENTER_X_RATIO = 404 / IMAGE_SIZES.stein.width;
-/** frosch_b feet row (source px from image bottom). */
-export const FROSCH_FEET_FROM_BOTTOM_PX = 0;
+export const STEIN_PEAK_CENTER_X_RATIO = 224 / IMAGE_SIZES.stein.width;
+/** worm_b feet row (source px from image bottom). */
+export const WORM_FEET_FROM_BOTTOM_PX = 40;
 
 /** Gap after berg1 right edge before stein (viewport width ratio). */
 export const STEIN_AFTER_BERG1_GAP_RATIO = 0.02;
 
-/** Extra horizontal offset for stein/frosch (viewport width ratio). */
+/** Extra horizontal offset for stein/worm (viewport width ratio). */
 export const STEIN_OFFSET_X_RATIO = 1.02;
 
 /** Landmark group screen center when camera pauses (viewport width ratio). */
-export const LANDMARK_FOCUS_CENTER_RATIO = 0.72;
+export const LANDMARK_FOCUS_CENTER_RATIO = 0.5;
 
 /** Gap between grun right edge and stein left edge when camera settles (reference px at 1080p). */
 export const GRUN_LANDMARK_STEIN_GAP_PX = 12;
@@ -263,7 +319,7 @@ export function getBerg1EndWorldX(metrics: SceneMetrics) {
   return scroll + berg1RightScreen;
 }
 
-/** stein/frosch sit in world space where berg1's right edge ends. */
+/** stein/worm sit in world space where berg1's right edge ends. */
 export function getSteinWorldX(metrics: SceneMetrics) {
   return (
     getBerg1EndWorldX(metrics) +
@@ -314,7 +370,7 @@ export function getGrunBesideKindWorldX(metrics: SceneMetrics) {
   return getKindAnchorWorldX(metrics) - grunWidth / 2 - standLeft;
 }
 
-/** World X where grun stops after frosch/moss reveals — partially behind stein. */
+/** World X where grun stops after worm/moss reveals — partially behind stein. */
 export function getGrunPostRevealStandX(metrics: SceneMetrics) {
   const stein = getSteinLayout(metrics);
   const grunWidth = getGrunDisplayWidth(metrics);
@@ -364,9 +420,9 @@ const MOSS_G_ASSET_KEY = {
 
 /** Moss placement on stein source canvas (px from stein bottom-left). */
 const MOSS_ON_STEIN_LAYERS: MossOnSteinLayer[] = [
-  { id: "moss1_b", assetKey: "moss1_b", leftPx: 7, bottomPx: -83 },
-  { id: "moss2_b-right", assetKey: "moss2_b", leftPx: 476, bottomPx: 113 },
-  { id: "moss2_b-left", assetKey: "moss2_b", leftPx: 150, bottomPx: 260, scale: 0.88 },
+  { id: "moss1_b", assetKey: "moss1_b", leftPx: 20, bottomPx: -10, scale: 0.55 },
+  { id: "moss2_b-right", assetKey: "moss2_b", leftPx: 343, bottomPx: -5, scale: 0.95 },
+  { id: "moss2_b-left", assetKey: "moss2_b", leftPx: 110, bottomPx: 520, scale: 0.4 },
 ];
 
 export function getMossOnSteinLayouts(metrics: SceneMetrics) {
@@ -391,10 +447,83 @@ export function getMossOnSteinLayouts(metrics: SceneMetrics) {
   });
 }
 
+/**
+ * Layout units follow the reference composite: the rock is 235 "ref px" wide there,
+ * so one ref px = rock width / 235. Positions are measured from the rock's left edge.
+ */
+const REF_ROCK_WIDTH = 235;
+const REF_GROUND_Y = 284;
+
+function getRefUnit(metrics: SceneMetrics) {
+  return getSteinDimensions(metrics).width / REF_ROCK_WIDTH;
+}
+
+export function getAmpelLayout(metrics: SceneMetrics) {
+  const stein = getSteinLayout(metrics);
+  const u = getRefUnit(metrics);
+  const width = 146 * u;
+  const height = width * (IMAGE_SIZES.ampel_g.height / IMAGE_SIZES.ampel_g.width);
+
+  return {
+    worldX: stein.worldX + (775 - 365) * u,
+    width,
+    height,
+    bottom: 49 * u,
+  };
+}
+
+/** Spore trees: x center / crown top / crown width are in ref px of the composite. */
+export const SPORE_TREES = [
+  { id: "spore_0", asset: "spore2", xc: 185, top: 35, crown: 100, front: false, blur: 2 },
+  { id: "spore_1", asset: "spore1", xc: 70, top: 135, crown: 80, front: true, blur: 0 },
+  { id: "spore_2", asset: "spore3", xc: 148, top: 155, crown: 40, front: true, blur: 0 },
+  { id: "spore_3", asset: "spore1", xc: 215, top: 100, crown: 45, front: false, blur: 1.5 },
+  { id: "spore_4", asset: "spore1", xc: 315, top: 80, crown: 35, front: false, blur: 1.5 },
+  { id: "spore_5", asset: "spore3", xc: 320, top: 0, crown: 80, front: false, blur: 2 },
+  { id: "spore_6", asset: "spore1", xc: 372, top: 5, crown: 50, front: false, blur: 2 },
+  { id: "spore_7", asset: "spore2", xc: 335, top: 160, crown: 70, front: true, blur: 0 },
+  { id: "spore_8", asset: "spore1", xc: 680, top: 150, crown: 45, front: true, blur: 0 },
+  { id: "spore_9", asset: "spore2", xc: 740, top: 95, crown: 50, front: false, blur: 1 },
+  { id: "spore_10", asset: "spore3", xc: 820, top: 165, crown: 38, front: true, blur: 0 },
+  { id: "spore_11", asset: "spore1", xc: 945, top: 175, crown: 50, front: true, blur: 0 },
+  { id: "spore_12", asset: "spore2", xc: 130, top: -175, crown: 120, front: false, blur: 3 },
+  { id: "spore_13", asset: "spore2", xc: 560, top: -170, crown: 110, front: false, blur: 3 },
+  { id: "spore_14", asset: "spore2", xc: 775, top: -390, crown: 330, front: false, blur: 6 },
+] as const;
+
+export type SporeId = (typeof SPORE_TREES)[number]["id"];
+
+export function getSporeLayouts(metrics: SceneMetrics) {
+  const stein = getSteinLayout(metrics);
+  const u = getRefUnit(metrics);
+
+  return SPORE_TREES.map((tree) => {
+    const size = IMAGE_SIZES[tree.asset];
+    const width = tree.crown * u * (size.width / (size.width * 0.96));
+    const height = width * (size.height / size.width);
+
+    return {
+      id: tree.id,
+      file: size.file,
+      front: tree.front,
+      blurSrcPx: (tree.blur * size.width) / tree.crown,
+      worldX: stein.worldX + (tree.xc - 365) * u - width / 2,
+      width,
+      height,
+      bottom: (REF_GROUND_Y - tree.top) * u - height,
+    };
+  });
+}
+
 export function getLandmarkZoneEnd(metrics: SceneMetrics) {
   const stein = getSteinLayout(metrics);
   const kind = getKindLayout(metrics);
-  const zoneRight = Math.max(stein.worldX + stein.width, kind.worldX + kind.width);
+  const ampel = getAmpelLayout(metrics);
+  const zoneRight = Math.max(
+    stein.worldX + stein.width,
+    kind.worldX + kind.width,
+    ampel.worldX + ampel.width,
+  );
 
   return zoneRight + metrics.width * STEIN_TAIL_RATIO;
 }
@@ -414,19 +543,19 @@ export function getTotalWorldWidth(metrics: SceneMetrics) {
 }
 
 export function getGrunDisplayWidth(metrics: SceneMetrics) {
-  const aspect = IMAGE_SIZES.grun_t.width / IMAGE_SIZES.grun_t.height;
+  const aspect = GRUN_WALK.width / GRUN_WALK.height;
 
   return metrics.height * aspect * GRUN_SCALE;
 }
 
-export function getFroschLayout(metrics: SceneMetrics) {
+export function getWormLayout(metrics: SceneMetrics) {
   const stein = getSteinLayout(metrics);
-  const height = metrics.height * FROSCH_HEIGHT_RATIO * FROSCH_SCALE;
-  const width = metrics.height * FROSCH_WIDTH_RATIO * FROSCH_SCALE;
+  const height = metrics.height * WORM_HEIGHT_RATIO * WORM_SCALE;
+  const width = metrics.height * WORM_WIDTH_RATIO * WORM_SCALE;
   const landingY =
     stein.height * (STEIN_LANDING_SURFACE_FROM_BOTTOM_PX / IMAGE_SIZES.stein.height);
-  const feetY = height * (FROSCH_FEET_FROM_BOTTOM_PX / IMAGE_SIZES.frosch_b.height);
-  const offsetY = FROSCH_OFFSET_Y_PX * (metrics.height / SCENE_REFERENCE_HEIGHT);
+  const feetY = height * (WORM_FEET_FROM_BOTTOM_PX / IMAGE_SIZES.worm_b.height);
+  const offsetY = WORM_OFFSET_Y_PX * (metrics.height / SCENE_REFERENCE_HEIGHT);
 
   return {
     worldX: stein.worldX + stein.width * STEIN_PEAK_CENTER_X_RATIO - width / 2,
@@ -436,16 +565,17 @@ export function getFroschLayout(metrics: SceneMetrics) {
   };
 }
 
-/** Scroll needed to center stein/frosch on screen. */
+/** Scroll needed to center stein/worm on screen. */
 export function getLandmarkFocusScroll(metrics: SceneMetrics) {
   const stein = getSteinLayout(metrics);
-  const frosch = getFroschLayout(metrics);
+  const worm = getWormLayout(metrics);
   const kind = getKindLayout(metrics);
-  const groupLeft = Math.min(stein.worldX, frosch.worldX);
+  const groupLeft = Math.min(stein.worldX, worm.worldX);
   const groupRight = Math.max(
     stein.worldX + stein.width,
-    frosch.worldX + frosch.width,
+    worm.worldX + worm.width,
     kind.worldX + kind.width,
+    getAmpelLayout(metrics).worldX + getAmpelLayout(metrics).width,
   );
   const groupCenterWorldX = (groupLeft + groupRight) / 2;
 
@@ -467,11 +597,11 @@ export function getGrunLandmarkStandX(metrics: SceneMetrics) {
   return Math.max(0, Math.max(minWorldX, maxWorldX));
 }
 
-export function isGrunNearFrosch(metrics: SceneMetrics, grunWorldX: number) {
-  const frosch = getFroschLayout(metrics);
+export function isGrunNearWorm(metrics: SceneMetrics, grunWorldX: number) {
+  const worm = getWormLayout(metrics);
   const proximity = metrics.width * LANDMARK_GRUN_PROXIMITY_RATIO;
 
-  return grunWorldX >= frosch.worldX - proximity;
+  return grunWorldX >= worm.worldX - proximity;
 }
 
 function smoothstep(value: number) {
@@ -479,13 +609,13 @@ function smoothstep(value: number) {
   return t * t * (3 - 2 * t);
 }
 
-/** 0 = black, 1 = white — eases in just before frosch enters view. */
+/** 0 = black, 1 = white — eases in just before worm enters view. */
 export function getBackgroundWhiteProgress(metrics: SceneMetrics, worldScroll: number) {
-  const frosch = getFroschLayout(metrics);
-  const froschEnterScroll = frosch.worldX - metrics.width;
+  const worm = getWormLayout(metrics);
+  const wormEnterScroll = worm.worldX - metrics.width;
   const fadeStartScroll =
-    froschEnterScroll - metrics.width * FROSCH_BACKGROUND_FADE_LEAD_RATIO;
-  const fadeEndScroll = fadeStartScroll + metrics.width * FROSCH_BACKGROUND_FADE_SPAN_RATIO;
+    wormEnterScroll - metrics.width * WORM_BACKGROUND_FADE_LEAD_RATIO;
+  const fadeEndScroll = fadeStartScroll + metrics.width * WORM_BACKGROUND_FADE_SPAN_RATIO;
 
   if (worldScroll <= fadeStartScroll) return 0;
   if (worldScroll >= fadeEndScroll) return 1;
@@ -493,23 +623,23 @@ export function getBackgroundWhiteProgress(metrics: SceneMetrics, worldScroll: n
   return smoothstep((worldScroll - fadeStartScroll) / (fadeEndScroll - fadeStartScroll));
 }
 
-export function areFroschMossRevealsComplete(
-  froschPhase: string,
+export function areWormMossRevealsComplete(
+  wormPhase: string,
   mossPhases: MossPhases,
 ) {
   return (
-    froschPhase === "g" &&
+    wormPhase === "g" &&
     MOSS_INSTANCE_IDS.every((id) => mossPhases[id] === "g")
   );
 }
 
 export function areLandmarkRevealsComplete(
-  froschPhase: string,
+  wormPhase: string,
   kindPhase: string,
   mossPhases: MossPhases,
 ) {
   return (
-    froschPhase === "g" &&
+    wormPhase === "g" &&
     kindPhase === "g" &&
     MOSS_INSTANCE_IDS.every((id) => mossPhases[id] === "g")
   );
@@ -524,6 +654,17 @@ export function getPostLandmarkMaxScroll(metrics: SceneMetrics) {
 
 export function getPostLandmarkMaxGrunWorldX(metrics: SceneMetrics) {
   return getPostLandmarkMaxScroll(metrics) + metrics.width * GRUN_FOLLOW_RATIO + 40;
+}
+
+/** Grun (left edge) world X that ends scene1: grun's center reaches the ampel. */
+export function getSceneEndGrunWorldX(metrics: SceneMetrics) {
+  const ampel = getAmpelLayout(metrics);
+  const grunWidth = getGrunDisplayWidth(metrics);
+
+  return Math.min(
+    ampel.worldX - grunWidth / 2,
+    getPostLandmarkMaxGrunWorldX(metrics) - 8,
+  );
 }
 
 export type SceneMetrics = {

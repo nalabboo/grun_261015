@@ -79,14 +79,6 @@ const MOUNTAIN_SHAPE: ReliefShape = {
   toneAmp: 3.5,
 };
 
-/** Small sprites such as moss: a rounder dome with more painted bumps. */
-const SPRITE_SHAPE: ReliefShape = {
-  gridScale: 0.5,
-  domeSigma: 0.14,
-  domeAmp: 26,
-  toneAmp: 6,
-};
-
 /**
  * Builds a mountain-like height field from the painting (soft dome from the
  * silhouette plus the painted tones) and returns its lit slope as shade in
@@ -260,40 +252,4 @@ export function createBakedLayerTexture(
   const baked = { map, padX: p / cw, padY: p / ch };
   bakedTextureCache.set(cacheKey, baked);
   return baked;
-}
-
-const spriteCache = new Map<string, THREE.CanvasTexture>();
-
-/**
- * Bakes the same lit-slope relief into a small sprite (moss etc.) so it reads
- * as a rounded, 3D object. Returns the original canvas-backed texture, cached.
- */
-export function createReliefSpriteTexture(
-  image: HTMLImageElement,
-  strength: number,
-): THREE.CanvasTexture {
-  const key = `${image.src}|${strength}`;
-  const cached = spriteCache.get(key);
-  if (cached) return cached;
-
-  const width = image.naturalWidth;
-  const height = image.naturalHeight;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("Could not bake a sprite texture");
-
-  ctx.drawImage(image, 0, 0);
-  const pixels = ctx.getImageData(0, 0, width, height);
-  const field = buildReliefField(pixels.data, width, height, SPRITE_SHAPE);
-  applyRelief(pixels.data, width, height, field, strength);
-  ctx.putImageData(pixels, 0, 0);
-
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.NoColorSpace;
-  map.anisotropy = 8;
-  map.needsUpdate = true;
-  spriteCache.set(key, map);
-  return map;
 }

@@ -2,6 +2,7 @@
 
 /* eslint-disable react-hooks/immutability, react-hooks/refs -- R3F scene objects (textures, meshes, uniforms) are mutated imperatively in useFrame by design. */
 
+import { gaussianBlurStraightRGBA } from "@/lib/gaussianBlur";
 import { TransformControls, useTexture } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
@@ -18,14 +19,18 @@ import * as THREE from "three";
 import {
   GRUN_OFFSET_Y_RATIO,
   GRUN_SCALE,
+  GRUN_WALK,
   IMAGE_SIZES,
   MOSS_INSTANCE_IDS,
+  getAmpelLayout,
+  getSporeLayouts,
+  SPORE_TREES,
   SCENE_LAYERS,
   SCENE_PERSPECTIVE_RATIO,
   SCENE_REFERENCE_HEIGHT,
   SHOW_LANDMARKS,
   assetUrl,
-  getFroschLayout,
+  getWormLayout,
   getGrunDisplayWidth,
   getKindLayout,
   getMossOnSteinLayouts,
@@ -41,7 +46,7 @@ import {
   easeOut,
   getRevealValues,
 } from "./revealMath";
-import { createBakedLayerTexture, createReliefSpriteTexture } from "@/lib/bakeLayerTexture";
+import { createBakedLayerTexture } from "@/lib/bakeLayerTexture";
 import { PAPER_GRAIN_TILE_PX } from "@/lib/paperGrain";
 import { revealFragmentShader, revealVertexShader } from "./revealShader";
 import type {
@@ -86,15 +91,6 @@ function useSceneTexture(file: string) {
   }, [texture]);
 
   return texture;
-}
-
-/** Same as `useSceneTexture`, with a lit relief baked in so the sprite looks rounded. */
-function useReliefTexture(file: string, strength: number) {
-  const texture = useSceneTexture(file);
-  return useMemo(() => {
-    const image = texture.image as HTMLImageElement;
-    return strength > 0 ? createReliefSpriteTexture(image, strength) : texture;
-  }, [texture, strength]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -336,6 +332,8 @@ type WorldSpriteProps = {
   metrics: SceneMetrics;
   viewRef: WorldViewRef;
   renderOrder: number;
+  /** Gaussian blur radius in source-image px (baked on the CPU). */
+  blurSrcPx?: number;
   getRect: (metrics: SceneMetrics) => {
     worldX: number;
     bottom: number;
@@ -344,8 +342,36 @@ type WorldSpriteProps = {
   };
 };
 
-function WorldSprite({ id, file, metrics, viewRef, renderOrder, getRect }: WorldSpriteProps) {
-  const map = useSceneTexture(file);
+function WorldSprite({
+  id,
+  file,
+  metrics,
+  viewRef,
+  renderOrder,
+  getRect,
+  blurSrcPx = 0,
+}: WorldSpriteProps) {
+  const baseMap = useSceneTexture(file);
+  const { map, pad } = useMemo(() => {
+    if (blurSrcPx < 0.5) return { map: baseMap, pad: 0 };
+    const image = baseMap.image as HTMLImageElement;
+    const p = Math.ceil(blurSrcPx * 3);
+    const w = image.naturalWidth + p * 2;
+    const h = image.naturalHeight + p * 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { map: baseMap, pad: 0 };
+    ctx.drawImage(image, p, p);
+    const data = ctx.getImageData(0, 0, w, h);
+    gaussianBlurStraightRGBA(data.data, w, h, blurSrcPx);
+    ctx.putImageData(data, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.anisotropy = 8;
+    return { map: texture, pad: p };
+  }, [baseMap, blurSrcPx]);
   const meshRef = useRef<THREE.Mesh>(null);
   const outerRef = useRef<THREE.Group>(null);
   const userRef = useRef<THREE.Group>(null);
@@ -360,7 +386,10 @@ function WorldSprite({ id, file, metrics, viewRef, renderOrder, getRect }: World
       rect.bottom + rect.height / 2,
       0,
     );
-    mesh.scale.set(rect.width, rect.height, 1);
+    const image = baseMap.image as HTMLImageElement;
+    const grow = pad > 0 ? (2 * pad) / image.naturalWidth : 0;
+    const growY = pad > 0 ? (2 * pad) / image.naturalHeight : 0;
+    mesh.scale.set(rect.width * (1 + grow), rect.height * (1 + growY), 1);
   });
 
   return (
@@ -387,8 +416,6 @@ type RevealSpriteProps = {
   id: CardId;
   bFile: string;
   gFile: string;
-  /** Baked 3D relief strength for the sprite (0 = flat painting). */
-  relief?: number;
   phase: RevealPhase;
   onRevealComplete: () => void;
   metrics: SceneMetrics;
@@ -406,7 +433,6 @@ function RevealSprite({
   id,
   bFile,
   gFile,
-  relief = 0,
   phase,
   onRevealComplete,
   metrics,
@@ -414,8 +440,8 @@ function RevealSprite({
   renderOrder,
   getRect,
 }: RevealSpriteProps) {
-  const bMap = useReliefTexture(bFile, relief);
-  const gMap = useReliefTexture(gFile, relief);
+  const bMap = useSceneTexture(bFile);
+  const gMap = useSceneTexture(gFile);
   const meshRef = useRef<THREE.Mesh>(null);
   const outerRef = useRef<THREE.Group>(null);
   const userRef = useRef<THREE.Group>(null);
@@ -533,18 +559,17 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
   const userRef = useRef<THREE.Group>(null);
   const hasFrameRef = useRef(false);
 
-  const { canvas, ctx, texture, frameBuffer } = useMemo(() => {
+  const { ctx, texture } = useMemo(() => {
     const canvas = document.createElement("canvas");
-    canvas.width = IMAGE_SIZES.grun_t.width;
-    canvas.height = IMAGE_SIZES.grun_t.height;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    canvas.width = GRUN_WALK.width;
+    canvas.height = GRUN_WALK.height;
+    const ctx = canvas.getContext("2d");
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.NoColorSpace;
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
-    const frameBuffer = new Uint8ClampedArray(canvas.width * canvas.height * 4);
-    return { canvas, ctx, texture, frameBuffer };
+    return { ctx, texture };
   }, []);
 
   useEffect(() => () => texture.dispose(), [texture]);
@@ -559,23 +584,9 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
 
     if (ctx && movie && (source.animating || source.dirty)) {
       const time = source.animating ? Date.now() - source.playStartMs : 0;
-      if (movie.renderAt(time, frameBuffer)) {
-        ctx.putImageData(new ImageData(frameBuffer, canvas.width, canvas.height), 0, 0);
+      if (movie.drawAt(time, ctx)) {
         texture.needsUpdate = true;
       }
-      source.dirty = false;
-      hasFrameRef.current = true;
-    } else if (
-      ctx &&
-      !movie &&
-      source.img &&
-      source.img.complete &&
-      source.img.naturalWidth > 0 &&
-      source.dirty
-    ) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(source.img, 0, 0, canvas.width, canvas.height);
-      texture.needsUpdate = true;
       source.dirty = false;
       hasFrameRef.current = true;
     }
@@ -648,10 +659,10 @@ export type WebGLWorldProps = {
   metrics: SceneMetrics;
   viewRef: WorldViewRef;
   grunSourceRef: GrunFrameSourceRef;
-  froschPhase: RevealPhase;
+  wormPhase: RevealPhase;
   kindPhase: RevealPhase;
   mossPhases: MossPhases;
-  onFroschRevealComplete: () => void;
+  onWormRevealComplete: () => void;
   onKindRevealComplete: () => void;
   onMossRevealComplete: (id: MossInstanceId) => void;
   editor: EditorState;
@@ -663,15 +674,33 @@ const kindRect = (metrics: SceneMetrics) => {
   return { worldX: kind.worldX, bottom: kind.bottom, width: kind.width, height: kind.height };
 };
 
-const froschRect = (metrics: SceneMetrics) => {
-  const frosch = getFroschLayout(metrics);
+const wormRect = (metrics: SceneMetrics) => {
+  const worm = getWormLayout(metrics);
   return {
-    worldX: frosch.worldX,
-    bottom: frosch.bottom,
-    width: frosch.width,
-    height: frosch.height,
+    worldX: worm.worldX,
+    bottom: worm.bottom,
+    width: worm.width,
+    height: worm.height,
   };
 };
+
+const ampelRect = (metrics: SceneMetrics) => getAmpelLayout(metrics);
+
+const SPORE_RECTS = Object.fromEntries(
+  SPORE_TREES.map((tree) => [
+    tree.id,
+    (metrics: SceneMetrics) => {
+      const layout = getSporeLayouts(metrics).find((l) => l.id === tree.id)!;
+      return { worldX: layout.worldX, bottom: layout.bottom, width: layout.width, height: layout.height };
+    },
+  ]),
+) as Record<(typeof SPORE_TREES)[number]["id"], (metrics: SceneMetrics) => { worldX: number; bottom: number; width: number; height: number }>;
+
+const noop = () => {};
+
+function getSporeBlur(metrics: SceneMetrics, id: string) {
+  return getSporeLayouts(metrics).find((l) => l.id === id)?.blurSrcPx ?? 0;
+}
 
 const steinRect = (metrics: SceneMetrics) => {
   const stein = getSteinLayout(metrics);
@@ -706,10 +735,10 @@ export default function WebGLWorld({
   metrics,
   viewRef,
   grunSourceRef,
-  froschPhase,
+  wormPhase,
   kindPhase,
   mossPhases,
-  onFroschRevealComplete,
+  onWormRevealComplete,
   onKindRevealComplete,
   onMossRevealComplete,
   editor,
@@ -732,6 +761,19 @@ export default function WebGLWorld({
         <>
           <BergLayer layerKey="berg4" metrics={metrics} viewRef={viewRef} renderOrder={1} />
           <BergLayer layerKey="berg3" metrics={metrics} viewRef={viewRef} renderOrder={2} />
+          {SHOW_LANDMARKS &&
+            SPORE_TREES.filter((tree) => tree.front === false).map((tree) => (
+              <WorldSprite
+                key={tree.id}
+                id={tree.id}
+                file={IMAGE_SIZES[tree.asset].file}
+                metrics={metrics}
+                viewRef={viewRef}
+                renderOrder={2.5}
+                blurSrcPx={getSporeBlur(metrics, tree.id)}
+                getRect={SPORE_RECTS[tree.id]}
+              />
+            ))}
           {SHOW_LANDMARKS && (
             <RevealSprite
               id="kind"
@@ -780,17 +822,43 @@ export default function WebGLWorld({
             ))}
           {SHOW_LANDMARKS && (
             <RevealSprite
-              id="frosch"
-              bFile={IMAGE_SIZES.frosch_b.file}
-              gFile={IMAGE_SIZES.frosch_g.file}
-              phase={froschPhase}
-              onRevealComplete={onFroschRevealComplete}
+              id="worm"
+              bFile={IMAGE_SIZES.worm_b.file}
+              gFile={IMAGE_SIZES.worm_b.file}
+              phase={wormPhase}
+              onRevealComplete={onWormRevealComplete}
               metrics={metrics}
               viewRef={viewRef}
               renderOrder={9}
-              getRect={froschRect}
+              getRect={wormRect}
             />
           )}
+          {SHOW_LANDMARKS && (
+            <RevealSprite
+              id="ampel"
+              bFile={IMAGE_SIZES.ampel_b.file}
+              gFile={IMAGE_SIZES.ampel_b.file}
+              phase="b"
+              onRevealComplete={noop}
+              metrics={metrics}
+              viewRef={viewRef}
+              renderOrder={3.2}
+              getRect={ampelRect}
+            />
+          )}
+          {SHOW_LANDMARKS &&
+            SPORE_TREES.filter((tree) => tree.front === true).map((tree) => (
+              <WorldSprite
+                key={tree.id}
+                id={tree.id}
+                file={IMAGE_SIZES[tree.asset].file}
+                metrics={metrics}
+                viewRef={viewRef}
+                renderOrder={10}
+                blurSrcPx={getSporeBlur(metrics, tree.id)}
+                getRect={SPORE_RECTS[tree.id]}
+              />
+            ))}
           <ReadySignal onReady={onReady} />
         </>
       )}
