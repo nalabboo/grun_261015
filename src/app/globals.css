@@ -301,6 +301,82 @@ body {
   transform: translate(-50%, -50%);
 }
 
+.chapter2-intro--out {
+  opacity: 0;
+  transition: opacity 1.4s ease-in-out;
+  pointer-events: none;
+}
+
+.chapter2-intro__title--out {
+  opacity: 0 !important;
+  filter: blur(10px);
+  transition:
+    opacity 1.4s ease-in-out,
+    filter 1.4s ease-in-out;
+}
+
+.chapter2-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  background: #07080a;
+  animation: chapter2-scene-in 1.5s ease-out forwards;
+}
+
+.chapter2-scene--editing {
+  cursor: default;
+}
+
+.chapter2-berg--floor {
+  z-index: 0;
+}
+
+.chapter2-berg--editable.chapter2-berg--selected {
+  outline: 2px dashed rgba(140, 255, 180, 0.85);
+  outline-offset: 2px;
+}
+
+.chapter2-berg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* Fit full PNG in viewport (both axes), then scale up for parallax headroom. */
+  width: calc(
+    var(--berg-scale, 1.18) * max(100vw, 100vh * var(--berg-aspect, 1.7777777778))
+  );
+  height: calc(
+    var(--berg-scale, 1.18) * max(100vh, 100vw / var(--berg-aspect, 1.7777777778))
+  );
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  object-position: center center;
+  transform-origin: center center;
+  will-change: transform, filter;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.chapter2-synesthesia-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  transition: opacity 0.12s linear;
+}
+
+@keyframes chapter2-scene-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes chapter2-papier-in {
   from {
     opacity: 0;

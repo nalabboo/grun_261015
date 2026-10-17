@@ -8,6 +8,8 @@ import KindHitTarget from "@/components/KindHitTarget";
 import MossHitTargets from "@/components/MossHitTargets";
 import SceneCanvasLoader from "@/components/canvas/SceneCanvasLoader";
 import Chapter2Intro from "@/components/scene2/Chapter2Intro";
+import Chapter2Scene from "@/components/scene2/Chapter2Scene";
+import { preloadChapter2BergAssets } from "@/constants/chapter2Config";
 import NextScene from "@/components/scene2/NextScene";
 import PageTurnButton from "@/components/scene2/PageTurnButton";
 import { preloadChapter1TableauAssets } from "@/constants/scene2Config";
@@ -53,7 +55,12 @@ type CameraMode = "grun" | "landmarkPaused";
 
 type Chapter = 1 | 2;
 type Chapter1Phase = "scroll" | "tableau";
-type Chapter2Step = "intro" | "done";
+type Chapter2Step = "intro" | "play";
+
+/** Local dev: open chapter 2 berg scene on load (set NEXT_PUBLIC_DEV_CHAPTER2=0 to disable). */
+const DEV_START_CHAPTER2 =
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2 !== "0";
 
 export default function SceneStage() {
   const stageRef = useRef<HTMLElement>(null);
@@ -104,23 +111,30 @@ export default function SceneStage() {
   const grunSourceRef = useRef<GrunFrameSource>(createGrunFrameSource());
   const prevHeightRef = useRef(0);
   const backgroundWhiteMaxRef = useRef(0);
-  const [chapter, setChapter] = useState<Chapter>(1);
+  const [chapter, setChapter] = useState<Chapter>(DEV_START_CHAPTER2 ? 2 : 1);
   const [chapter1Phase, setChapter1Phase] = useState<Chapter1Phase>("scroll");
   const [tableauRevealed, setTableauRevealed] = useState(false);
-  const [chapter2Step, setChapter2Step] = useState<Chapter2Step | null>(null);
-  const chapterRef = useRef<Chapter>(1);
+  const [chapter2Step, setChapter2Step] = useState<Chapter2Step | null>(
+    DEV_START_CHAPTER2 ? "play" : null,
+  );
+  const chapterRef = useRef<Chapter>(DEV_START_CHAPTER2 ? 2 : 1);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
+
+  useEffect(() => {
+    if (DEV_START_CHAPTER2) preloadChapter2BergAssets();
+  }, []);
 
   const handlePageTurn = useCallback(() => {
     chapterRef.current = 2;
     setChapter(2);
     setChapter2Step("intro");
+    preloadChapter2BergAssets();
     stateRef.current.targetWorldX = null;
     setTargetWorldX(null);
   }, []);
 
   const handleChapter2IntroComplete = useCallback(() => {
-    setChapter2Step("done");
+    setChapter2Step("play");
   }, []);
 
   const handleTableauRevealComplete = useCallback(() => {
@@ -621,6 +635,7 @@ export default function SceneStage() {
     {showChapter1Tableau && tableauRevealed && (
       <PageTurnButton onTurn={handlePageTurn} />
     )}
+    {chapter === 2 && chapter2Step === "play" && <Chapter2Scene />}
     {chapter === 2 && chapter2Step === "intro" && (
       <Chapter2Intro onComplete={handleChapter2IntroComplete} />
     )}

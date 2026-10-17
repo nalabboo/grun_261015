@@ -9,8 +9,14 @@ export const SCENE2_PAINT_TEXTURE = "landmark/paint_bleed.webp";
 export const SCENE2_PAPIER = "landmark/papier.jpg";
 
 export const CHAPTER2_TITLE = "작아지는 초록";
+/** Title fade-in duration (ms). */
 export const CHAPTER2_INTRO_TITLE_MS = 2400;
-export const CHAPTER2_INTRO_HOLD_MS = 1400;
+/** Title stays fully visible before fade-out (ms). */
+export const CHAPTER2_TITLE_HOLD_MS = 5000;
+/** Papier + title fade-out before chapter 2 scene (ms). */
+export const CHAPTER2_INTRO_FADEOUT_MS = 1400;
+/** @deprecated use CHAPTER2_TITLE_HOLD_MS */
+export const CHAPTER2_INTRO_HOLD_MS = CHAPTER2_TITLE_HOLD_MS;
 
 /** Composition frame aspect (reference image 1024 x 577). */
 export const SCENE2_ASPECT = 1024 / 577;
