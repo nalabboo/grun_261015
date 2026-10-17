@@ -1,12 +1,12 @@
-import type { EditorMode } from "@/components/canvas/worldView";
-
-/** Dev-tunable berg layers (prod berg4 uses `CHAPTER2_BERG4_FIXED_LAYOUT` in config). */
 export const CHAPTER2_BERG_TUNABLE_IDS = ["berg4", "berg3", "berg2"] as const;
 export type Chapter2BergTunableId = (typeof CHAPTER2_BERG_TUNABLE_IDS)[number];
 
-/** @deprecated use CHAPTER2_BERG_TUNABLE_IDS — berg4 layout lives in config. */
-export const CHAPTER2_BERG_EDIT_IDS = ["berg4", "berg3", "berg2"] as const;
-export type Chapter2BergEditId = (typeof CHAPTER2_BERG_EDIT_IDS)[number];
+export const CHAPTER2_TUNABLE_IDS = [...CHAPTER2_BERG_TUNABLE_IDS] as const;
+export type Chapter2TunableId = (typeof CHAPTER2_TUNABLE_IDS)[number];
+
+/** @deprecated use CHAPTER2_TUNABLE_IDS */
+export const CHAPTER2_BERG_EDIT_IDS = [...CHAPTER2_TUNABLE_IDS] as const;
+export type Chapter2BergEditId = Chapter2TunableId;
 
 export type Chapter2BergEditTransform = {
   x: number;
@@ -33,6 +33,14 @@ export const CHAPTER2_BERG4_LAYOUT_DEFAULT: Chapter2BergEditTransform = {
   rotate: 0,
 };
 
+export const CHAPTER2_BERG3_LAYOUT_DEFAULT: Chapter2BergEditTransform = {
+  x: -410,
+  y: 0,
+  scale: 1,
+  scaleY: 1,
+  rotate: 0,
+};
+
 function finiteOr(fallback: number, value: unknown) {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -53,103 +61,127 @@ export function sanitizeChapter2BergEditTransform(
   };
 }
 
+export function getChapter2TunableSeed(id: Chapter2TunableId): Chapter2BergEditTransform {
+  if (id === "berg4") return { ...CHAPTER2_BERG4_LAYOUT_DEFAULT };
+  if (id === "berg3") return { ...CHAPTER2_BERG3_LAYOUT_DEFAULT };
+  return { ...DEFAULT_CHAPTER2_BERG_EDIT };
+}
+
 export const CHAPTER2_BERG_LAYOUT_STORAGE_KEY = "grun-chapter2-berg-layout-v1";
 const STORAGE_KEY = CHAPTER2_BERG_LAYOUT_STORAGE_KEY;
+const BERG3_NUDGE_LEFT_KEY = "grun-chapter2-berg3-nudge-left-v1";
+const BERG3_NUDGE_LEFT_V2_KEY = "grun-chapter2-berg3-nudge-left-v2";
+const BERG3_NUDGE_LEFT_PX = 105;
+const BERG3_NUDGE_LEFT_V2_PX = 105;
+const BERG3_NUDGE_LEFT_V3_KEY = "grun-chapter2-berg3-nudge-left-v3";
+const BERG3_NUDGE_LEFT_V3_PX = 300;
+const BERG3_NUDGE_LEFT_V4_KEY = "grun-chapter2-berg3-nudge-left-v4";
+const BERG3_NUDGE_LEFT_V4_PX = 100;
+const BERG3_NUDGE_RIGHT_V5_KEY = "grun-chapter2-berg3-nudge-right-v5";
+const BERG3_NUDGE_RIGHT_V5_PX = 200;
 
-export function readSavedBerg4Layout(
-  fallback: Chapter2BergEditTransform,
-): Chapter2BergEditTransform {
-  if (typeof window === "undefined") return fallback;
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fallback;
-    const berg4 = (JSON.parse(raw) as { berg4?: Partial<Chapter2BergEditTransform> }).berg4;
-    if (!berg4) return fallback;
-    return { ...DEFAULT_CHAPTER2_BERG_EDIT, ...berg4 };
-  } catch {
-    return fallback;
+export function defaultChapter2TunableEdits(): Record<
+  Chapter2TunableId,
+  Chapter2BergEditTransform
+> {
+  const edits = {} as Record<Chapter2TunableId, Chapter2BergEditTransform>;
+  for (const id of CHAPTER2_TUNABLE_IDS) {
+    edits[id] = getChapter2TunableSeed(id);
   }
+  return edits;
 }
 
-export function defaultChapter2BergTunableEdits(): Record<
-  Chapter2BergTunableId,
-  Chapter2BergEditTransform
-> {
-  return {
-    berg4: { ...CHAPTER2_BERG4_LAYOUT_DEFAULT },
-    berg3: { ...DEFAULT_CHAPTER2_BERG_EDIT },
-    berg2: { ...DEFAULT_CHAPTER2_BERG_EDIT },
-  };
-}
+/** @deprecated */
+export const defaultChapter2BergTunableEdits = defaultChapter2TunableEdits;
 
-export function loadChapter2BergTunableEdits(): Record<
-  Chapter2BergTunableId,
+export function loadChapter2TunableEdits(): Record<
+  Chapter2TunableId,
   Chapter2BergEditTransform
 > {
-  if (typeof window === "undefined") return defaultChapter2BergTunableEdits();
+  if (typeof window === "undefined") return defaultChapter2TunableEdits();
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultChapter2BergTunableEdits();
+    if (!raw) return defaultChapter2TunableEdits();
     const parsed = JSON.parse(raw) as Partial<
-      Record<Chapter2BergEditId, Partial<Chapter2BergEditTransform>>
+      Record<Chapter2TunableId | "spore2" | "spore2_0" | "spore2_1" | "spore2_2", Partial<Chapter2BergEditTransform>>
     >;
-    const base = defaultChapter2BergTunableEdits();
-    for (const id of CHAPTER2_BERG_TUNABLE_IDS) {
-      const patch = parsed[id];
-      const seed = id === "berg4" ? CHAPTER2_BERG4_LAYOUT_DEFAULT : DEFAULT_CHAPTER2_BERG_EDIT;
-      base[id] = sanitizeChapter2BergEditTransform(patch, seed);
+    const base = defaultChapter2TunableEdits();
+    for (const id of CHAPTER2_TUNABLE_IDS) {
+      base[id] = sanitizeChapter2BergEditTransform(parsed[id], getChapter2TunableSeed(id));
+    }
+    if (!window.localStorage.getItem(BERG3_NUDGE_LEFT_KEY)) {
+      base.berg3 = sanitizeChapter2BergEditTransform(
+        { ...base.berg3, x: base.berg3.x - BERG3_NUDGE_LEFT_PX },
+        getChapter2TunableSeed("berg3"),
+      );
+      window.localStorage.setItem(BERG3_NUDGE_LEFT_KEY, "1");
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(base, null, 2));
+    }
+    if (!window.localStorage.getItem(BERG3_NUDGE_LEFT_V2_KEY)) {
+      base.berg3 = sanitizeChapter2BergEditTransform(
+        { ...base.berg3, x: base.berg3.x - BERG3_NUDGE_LEFT_V2_PX },
+        getChapter2TunableSeed("berg3"),
+      );
+      window.localStorage.setItem(BERG3_NUDGE_LEFT_V2_KEY, "1");
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(base, null, 2));
+    }
+    if (!window.localStorage.getItem(BERG3_NUDGE_LEFT_V3_KEY)) {
+      base.berg3 = sanitizeChapter2BergEditTransform(
+        { ...base.berg3, x: base.berg3.x - BERG3_NUDGE_LEFT_V3_PX },
+        getChapter2TunableSeed("berg3"),
+      );
+      window.localStorage.setItem(BERG3_NUDGE_LEFT_V3_KEY, "1");
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(base, null, 2));
+    }
+    if (!window.localStorage.getItem(BERG3_NUDGE_LEFT_V4_KEY)) {
+      base.berg3 = sanitizeChapter2BergEditTransform(
+        { ...base.berg3, x: base.berg3.x - BERG3_NUDGE_LEFT_V4_PX },
+        getChapter2TunableSeed("berg3"),
+      );
+      window.localStorage.setItem(BERG3_NUDGE_LEFT_V4_KEY, "1");
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(base, null, 2));
+    }
+    if (!window.localStorage.getItem(BERG3_NUDGE_RIGHT_V5_KEY)) {
+      base.berg3 = sanitizeChapter2BergEditTransform(
+        { ...base.berg3, x: base.berg3.x + BERG3_NUDGE_RIGHT_V5_PX },
+        getChapter2TunableSeed("berg3"),
+      );
+      window.localStorage.setItem(BERG3_NUDGE_RIGHT_V5_KEY, "1");
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(base, null, 2));
     }
     return base;
   } catch {
-    return defaultChapter2BergTunableEdits();
+    return defaultChapter2TunableEdits();
   }
 }
 
-export function saveChapter2BergTunableEdits(
-  edits: Record<Chapter2BergTunableId, Chapter2BergEditTransform>,
+/** @deprecated */
+export const loadChapter2BergTunableEdits = loadChapter2TunableEdits;
+
+export function saveChapter2TunableEdits(
+  edits: Record<Chapter2TunableId, Chapter2BergEditTransform>,
 ) {
   if (typeof window === "undefined") return;
-  const clean = defaultChapter2BergTunableEdits();
-  for (const id of CHAPTER2_BERG_TUNABLE_IDS) {
-    const seed = id === "berg4" ? CHAPTER2_BERG4_LAYOUT_DEFAULT : DEFAULT_CHAPTER2_BERG_EDIT;
-    clean[id] = sanitizeChapter2BergEditTransform(edits[id], seed);
+  const clean = defaultChapter2TunableEdits();
+  for (const id of CHAPTER2_TUNABLE_IDS) {
+    clean[id] = sanitizeChapter2BergEditTransform(edits[id], getChapter2TunableSeed(id));
   }
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clean, null, 2));
 }
 
 /** @deprecated */
-export function defaultChapter2BergEdits(): Record<Chapter2BergEditId, Chapter2BergEditTransform> {
-  return { ...defaultChapter2BergTunableEdits() };
-}
+export const saveChapter2BergTunableEdits = saveChapter2TunableEdits;
 
-/** @deprecated */
-export function loadChapter2BergEdits(): Record<Chapter2BergEditId, Chapter2BergEditTransform> {
-  return { ...loadChapter2BergTunableEdits() };
-}
-
-/** @deprecated */
-export function saveChapter2BergEdits(edits: Record<Chapter2BergEditId, Chapter2BergEditTransform>) {
-  saveChapter2BergTunableEdits({
-    berg4: edits.berg4,
-    berg3: edits.berg3,
-    berg2: edits.berg2,
-  });
-}
-
-export function formatChapter2BergEditsForConfig(
-  edits: Record<Chapter2BergEditId, Chapter2BergEditTransform>,
+export function formatChapter2SceneLayout(
+  edits: Record<Chapter2TunableId, Chapter2BergEditTransform>,
 ) {
   return JSON.stringify(edits, null, 2);
 }
 
-export type Chapter2BergEditorState = {
-  enabled: boolean;
-  selectedId: Chapter2BergTunableId | null;
-  mode: EditorMode;
-};
-
-export const DEV_CHAPTER2_BERG_EDITOR =
-  process.env.NODE_ENV === "development" &&
-  process.env.NEXT_PUBLIC_DEV_CHAPTER2_EDIT !== "0";
+/** @deprecated */
+export function formatChapter2BergEditsForConfig(
+  edits: Record<Chapter2BergEditId, Chapter2BergEditTransform>,
+) {
+  return formatChapter2SceneLayout(edits);
+}

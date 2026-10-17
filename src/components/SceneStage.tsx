@@ -117,18 +117,29 @@ export default function SceneStage() {
   const [chapter2Step, setChapter2Step] = useState<Chapter2Step | null>(
     DEV_START_CHAPTER2 ? "play" : null,
   );
+  const [chapter2PlayReady, setChapter2PlayReady] = useState(false);
   const chapterRef = useRef<Chapter>(DEV_START_CHAPTER2 ? 2 : 1);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
 
   useEffect(() => {
-    if (DEV_START_CHAPTER2) preloadChapter2BergAssets();
-  }, []);
+    if (chapter !== 2 || chapter2Step !== "play") {
+      setChapter2PlayReady(false);
+      return;
+    }
+    let cancelled = false;
+    void preloadChapter2BergAssets().then(() => {
+      if (!cancelled) setChapter2PlayReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chapter, chapter2Step]);
 
   const handlePageTurn = useCallback(() => {
     chapterRef.current = 2;
     setChapter(2);
     setChapter2Step("intro");
-    preloadChapter2BergAssets();
+    void preloadChapter2BergAssets();
     stateRef.current.targetWorldX = null;
     setTargetWorldX(null);
   }, []);
@@ -635,7 +646,7 @@ export default function SceneStage() {
     {showChapter1Tableau && tableauRevealed && (
       <PageTurnButton onTurn={handlePageTurn} />
     )}
-    {chapter === 2 && chapter2Step === "play" && <Chapter2Scene />}
+    {chapter === 2 && chapter2Step === "play" && chapter2PlayReady && <Chapter2Scene />}
     {chapter === 2 && chapter2Step === "intro" && (
       <Chapter2Intro onComplete={handleChapter2IntroComplete} />
     )}

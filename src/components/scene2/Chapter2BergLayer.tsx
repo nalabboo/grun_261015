@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { SCENE_REFERENCE_HEIGHT } from "@/constants/sceneConfig";
 import {
+  CHAPTER2_SKIP_BERG_BAKE,
   chapter2LayerAssetUrl,
+  getChapter2BergViewportBlurPx,
   type Chapter2BergLayerConfig,
 } from "@/constants/chapter2Config";
 import {
@@ -16,6 +18,13 @@ import { PAPER_GRAIN_TILE_PX } from "@/lib/paperGrain";
 
 const PAPER_TILE_DISPLAY_PX = PAPER_GRAIN_TILE_PX * 0.75;
 const MAX_BAKE_TEXTURE_PX = 4096;
+
+/** Stagger bakes so the main thread can paint raw PNGs first (berg4 → berg3 → berg2). */
+const BAKE_STAGGER_MS: Record<string, number> = {
+  berg4: 80,
+  berg3: 520,
+  berg2: 960,
+};
 
 const bakedSrcCache = new Map<string, string>();
 
@@ -39,8 +48,19 @@ function canvasToObjectUrl(canvas: HTMLCanvasElement): Promise<string> {
   });
 }
 
+function scheduleIdleWork(work: () => void, delayMs: number) {
+  window.setTimeout(() => {
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(work, { timeout: 4000 });
+    } else {
+      window.requestAnimationFrame(work);
+    }
+  }, delayMs);
+}
+
 type Props = {
   layer: Chapter2BergLayerConfig;
+  viewportHeight: number;
   shiftX: number;
   shiftY: number;
   scale: number;
@@ -55,6 +75,7 @@ type Props = {
 /** One chapter-2 berg plane: CPU-baked blur/grain/relief like scene 1 WebGL bergs. */
 export default function Chapter2BergLayer({
   layer,
+  viewportHeight,
   shiftX,
   shiftY,
   scale,
@@ -70,6 +91,11 @@ export default function Chapter2BergLayer({
   const cacheKey = `${layer.id}|${layerAssetUrl}`;
 
   useEffect(() => {
+    if (CHAPTER2_SKIP_BERG_BAKE) {
+      setSrc(layerAssetUrl);
+      return;
+    }
+
     const cached = bakedSrcCache.get(cacheKey);
     if (cached) {
       setSrc(cached);
@@ -81,7 +107,7 @@ export default function Chapter2BergLayer({
     const image = new Image();
     image.decoding = "async";
 
-    image.onload = () => {
+    const runBake = () => {
       if (cancelled) return;
 
       const blurCanvasPx =
@@ -117,6 +143,11 @@ export default function Chapter2BergLayer({
       })();
     };
 
+    image.onload = () => {
+      if (cancelled) return;
+      scheduleIdleWork(runBake, BAKE_STAGGER_MS[layer.id] ?? 200);
+    };
+
     image.onerror = () => {
       if (!cancelled) setSrc(layerAssetUrl);
     };
@@ -149,6 +180,16 @@ export default function Chapter2BergLayer({
     .filter(Boolean)
     .join(" ");
 
+  const textureIsBaked = src.startsWith("blob:");
+  const cssBlurPx =
+    CHAPTER2_SKIP_BERG_BAKE || !textureIsBaked
+      ? getChapter2BergViewportBlurPx(viewportHeight, layer.blurRatio)
+      : 0;
+  const filterParts = [`brightness(${layer.brightness})`];
+  if (cssBlurPx >= 0.4) {
+    filterParts.push(`blur(${cssBlurPx.toFixed(2)}px)`);
+  }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -156,6 +197,7 @@ export default function Chapter2BergLayer({
       alt=""
       draggable={false}
       className={className}
+      decoding="async"
       style={{
         top: anchoredTop,
         zIndex: isSelected ? 40 : layer.depth,
@@ -169,7 +211,7 @@ export default function Chapter2BergLayer({
             : null),
         ["--berg-aspect" as string]: String(aspect),
         objectPosition: layer.objectPosition ?? "center center",
-        filter: `brightness(${layer.brightness})`,
+        filter: filterParts.join(" "),
         transformOrigin: layer.transformOrigin ?? "center center",
         transform: `translate(calc(-50% + ${shiftX + edit.x}px), ${anchoredTranslateY}) scale(${scale * edit.scale}, ${scale * scaleY * edit.scaleY}) rotate(${edit.rotate}deg)`,
       }}

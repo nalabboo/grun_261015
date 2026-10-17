@@ -8,11 +8,10 @@ import {
   CHAPTER2_BERG4_LAYOUT_DEFAULT,
   type Chapter2BergEditTransform,
 } from "@/constants/chapter2Layout";
-
 export const CHAPTER2_ID = "scene2";
 
 /** Bump when `public/scene2/` berg PNGs change (cache bust). */
-export const CHAPTER2_ASSET_VERSION = "20261017-scene2-bg-berg-b";
+export const CHAPTER2_ASSET_VERSION = "20261018-scene2-bg-berg-1600";
 
 /** Base fit scale (contain + parallax headroom). Transform depth is normalized on top. */
 export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
@@ -23,6 +22,19 @@ export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
  */
 export const CHAPTER2_DEPTH_SIZE_STRENGTH = 0.28;
 
+/** Multiplier on scene-1 depth blur (display / CSS path). */
+export const CHAPTER2_DOF_BLUR_STRENGTH = 1;
+
+/** Viewport blur px from layer `blurRatio` (ratio × ref height, same as scene 1). */
+export function getChapter2BergViewportBlurPx(
+  viewportHeight: number,
+  blurRatio: number,
+  strength = CHAPTER2_DOF_BLUR_STRENGTH,
+) {
+  if (blurRatio <= 0 || viewportHeight <= 0) return 0;
+  return blurRatio * viewportHeight * strength;
+}
+
 /**
  * Production berg4 layout. Tune in dev (Ch2 berg edit), then paste into
  * `CHAPTER2_BERG4_LAYOUT_DEFAULT` in chapter2Layout.ts.
@@ -30,14 +42,18 @@ export const CHAPTER2_DEPTH_SIZE_STRENGTH = 0.28;
 export const CHAPTER2_BERG4_FIXED_LAYOUT = CHAPTER2_BERG4_LAYOUT_DEFAULT;
 
 export function chapter2AssetUrl(file: string) {
-  return `/${CHAPTER2_ID}/${file}?v=${CHAPTER2_ASSET_VERSION}`;
+  const path = file.split("/").map(encodeURIComponent).join("/");
+  return `/${CHAPTER2_ID}/${path}?v=${CHAPTER2_ASSET_VERSION}`;
 }
 
-/** Chapter 2 background berg PNGs under `public/scene2/background/`. */
+/** Chapter 2 background berg PNGs under `public/scene2/background/` (1600×300). */
 const CH2_BG_BERG = {
-  width: 5760,
-  height: 1080,
+  width: 1600,
+  height: 300,
 } as const;
+
+/** Keeps CPU bake blur strength aligned with the previous 1080px-tall berg exports. */
+const CH2_BERG_BAKE_HEIGHT_RATIO = CH2_BG_BERG.height / 1080;
 
 /** Depth planes aligned with scene 1 berg4 → berg2 (farthest to nearest). */
 const CH2_BERG4_DEPTH_PX = -260;
@@ -93,7 +109,7 @@ export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
     paper: SCENE_LAYERS.berg4.paper ?? 0.07,
     relief: SCENE_LAYERS.berg4.relief ?? 0.22,
     layerScale: 1,
-    heightRatio: 1,
+    heightRatio: CH2_BERG_BAKE_HEIGHT_RATIO,
   },
   {
     id: "berg3",
@@ -110,7 +126,7 @@ export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
     paper: SCENE_LAYERS.berg3.paper ?? 0.09,
     relief: SCENE_LAYERS.berg3.relief ?? 0.28,
     layerScale: 0.98,
-    heightRatio: 1,
+    heightRatio: CH2_BERG_BAKE_HEIGHT_RATIO,
   },
   {
     id: "berg2",
@@ -125,7 +141,7 @@ export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
     paper: SCENE_LAYERS.berg2.paper ?? 0.11,
     relief: SCENE_LAYERS.berg2.relief ?? 0.32,
     layerScale: 1,
-    heightRatio: 1,
+    heightRatio: CH2_BERG_BAKE_HEIGHT_RATIO,
   },
 ] as const;
 
@@ -133,9 +149,27 @@ export function chapter2LayerAssetUrl(layer: Chapter2BergLayerConfig) {
   return chapter2AssetUrl(layer.file);
 }
 
-export function preloadChapter2BergAssets() {
-  for (const layer of CHAPTER2_BERG_LAYERS) {
+function loadImage(src: string): Promise<void> {
+  return new Promise((resolve) => {
     const image = new Image();
-    image.src = chapter2LayerAssetUrl(layer);
-  }
+    image.decoding = "async";
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+    image.src = src;
+  });
 }
+
+/** Waits until berg + prop PNGs are in the browser cache (decode may still run later). */
+export function preloadChapter2BergAssets(): Promise<void> {
+  const urls = [
+    ...CHAPTER2_BERG_LAYERS.map((layer) => chapter2LayerAssetUrl(layer)),
+    chapter2AssetUrl("grun objekt/spore2.png"),
+    chapter2AssetUrl("grun objekt/spore3.png"),
+  ];
+  return Promise.all(urls.map((src) => loadImage(src))).then(() => undefined);
+}
+
+/** Dev: skip CPU blur/grain bake and use raw PNGs (much faster first paint). */
+export const CHAPTER2_SKIP_BERG_BAKE =
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_CHAPTER2_RAW_BERG !== "0";
