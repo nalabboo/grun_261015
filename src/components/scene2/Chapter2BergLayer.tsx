@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SCENE_REFERENCE_HEIGHT } from "@/constants/sceneConfig";
 import {
   CHAPTER2_SKIP_BERG_BAKE,
+  chapter2AssetUrl,
   chapter2LayerAssetUrl,
   getChapter2BergViewportBlurPx,
   type Chapter2BergLayerConfig,
@@ -58,37 +59,10 @@ function scheduleIdleWork(work: () => void, delayMs: number) {
   }, delayMs);
 }
 
-type Props = {
-  layer: Chapter2BergLayerConfig;
-  viewportHeight: number;
-  shiftX: number;
-  shiftY: number;
-  scale: number;
-  edit?: Chapter2BergEditTransform;
-  editorActive?: boolean;
-  isSelected?: boolean;
-  editMode?: EditorMode;
-  onSelect?: () => void;
-  onDragStart?: (clientX: number, clientY: number) => void;
-};
-
-/** One chapter-2 berg plane: CPU-baked blur/grain/relief like scene 1 WebGL bergs. */
-export default function Chapter2BergLayer({
-  layer,
-  viewportHeight,
-  shiftX,
-  shiftY,
-  scale,
-  edit = DEFAULT_CHAPTER2_BERG_EDIT,
-  editorActive = false,
-  isSelected = false,
-  editMode = "translate",
-  onSelect,
-  onDragStart,
-}: Props) {
-  const layerAssetUrl = chapter2LayerAssetUrl(layer);
+function useBakedBergSrc(layer: Chapter2BergLayerConfig, file: string) {
+  const layerAssetUrl = chapter2AssetUrl(file);
   const [src, setSrc] = useState(layerAssetUrl);
-  const cacheKey = `${layer.id}|${layerAssetUrl}`;
+  const cacheKey = `${layer.id}|${file}`;
 
   useEffect(() => {
     if (CHAPTER2_SKIP_BERG_BAKE) {
@@ -159,17 +133,58 @@ export default function Chapter2BergLayer({
         revokeBakedSrc(objectUrlToRevoke);
       }
     };
-  }, [cacheKey, layer, layerAssetUrl]);
+  }, [cacheKey, file, layer, layerAssetUrl]);
+
+  return { src, layerAssetUrl };
+}
+
+type Props = {
+  layer: Chapter2BergLayerConfig;
+  viewportHeight: number;
+  shiftX: number;
+  shiftY: number;
+  /** Scroll-driven Y offset (px), added to layout shift. */
+  scrollYOffset?: number;
+  /** 0 = scene 2-1 texture, 1 = scrollAltFile (scene 2-2). */
+  scrollBlend?: number;
+  scale: number;
+  edit?: Chapter2BergEditTransform;
+  editorActive?: boolean;
+  isSelected?: boolean;
+  editMode?: EditorMode;
+  onSelect?: () => void;
+  onDragStart?: (clientX: number, clientY: number) => void;
+};
+
+/** One chapter-2 berg plane: CPU-baked blur/grain/relief like scene 1 WebGL bergs. */
+export default function Chapter2BergLayer({
+  layer,
+  viewportHeight,
+  shiftX,
+  shiftY,
+  scrollYOffset = 0,
+  scrollBlend = 0,
+  scale,
+  edit = DEFAULT_CHAPTER2_BERG_EDIT,
+  editorActive = false,
+  isSelected = false,
+  editMode = "translate",
+  onSelect,
+  onDragStart,
+}: Props) {
+  const base = useBakedBergSrc(layer, layer.file);
+  const alt = useBakedBergSrc(layer, layer.scrollAltFile ?? layer.file);
 
   const aspect = layer.width / layer.height;
   const scaleY = layer.scaleY ?? 1;
 
   const anchor = layer.anchor ?? "center";
   const anchoredTop = anchor === "bottom" ? "100%" : "50%";
+  const translateY = shiftY + edit.y + scrollYOffset;
   const anchoredTranslateY =
     anchor === "bottom"
-      ? `calc(-100% + ${shiftY + edit.y}px)`
-      : `calc(-50% + ${shiftY + edit.y}px)`;
+      ? `calc(-100% + ${translateY}px)`
+      : `calc(-50% + ${translateY}px)`;
 
   const className = [
     "chapter2-berg",
@@ -180,52 +195,82 @@ export default function Chapter2BergLayer({
     .filter(Boolean)
     .join(" ");
 
-  const textureIsBaked = src.startsWith("blob:");
-  const cssBlurPx =
-    CHAPTER2_SKIP_BERG_BAKE || !textureIsBaked
-      ? getChapter2BergViewportBlurPx(viewportHeight, layer.blurRatio)
-      : 0;
-  const filterParts = [`brightness(${layer.brightness})`];
-  if (cssBlurPx >= 0.4) {
-    filterParts.push(`blur(${cssBlurPx.toFixed(2)}px)`);
-  }
+  const blend = layer.scrollAltFile
+    ? Math.min(1, Math.max(0, scrollBlend))
+    : 0;
+  const baseOpacity = 1 - blend;
+  const altOpacity = blend;
+
+  const renderImage = (
+    key: string,
+    src: string,
+    fallbackUrl: string,
+    opacity: number,
+    capturePointer: boolean,
+  ) => {
+    const textureIsBaked = src.startsWith("blob:");
+    const cssBlurPx =
+      CHAPTER2_SKIP_BERG_BAKE || !textureIsBaked
+        ? getChapter2BergViewportBlurPx(viewportHeight, layer.blurRatio)
+        : 0;
+    const filterParts = [`brightness(${layer.brightness})`];
+    if (cssBlurPx >= 0.4) {
+      filterParts.push(`blur(${cssBlurPx.toFixed(2)}px)`);
+    }
+
+    if (opacity <= 0.001) return null;
+
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        key={key}
+        src={src}
+        alt=""
+        draggable={false}
+        className={className}
+        decoding="async"
+        style={{
+          top: anchoredTop,
+          zIndex: isSelected ? 40 : layer.depth,
+          pointerEvents: editorActive && capturePointer ? "auto" : "none",
+          ...(editorActive && isSelected && capturePointer
+            ? {
+                cursor: editMode === "translate" ? "grab" : "ns-resize",
+              }
+            : editorActive && capturePointer
+              ? { cursor: "pointer" }
+              : null),
+          ["--berg-aspect" as string]: String(aspect),
+          objectPosition: layer.objectPosition ?? "center center",
+          filter: filterParts.join(" "),
+          transformOrigin: layer.transformOrigin ?? "center center",
+          transform: `translate(calc(-50% + ${shiftX + edit.x}px), ${anchoredTranslateY}) scale(${scale * edit.scale}, ${scale * scaleY * edit.scaleY}) rotate(${edit.rotate}deg)`,
+          opacity,
+        }}
+        onError={() => {
+          if (src !== fallbackUrl) {
+            /* raw fallback handled by hook on next load */
+          }
+        }}
+        onPointerDown={(event) => {
+          if (!editorActive || !capturePointer) return;
+          event.preventDefault();
+          event.stopPropagation();
+          onSelect?.();
+          onDragStart?.(event.clientX, event.clientY);
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+      />
+    );
+  };
+
+  const pointerOnAlt = blend >= 0.5;
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      draggable={false}
-      className={className}
-      decoding="async"
-      style={{
-        top: anchoredTop,
-        zIndex: isSelected ? 40 : layer.depth,
-        pointerEvents: editorActive ? "auto" : "none",
-        ...(editorActive && isSelected
-          ? {
-              cursor: editMode === "translate" ? "grab" : "ns-resize",
-            }
-          : editorActive
-            ? { cursor: "pointer" }
-            : null),
-        ["--berg-aspect" as string]: String(aspect),
-        objectPosition: layer.objectPosition ?? "center center",
-        filter: filterParts.join(" "),
-        transformOrigin: layer.transformOrigin ?? "center center",
-        transform: `translate(calc(-50% + ${shiftX + edit.x}px), ${anchoredTranslateY}) scale(${scale * edit.scale}, ${scale * scaleY * edit.scaleY}) rotate(${edit.rotate}deg)`,
-      }}
-      onError={() => {
-        if (src !== layerAssetUrl) setSrc(layerAssetUrl);
-      }}
-      onPointerDown={(event) => {
-        if (!editorActive) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onSelect?.();
-        onDragStart?.(event.clientX, event.clientY);
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-    />
+    <>
+      {renderImage("base", base.src, base.layerAssetUrl, baseOpacity, !pointerOnAlt)}
+      {layer.scrollAltFile &&
+        renderImage("alt", alt.src, alt.layerAssetUrl, altOpacity, pointerOnAlt)}
+    </>
   );
 }

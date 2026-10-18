@@ -8,11 +8,24 @@ import {
   CHAPTER2_BERG_LAYERS,
   CHAPTER2_BERG4_FIXED_LAYOUT,
   CHAPTER2_DEPTH_SIZE_STRENGTH,
+  CHAPTER2_SCROLL_BERG3_Y,
+  CHAPTER2_SCROLL_BERG4_Y,
+  CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN,
+  CHAPTER2_PAPIER_BG_URL,
 } from "@/constants/chapter2Config";
+import {
+  CHAPTER2_SUBSCENE_SCROLL_MAX,
+  getChapter2PropScrollOpacity,
+  getChapter2PropScrollScaleMultiplier,
+  getChapter2ScrollSegments,
+} from "@/constants/chapter2ScrollMotion";
 import Chapter2BergLayer from "@/components/scene2/Chapter2BergLayer";
 import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2PropEditorPanel from "@/components/scene2/Chapter2PropEditorPanel";
 import Chapter2FloatingMarimos from "@/components/scene2/Chapter2FloatingMarimos";
+import Chapter2FloatingNabis from "@/components/scene2/Chapter2FloatingNabis";
+import Chapter2VogelFlyby from "@/components/scene2/Chapter2VogelFlyby";
+import { CHAPTER2_VOGEL } from "@/constants/chapter2VogelConfig";
 import {
   CHAPTER2_PROPS,
   CHAPTER2_TUNABLE_PROP_IDS,
@@ -43,6 +56,7 @@ import {
 type Point = { x: number; y: number };
 
 const SMOOTH = 0.07;
+const SCROLL_SMOOTH = 0.09;
 
 type PropDragState = {
   id: Chapter2TunablePropId;
@@ -59,12 +73,13 @@ function getChapter2DepthFactor(viewportHeight: number, depthRatio: number) {
   return 1 + (full - 1) * CHAPTER2_DEPTH_SIZE_STRENGTH;
 }
 
-/** Chapter 2 — stacked berg layers with mouse-driven synesthesia parallax. */
+/** Chapter 2 — stacked berg layers with mouse parallax. */
 export default function Chapter2Scene() {
   const targetRef = useRef<Point>({ x: 0, y: 0 });
   const smoothRef = useRef<Point>({ x: 0, y: 0 });
-  const velocityRef = useRef(0);
   const propDragRef = useRef<PropDragState | null>(null);
+  const scrollTargetRef = useRef(0);
+  const scrollSmoothRef = useRef(0);
   const [frame, setFrame] = useState(0);
 
   const [editor, setEditor] = useState<Chapter2PropEditorState>({
@@ -120,16 +135,31 @@ export default function Chapter2Scene() {
   }, [editor.enabled]);
 
   useEffect(() => {
+    const onWheel = (event: WheelEvent) => {
+      if (editor.enabled) return;
+      event.preventDefault();
+      const next =
+        scrollTargetRef.current + event.deltaY * CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN;
+      scrollTargetRef.current = Math.min(
+        CHAPTER2_SUBSCENE_SCROLL_MAX,
+        Math.max(0, next),
+      );
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, [editor.enabled]);
+
+  useEffect(() => {
     let raf = 0;
     const tick = () => {
       const target = targetRef.current;
       const smooth = smoothRef.current;
-      const prevX = smooth.x;
-      const prevY = smooth.y;
-
       smooth.x += (target.x - smooth.x) * SMOOTH;
       smooth.y += (target.y - smooth.y) * SMOOTH;
-      velocityRef.current = Math.hypot(smooth.x - prevX, smooth.y - prevY);
+
+      scrollSmoothRef.current +=
+        (scrollTargetRef.current - scrollSmoothRef.current) * SCROLL_SMOOTH;
 
       setFrame((f) => f + 1);
       raf = requestAnimationFrame(tick);
@@ -189,11 +219,14 @@ export default function Chapter2Scene() {
   );
 
   const smooth = smoothRef.current;
-  const velocity = velocityRef.current;
+  const scrollAmount = scrollSmoothRef.current;
+  const scrollSegments = getChapter2ScrollSegments(scrollAmount);
   void frame;
 
-  const hue = smooth.x * 14 + smooth.y * 10 + velocity * 120;
-  const saturate = 1 + Math.min(0.35, velocity * 8 + Math.hypot(smooth.x, smooth.y) * 0.12);
+  const berg4ScrollY = scrollSegments.berg * CHAPTER2_SCROLL_BERG4_Y;
+  const berg3ScrollY = scrollSegments.berg * CHAPTER2_SCROLL_BERG3_Y;
+  const bergScrollBlend = scrollSegments.berg;
+
   const breathe = 1 + Math.hypot(smooth.x, smooth.y) * 0.012;
   const motion = Math.hypot(smooth.x, smooth.y);
   const parallaxBreathe = breathe + motion * 0.004;
@@ -227,6 +260,14 @@ export default function Chapter2Scene() {
     const shiftY = attached ? bergMotion.shiftY : smooth.y * prop.parallax * 0.65;
     const bergScale = attached ? bergMotion.bergScale : 1;
     const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultEdit(prop.id);
+    const scrollScaleMul = getChapter2PropScrollScaleMultiplier(
+      prop,
+      layout,
+      viewportHeight,
+      bergScale,
+      scrollSegments,
+    );
+    const scrollOpacity = getChapter2PropScrollOpacity(prop, scrollSegments);
     const tunable = isChapter2PropTunable(prop.id);
     const isSelected = tunable && editor.selectedId === prop.id;
     return (
@@ -237,6 +278,8 @@ export default function Chapter2Scene() {
         shiftX={shiftX}
         shiftY={shiftY}
         bergScale={bergScale}
+        scrollScaleMul={scrollScaleMul}
+        scrollOpacity={scrollOpacity}
         layout={layout}
         editorActive={editor.enabled && tunable}
         isSelected={isSelected}
@@ -257,10 +300,18 @@ export default function Chapter2Scene() {
     <div
       className={`chapter2-scene chapter2-scene--visible${editor.enabled ? " chapter2-scene--editing" : ""}`}
       style={{
-        filter: `hue-rotate(${hue}deg) saturate(${saturate})`,
         ["--berg-scale" as string]: String(CHAPTER2_BERG_DISPLAY_SCALE),
       }}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={CHAPTER2_PAPIER_BG_URL}
+        alt=""
+        draggable={false}
+        decoding="async"
+        className="chapter2-papier-bg"
+      />
+
       {berg4Layer && (() => {
         const berg4Edit = devEditsReady
           ? tunableEdits.berg4
@@ -274,6 +325,8 @@ export default function Chapter2Scene() {
             viewportHeight={viewportHeight}
             shiftX={berg4ShiftX}
             shiftY={berg4ShiftY}
+            scrollYOffset={berg4ScrollY}
+            scrollBlend={bergScrollBlend}
             scale={1}
             edit={berg4Edit}
           />
@@ -292,6 +345,14 @@ export default function Chapter2Scene() {
           : DEFAULT_CHAPTER2_BERG_EDIT;
         return (
           <Fragment key={layer.id}>
+            {layer.id === "berg2" && (
+              <Chapter2VogelFlyby
+                viewportHeight={viewportHeight}
+                shiftX={smooth.x * CHAPTER2_VOGEL.parallax}
+                shiftY={smooth.y * CHAPTER2_VOGEL.parallax * 0.65}
+                nariProgress={scrollSegments.nari}
+              />
+            )}
             {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
             {layer.id === "berg2" && midBerg2Props.map((prop) => renderPropLayer(prop))}
             <Chapter2BergLayer
@@ -299,6 +360,8 @@ export default function Chapter2Scene() {
               viewportHeight={viewportHeight}
               shiftX={shiftX}
               shiftY={shiftY}
+              scrollYOffset={layer.id === "berg3" ? berg3ScrollY : 0}
+              scrollBlend={layer.id === "berg3" ? bergScrollBlend : 0}
               scale={scale}
               edit={edit}
             />
@@ -315,16 +378,10 @@ export default function Chapter2Scene() {
         );
       })}
 
-      <Chapter2FloatingMarimos />
+      <Chapter2FloatingMarimos sporeProgress={scrollSegments.spore} />
 
-      <div
-        className="chapter2-synesthesia-veil"
-        style={{
-          opacity: 0.08 + Math.min(0.22, velocity * 6),
-          background: `radial-gradient(circle at ${50 + smooth.x * 22}% ${50 + smooth.y * 18}%, rgba(120,220,160,0.45), transparent 62%)`,
-          pointerEvents: "none",
-        }}
-      />
+      <Chapter2FloatingNabis sporeProgress={scrollSegments.spore} />
+
       {DEV_CHAPTER2_PROP_EDITOR && (
         <Chapter2PropEditorPanel
           editor={editor}

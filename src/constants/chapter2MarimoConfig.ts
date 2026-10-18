@@ -26,7 +26,46 @@ export type Chapter2MarimoInstance = {
   /** 0–1 display opacity (seed-random per instance). */
   opacity: number;
   zIndex: number;
+  /** Drift off-screen during spore / nabi segment (3 marimos). */
+  sporeExit?: {
+    delay: number;
+    span: number;
+    exitAngleRad: number;
+  };
 };
+
+export const CHAPTER2_MARIMO_SPORE_EXIT_IDS = new Set([
+  "marimo_0",
+  "marimo_3",
+  "marimo_5",
+]);
+
+function clamp01(value: number) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function easeInOutSine(t: number) {
+  return -(Math.cos(Math.PI * t) - 1) / 2;
+}
+
+export function getChapter2MarimoSporeExitProgress(
+  spec: Chapter2MarimoInstance,
+  sporeProgress: number,
+) {
+  if (!spec.sporeExit || sporeProgress <= 0) return 0;
+  const { delay, span } = spec.sporeExit;
+  if (sporeProgress <= delay) return 0;
+  return clamp01((sporeProgress - delay) / Math.max(0.12, span));
+}
+
+export function getChapter2MarimoSporeExitOpacity(
+  spec: Chapter2MarimoInstance,
+  sporeProgress: number,
+) {
+  const exit = getChapter2MarimoSporeExitProgress(spec, sporeProgress);
+  if (exit <= 0) return 1;
+  return 1 - easeInOutSine(exit);
+}
 
 function seededRandom(seed: number) {
   let state = seed >>> 0;
@@ -53,8 +92,18 @@ function buildMarimoInstances(): Chapter2MarimoInstance[] {
     const spinDegPerSec = (rand() > 0.5 ? 1 : -1) * (4 + rand() * 12);
     const opacity = 0.38 + rand() * 0.52;
 
+    const id = `marimo_${index}`;
+    const exitAngleRad = Math.atan2(yNorm - 0.5, xNorm - 0.5);
+    const sporeExit = CHAPTER2_MARIMO_SPORE_EXIT_IDS.has(id)
+      ? {
+          delay: 0.04 + (index % 3) * 0.07,
+          span: 0.58,
+          exitAngleRad,
+        }
+      : undefined;
+
     return {
-      id: `marimo_${index}`,
+      id,
       src: chapter2AssetUrl(asset.file),
       width: asset.width,
       height: asset.height,
@@ -67,6 +116,7 @@ function buildMarimoInstances(): Chapter2MarimoInstance[] {
       blurRatio,
       opacity,
       zIndex: 5 + (index % 3),
+      sporeExit,
     };
   });
 }

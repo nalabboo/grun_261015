@@ -328,6 +328,19 @@ body {
   cursor: default;
 }
 
+.chapter2-papier-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .chapter2-berg--floor {
   z-index: 0;
 }
@@ -375,12 +388,52 @@ body {
   -webkit-user-drag: none;
 }
 
+.chapter2-vogel-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.chapter2-vogel {
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center center;
+}
+
 .chapter2-marimo-layer {
   position: absolute;
   inset: 0;
   z-index: 6;
   pointer-events: none;
   overflow: hidden;
+}
+
+.chapter2-nabi-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.chapter2-nabi-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.chapter2-nabi {
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center center;
 }
 
 .chapter2-marimo-anchor {

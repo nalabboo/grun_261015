@@ -5,8 +5,14 @@ import { getChapter2BergViewportBlurPx } from "@/constants/chapter2Config";
 import { SCENE_REFERENCE_HEIGHT } from "@/constants/sceneConfig";
 import {
   CHAPTER2_MARIMO_INSTANCES,
+  getChapter2MarimoSporeExitOpacity,
+  getChapter2MarimoSporeExitProgress,
   type Chapter2MarimoInstance,
 } from "@/constants/chapter2MarimoConfig";
+
+type Props = {
+  sporeProgress: number;
+};
 
 type SimBody = {
   x: number;
@@ -17,6 +23,7 @@ type SimBody = {
   spin: number;
   halfW: number;
   halfH: number;
+  retired: boolean;
 };
 
 function createSimBodies(
@@ -39,12 +46,17 @@ function createSimBodies(
       spin: spec.spinDegPerSec,
       halfW,
       halfH,
+      retired: false,
     };
   });
 }
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
 }
 
 function bounce(body: SimBody, width: number, height: number) {
@@ -72,11 +84,24 @@ function bounce(body: SimBody, width: number, height: number) {
   }
 }
 
-export default function Chapter2FloatingMarimos() {
+function isOffScreen(body: SimBody, width: number, height: number) {
+  const pad = Math.max(body.halfW, body.halfH) * 1.2;
+  return (
+    body.x < -pad ||
+    body.x > width + pad ||
+    body.y < -pad ||
+    body.y > height + pad
+  );
+}
+
+export default function Chapter2FloatingMarimos({ sporeProgress }: Props) {
   const anchorRefs = useRef<(HTMLDivElement | null)[]>([]);
   const simRef = useRef<SimBody[] | null>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
+  const sporeRef = useRef(sporeProgress);
   const [viewportHeight, setViewportHeight] = useState(SCENE_REFERENCE_HEIGHT);
+
+  sporeRef.current = sporeProgress;
 
   useEffect(() => {
     const syncSize = () => {
@@ -97,22 +122,76 @@ export default function Chapter2FloatingMarimos() {
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
       const { width, height } = sizeRef.current;
+      const spore = sporeRef.current;
       const sim = simRef.current;
+      const scale = Math.max(0.75, Math.min(1.35, height / 1080));
+
       if (sim && width > 0 && height > 0) {
+        if (spore <= 0.001) {
+          for (let i = 0; i < sim.length; i++) {
+            const body = sim[i];
+            if (!body.retired) continue;
+            const spec = CHAPTER2_MARIMO_INSTANCES[i];
+            body.retired = false;
+            body.halfH = (spec.heightVh * height) / 2;
+            body.halfW = (body.halfH * spec.width) / spec.height;
+            body.x = clamp(spec.xNorm * width, body.halfW, width - body.halfW);
+            body.y = clamp(spec.yNorm * height, body.halfH, height - body.halfH);
+            const scaleReset = Math.max(0.75, Math.min(1.35, height / 1080));
+            body.vx = spec.vx * scaleReset;
+            body.vy = spec.vy * scaleReset;
+            body.rot = 0;
+            body.spin = spec.spinDegPerSec;
+            const el = anchorRefs.current[i];
+            if (el) {
+              el.style.visibility = "visible";
+              el.style.opacity = String(spec.opacity);
+            }
+          }
+        }
+
         for (let i = 0; i < sim.length; i++) {
           const body = sim[i];
           const spec = CHAPTER2_MARIMO_INSTANCES[i];
+          if (body.retired) continue;
+
           body.halfH = (spec.heightVh * height) / 2;
           body.halfW = (body.halfH * spec.width) / spec.height;
+
+          const exitProgress = getChapter2MarimoSporeExitProgress(spec, spore);
+          const exitOpacity = getChapter2MarimoSporeExitOpacity(spec, spore);
+
+          if (exitProgress > 0 && spec.sporeExit) {
+            const drift = exitProgress * exitProgress;
+            const targetSpeed = (28 + drift * 95) * scale;
+            const tx = Math.cos(spec.sporeExit.exitAngleRad) * targetSpeed;
+            const ty = Math.sin(spec.sporeExit.exitAngleRad) * targetSpeed;
+            const blend = Math.min(1, exitProgress * 2.2);
+            body.vx = lerp(body.vx, tx, 0.035 * blend);
+            body.vy = lerp(body.vy, ty, 0.035 * blend);
+            body.spin = lerp(body.spin, spec.spinDegPerSec * 0.35, 0.02);
+          }
 
           body.x += body.vx * dt;
           body.y += body.vy * dt;
           body.rot += body.spin * dt;
-          bounce(body, width, height);
+
+          if (exitProgress <= 0.12) {
+            bounce(body, width, height);
+          }
 
           const el = anchorRefs.current[i];
           if (el) {
-            el.style.transform = `translate3d(${body.x}px, ${body.y}px, 0) translate(-50%, -50%) rotate(${body.rot}deg)`;
+            const alpha = spec.opacity * exitOpacity;
+            if (alpha <= 0.02 && (exitProgress >= 0.92 || isOffScreen(body, width, height))) {
+              body.retired = true;
+              el.style.opacity = "0";
+              el.style.visibility = "hidden";
+            } else {
+              el.style.opacity = String(alpha);
+              el.style.visibility = alpha > 0.01 ? "visible" : "hidden";
+              el.style.transform = `translate3d(${body.x}px, ${body.y}px, 0) translate(-50%, -50%) rotate(${body.rot}deg)`;
+            }
           }
         }
       }
@@ -152,7 +231,6 @@ export default function Chapter2FloatingMarimos() {
                 height: `${marimo.heightVh * 100}vh`,
                 width: "auto",
                 aspectRatio: String(aspect),
-                opacity: marimo.opacity,
                 filter,
               }}
             />

@@ -17,6 +17,10 @@ type Props = {
   shiftY: number;
   /** Multiplier when prop is fixed to a berg layer depth scale. */
   bergScale?: number;
+  /** Scroll-driven scale (grun / spore segments). */
+  scrollScaleMul?: number;
+  /** Scroll-driven opacity (nari reveal). */
+  scrollOpacity?: number;
   layout: Chapter2PropEdit;
   editorActive?: boolean;
   isSelected?: boolean;
@@ -31,6 +35,8 @@ export default function Chapter2PropLayer({
   shiftX,
   shiftY,
   bergScale = 1,
+  scrollScaleMul = 1,
+  scrollOpacity = 1,
   layout,
   editorActive = false,
   isSelected = true,
@@ -57,6 +63,9 @@ export default function Chapter2PropLayer({
   if (blurPx >= 0.4) {
     filterParts.push(`blur(${blurPx.toFixed(2)}px)`);
   }
+  if (scrollOpacity <= 0.001) {
+    return null;
+  }
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -71,6 +80,7 @@ export default function Chapter2PropLayer({
         height: `${prop.heightVh * 100}vh`,
         width: "auto",
         aspectRatio: String(aspect),
+        opacity: scrollOpacity,
         pointerEvents: editorActive ? "auto" : "none",
         cursor: editorActive
           ? editMode === "translate"
@@ -79,7 +89,7 @@ export default function Chapter2PropLayer({
           : undefined,
         filter: filterParts.join(" "),
         transformOrigin: "50% 100%",
-        transform: `translate(calc(-50% + ${shiftX + layout.x}px), calc(-100% + ${shiftY + layout.y}px)) scale(${layout.scale * bergScale}, ${layout.scaleY * bergScale}) rotate(${layout.rotate}deg)`,
+        transform: `translate(calc(-50% + ${shiftX + layout.x}px), calc(-100% + ${shiftY + layout.y}px)) scale(${layout.scale * bergScale * scrollScaleMul}, ${layout.scaleY * bergScale * scrollScaleMul}) rotate(${layout.rotate}deg)`,
       }}
       onPointerDown={(event) => {
         if (!editorActive) return;

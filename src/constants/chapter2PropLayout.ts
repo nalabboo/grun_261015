@@ -8,6 +8,7 @@ import {
   CHAPTER2_SPORE4_LAYOUT_LOCKED,
   CHAPTER2_GRUN_V_LAYOUT_LOCKED,
   CHAPTER2_WORM_G_LAYOUT_LOCKED,
+  CHAPTER2_NARI_LAYOUT_LOCKED,
   CHAPTER2_TUNABLE_PROP_IDS,
   getChapter2PropDefaultEdit,
   isChapter2PropTunable,
@@ -100,6 +101,10 @@ function pruneStoredProductionPropLayouts() {
       delete parsed.worm_g;
       changed = true;
     }
+    if (CHAPTER2_NARI_LAYOUT_LOCKED && "nari" in parsed) {
+      delete parsed.nari;
+      changed = true;
+    }
     if (!changed) return;
     window.localStorage.setItem(CHAPTER2_PROP_LAYOUT_STORAGE_KEY, JSON.stringify(parsed, null, 2));
   } catch {
@@ -144,6 +149,10 @@ export function loadChapter2PropEdits(): Record<Chapter2PropId, Chapter2PropEdit
 
   if (CHAPTER2_WORM_G_LAYOUT_LOCKED) {
     base.worm_g = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("worm_g"));
+  }
+
+  if (CHAPTER2_NARI_LAYOUT_LOCKED) {
+    base.nari = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("nari"));
   }
 
   return base;

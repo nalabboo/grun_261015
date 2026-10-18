@@ -10,8 +10,25 @@ import {
 } from "@/constants/chapter2Layout";
 export const CHAPTER2_ID = "scene2";
 
+/**
+ * Chapter 2 **play** sub-scenes (berg stack + props in `Chapter2Scene`).
+ *
+ * - **2-1** — Baseline as of 2026-10-18: berg4→berg3→berg2 stack, spores, grun_v,
+ *   worm_g (berg2-fixed), floating marimos. Layouts in `chapter2ObjectsConfig.ts`.
+ * - **2-2** — Scroll segments (see `chapter2ScrollMotion.ts`): berg y2 → grun shrink → spore scale.
+ */
+export const CHAPTER2_PLAY_SUBSCENE_BASELINE = "2-1" as const;
+export type Chapter2PlaySubscene = "2-1" | "2-2";
+
+/** Wheel delta → scroll progress (0 = scene 2-1, 1 = full 2-1→2-2 shift). */
+export const CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN = 0.0018;
+
+/** Extra Y (px) at scroll progress 1 — scene 2-1 → 2-2 berg drift. */
+export const CHAPTER2_SCROLL_BERG3_Y = 20;
+export const CHAPTER2_SCROLL_BERG4_Y = 40;
+
 /** Bump when `public/scene2/` berg PNGs change (cache bust). */
-export const CHAPTER2_ASSET_VERSION = "20261018-scene2-spore4";
+export const CHAPTER2_ASSET_VERSION = "20261018-scene2-y2-berg";
 
 /** Base fit scale (contain + parallax headroom). Transform depth is normalized on top. */
 export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
@@ -45,6 +62,9 @@ export function chapter2AssetUrl(file: string) {
   const path = file.split("/").map(encodeURIComponent).join("/");
   return `/${CHAPTER2_ID}/${path}?v=${CHAPTER2_ASSET_VERSION}`;
 }
+
+/** Paper backdrop behind berg4 (scene 2-1 base). */
+export const CHAPTER2_PAPIER_BG_URL = chapter2AssetUrl("background/papier.jpg");
 
 /** Chapter 2 background berg PNGs under `public/scene2/background/` (1600×300). */
 const CH2_BG_BERG = {
@@ -89,12 +109,15 @@ export type Chapter2BergLayerConfig = {
   /** Baked layout transform (berg4). */
   fixedLayout?: Chapter2BergEditTransform;
   objectPosition?: string;
+  /** Scene 2-2 PNG crossfaded in at scroll progress 1. */
+  scrollAltFile?: string;
 };
 
 export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
   {
     id: "berg4",
     file: "background/2_berg4.png",
+    scrollAltFile: "background/y2_berg4.png",
     width: CH2_BG_BERG.width,
     height: CH2_BG_BERG.height,
     anchor: "bottom",
@@ -114,6 +137,7 @@ export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
   {
     id: "berg3",
     file: "background/2_berg3.png",
+    scrollAltFile: "background/y2_berg3.png",
     width: CH2_BG_BERG.width,
     height: CH2_BG_BERG.height,
     scaleY: 1.12,
@@ -162,7 +186,11 @@ function loadImage(src: string): Promise<void> {
 /** Waits until berg + prop PNGs are in the browser cache (decode may still run later). */
 export function preloadChapter2BergAssets(): Promise<void> {
   const urls = [
-    ...CHAPTER2_BERG_LAYERS.map((layer) => chapter2LayerAssetUrl(layer)),
+    CHAPTER2_PAPIER_BG_URL,
+    ...CHAPTER2_BERG_LAYERS.flatMap((layer) => [
+      chapter2LayerAssetUrl(layer),
+      ...(layer.scrollAltFile ? [chapter2AssetUrl(layer.scrollAltFile)] : []),
+    ]),
     chapter2AssetUrl("grun objekt/spore1.png"),
     chapter2AssetUrl("grun objekt/spore2.png"),
     chapter2AssetUrl("grun objekt/spore3.png"),
@@ -170,7 +198,12 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("grun objekt/marimo1.png"),
     chapter2AssetUrl("grun objekt/marimo2.png"),
     chapter2AssetUrl("charactor/grun_v.png"),
+    chapter2AssetUrl("charactor/nari.png"),
     chapter2AssetUrl("grun objekt/worm_g.png"),
+    chapter2AssetUrl("gelb objekt/g_nabi1.png"),
+    chapter2AssetUrl("gelb objekt/g_nabi2.png"),
+    chapter2AssetUrl("gelb objekt/g_nabi3.png"),
+    chapter2AssetUrl("gelb objekt/g_vogel.png"),
   ];
   return Promise.all(urls.map((src) => loadImage(src))).then(() => undefined);
 }

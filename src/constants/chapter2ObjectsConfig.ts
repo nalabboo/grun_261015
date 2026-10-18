@@ -29,6 +29,8 @@ export type Chapter2PropConfig = {
   defaultLayout: Chapter2BergEditTransform;
   /** Move/scale with this berg layer (same parallax + depth scale). */
   attachToBergId?: "berg2";
+  /** Opacity follows scroll nari segment (before berg y2). */
+  revealOnScroll?: boolean;
 };
 
 export const CHAPTER2_PROP_IDS = [
@@ -40,6 +42,7 @@ export const CHAPTER2_PROP_IDS = [
   "spore4",
   "grun_v",
   "worm_g",
+  "nari",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -65,6 +68,7 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   grun_v: { x: -250, y: -2, scale: 1.9, scaleY: 1.9, rotate: 0 },
   /** 벌레 — bottom-right, in front of berg2 */
   worm_g: { x: 450, y: -244, scale: 1.12, scaleY: 1.12, rotate: 0 },
+  nari: { x: 360, y: -392, scale: 1.35, scaleY: 1.35, rotate: 0 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -92,6 +96,9 @@ export const CHAPTER2_GRUN_V_LAYOUT_LOCKED = true;
 /** When true, worm_g (벌레) uses fixed layout/blur (not localStorage). */
 export const CHAPTER2_WORM_G_LAYOUT_LOCKED = true;
 
+/** When true, nari uses fixed layout/blur (not localStorage). */
+export const CHAPTER2_NARI_LAYOUT_LOCKED = true;
+
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
 const SPORE1_DEPTH_PX = -180;
 /** Between spore4 (35) and berg2 (90); in front of berg2. */
@@ -102,6 +109,7 @@ const SPORE3_DEPTH_PX = -120;
 const SPORE4_DEPTH_PX = 35;
 /** Between spore4 and berg2 foreground ridge. */
 const GRUN_V_DEPTH_PX = 58;
+const NARI_DEPTH_PX = 55;
 /** Foreground critter on berg2 (벌레). */
 const WORM_G_DEPTH_PX = 72;
 
@@ -216,6 +224,23 @@ export const CHAPTER2_GRUN_V: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.grun_v,
 };
 
+/** 나리 — scroll fade-in before berg y2. */
+export const CHAPTER2_NARI: Chapter2PropConfig = {
+  id: "nari",
+  file: "charactor/nari.png",
+  width: 455,
+  height: 600,
+  zIndex: 3,
+  stack: "midBerg2",
+  revealOnScroll: true,
+  parallax: 18,
+  heightVh: 0.38,
+  depthPx: NARI_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(NARI_DEPTH_PX),
+  brightness: getDepthBrightness(NARI_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.nari,
+};
+
 /** 벌레 */
 export const CHAPTER2_WORM_G: Chapter2PropConfig = {
   id: "worm_g",
@@ -241,6 +266,7 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_SPORE2_0,
   CHAPTER2_SPORE4,
   CHAPTER2_GRUN_V,
+  CHAPTER2_NARI,
   CHAPTER2_WORM_G,
 ] as const;
 
