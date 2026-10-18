@@ -104,9 +104,9 @@ export default function Chapter2PropEditorPanel({
     const text = formatChapter2PropLayout(edits);
     try {
       await navigator.clipboard.writeText(text);
-      console.log("[Chapter2 spore4]", text);
+      console.log("[Chapter2 prop layout]", text);
     } catch {
-      console.log("[Chapter2 spore4]\n", text);
+      console.log("[Chapter2 prop layout]\n", text);
     }
   };
 
@@ -115,7 +115,7 @@ export default function Chapter2PropEditorPanel({
   return (
     <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
       <button type="button" style={buttonStyle(editor.enabled)} onClick={onToggle}>
-        Ch2 spore4 edit: {editor.enabled ? "ON" : "OFF"}
+        Ch2 prop edit: {editor.enabled ? "ON" : "OFF"}
       </button>
 
       {editor.enabled && (
@@ -214,8 +214,8 @@ export default function Chapter2PropEditorPanel({
           </div>
 
           <div style={{ opacity: 0.72, lineHeight: 1.45 }}>
-            spore4 (berg2 뒤): Move / Scale on canvas. Copy JSON → CHAPTER2_PROP_FIXED_LAYOUTS.spore4 +
-            CHAPTER2_PROP_FIXED_BLUR.
+            spore2 ×2 + spore3: Move / Scale on canvas, blurRatio in panel. Copy JSON →
+            CHAPTER2_PROP_FIXED_LAYOUTS + CHAPTER2_PROP_FIXED_BLUR.
           </div>
         </>
       )}

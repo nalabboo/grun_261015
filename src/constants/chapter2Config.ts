@@ -163,6 +163,7 @@ function loadImage(src: string): Promise<void> {
 export function preloadChapter2BergAssets(): Promise<void> {
   const urls = [
     ...CHAPTER2_BERG_LAYERS.map((layer) => chapter2LayerAssetUrl(layer)),
+    chapter2AssetUrl("grun objekt/spore1.png"),
     chapter2AssetUrl("grun objekt/spore2.png"),
     chapter2AssetUrl("grun objekt/spore3.png"),
     chapter2AssetUrl("grun objekt/spore4.png"),

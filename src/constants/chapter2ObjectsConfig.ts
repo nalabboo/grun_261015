@@ -2,7 +2,7 @@ import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
 import { chapter2AssetUrl } from "@/constants/chapter2Config";
 import { getDepthBlurRatio, getDepthBrightness } from "@/constants/sceneConfig";
 
-export type Chapter2PropStack = "foreground" | "behindBerg2";
+export type Chapter2PropStack = "aboveBerg4" | "aboveBerg3" | "behindBerg2";
 
 export type Chapter2PropEdit = Chapter2BergEditTransform & {
   blurRatio?: number;
@@ -24,15 +24,15 @@ export type Chapter2PropConfig = {
   defaultLayout: Chapter2BergEditTransform;
 };
 
-export const CHAPTER2_PROP_IDS = ["spore2_0", "spore2_1", "spore3", "spore4"] as const;
+export const CHAPTER2_PROP_IDS = ["spore1", "spore2_0", "spore2_1", "spore3", "spore4"] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
-/** Dev-only props (empty = all props use `CHAPTER2_PROP_FIXED_LAYOUTS`). */
-export const CHAPTER2_TUNABLE_PROP_IDS = [] as const satisfies readonly Chapter2PropId[];
-export type Chapter2TunablePropId = Chapter2PropId;
+/** Dev-tunable props (spore1 + spore4 are production-fixed). */
+export const CHAPTER2_TUNABLE_PROP_IDS = ["spore2_0", "spore2_1", "spore3"] as const;
+export type Chapter2TunablePropId = (typeof CHAPTER2_TUNABLE_PROP_IDS)[number];
 
-export function isChapter2PropTunable(id: Chapter2PropId): boolean {
-  return (CHAPTER2_TUNABLE_PROP_IDS as readonly Chapter2PropId[]).includes(id);
+export function isChapter2PropTunable(id: Chapter2PropId): id is Chapter2TunablePropId {
+  return (CHAPTER2_TUNABLE_PROP_IDS as readonly string[]).includes(id);
 }
 
 /** Production prop transforms — tune here after dev Copy JSON. */
@@ -40,13 +40,15 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   Chapter2PropId,
   Chapter2BergEditTransform
 > = {
-  spore2_0: { x: 97.6, y: -564.8, scale: 0.48, scaleY: 0.48, rotate: 0 },
-  spore2_1: { x: 286.6, y: -564.8, scale: 0.48, scaleY: 0.48, rotate: 0 },
-  spore3: { x: 237.6, y: -604.8, scale: 0.52, scaleY: 0.52, rotate: 0 },
+  spore1: { x: 620, y: 40, scale: 2.56, scaleY: 2.56, rotate: 0 },
+  spore2_0: { x: 97.6, y: -564.8, scale: 1.44, scaleY: 1.44, rotate: 0 },
+  spore2_1: { x: 286.6, y: -564.8, scale: 1.44, scaleY: 1.44, rotate: 0 },
+  spore3: { x: 237.6, y: -604.8, scale: 1.56, scaleY: 1.56, rotate: 0 },
   spore4: { x: -370, y: -35, scale: 1.58, scaleY: 1.58, rotate: 0 },
 };
 
-/** Production spore4 (berg2 뒤) — same as `CHAPTER2_PROP_FIXED_LAYOUTS.spore4`. */
+/** Production spore1 / spore4 — same as fixed layouts in this file. */
+export const CHAPTER2_SPORE1_PRODUCTION_LAYOUT = CHAPTER2_PROP_FIXED_LAYOUTS.spore1;
 export const CHAPTER2_SPORE4_PRODUCTION_LAYOUT = CHAPTER2_PROP_FIXED_LAYOUTS.spore4;
 
 /** Optional prod blur overrides (spore4 `blurRatio` when set). */
@@ -55,10 +57,14 @@ export const CHAPTER2_PROP_FIXED_BLUR: Partial<Record<Chapter2PropId, number>> =
 /** When true, front props use fixed layout only. */
 export const CHAPTER2_PROPS_LAYOUT_LOCKED = true;
 
+/** When true, spore1 uses fixed layout/blur (not localStorage). */
+export const CHAPTER2_SPORE1_LAYOUT_LOCKED = true;
+
 /** When true, spore4 uses fixed layout/blur (not localStorage). */
 export const CHAPTER2_SPORE4_LAYOUT_LOCKED = true;
 
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
+const SPORE1_DEPTH_PX = -180;
 const SPORE2_0_DEPTH_PX = -210;
 const SPORE2_1_DEPTH_PX = -150;
 const SPORE3_DEPTH_PX = -120;
@@ -67,13 +73,31 @@ const SPORE4_DEPTH_PX = 35;
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
 
+/** Match spore4 DOF softness (depth plane differs; blur is shared). */
+const SPORE4_BLUR = getDepthBlurRatio(SPORE4_DEPTH_PX);
+
+export const CHAPTER2_SPORE1: Chapter2PropConfig = {
+  id: "spore1",
+  file: "grun objekt/spore1.png",
+  width: 180,
+  height: 693,
+  zIndex: 3,
+  stack: "aboveBerg3",
+  parallax: 40,
+  heightVh: 0.34,
+  depthPx: SPORE1_DEPTH_PX,
+  blurRatio: SPORE4_BLUR,
+  brightness: getDepthBrightness(SPORE1_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.spore1,
+};
+
 export const CHAPTER2_SPORE2_0: Chapter2PropConfig = {
   id: "spore2_0",
   file: SPORE2_FILE,
   width: SPORE2_SIZE.width,
   height: SPORE2_SIZE.height,
-  zIndex: 22,
-  stack: "foreground",
+  zIndex: 2,
+  stack: "aboveBerg4",
   parallax: 42,
   heightVh: 0.36,
   depthPx: SPORE2_0_DEPTH_PX,
@@ -87,8 +111,8 @@ export const CHAPTER2_SPORE2_1: Chapter2PropConfig = {
   file: SPORE2_FILE,
   width: SPORE2_SIZE.width,
   height: SPORE2_SIZE.height,
-  zIndex: 22,
-  stack: "foreground",
+  zIndex: 1,
+  stack: "aboveBerg4",
   parallax: 46,
   heightVh: 0.36,
   depthPx: SPORE2_1_DEPTH_PX,
@@ -102,8 +126,8 @@ export const CHAPTER2_SPORE3: Chapter2PropConfig = {
   file: "grun objekt/spore3.png",
   width: 182,
   height: 645,
-  zIndex: 22,
-  stack: "foreground",
+  zIndex: 1,
+  stack: "aboveBerg4",
   parallax: 44,
   heightVh: 0.32,
   depthPx: SPORE3_DEPTH_PX,
@@ -111,8 +135,6 @@ export const CHAPTER2_SPORE3: Chapter2PropConfig = {
   brightness: getDepthBrightness(SPORE3_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.spore3,
 };
-
-const SPORE4_BLUR = getDepthBlurRatio(SPORE4_DEPTH_PX);
 
 export const CHAPTER2_SPORE4: Chapter2PropConfig = {
   id: "spore4",
@@ -130,9 +152,10 @@ export const CHAPTER2_SPORE4: Chapter2PropConfig = {
 };
 
 export const CHAPTER2_PROPS = [
-  CHAPTER2_SPORE2_0,
+  CHAPTER2_SPORE1,
   CHAPTER2_SPORE2_1,
   CHAPTER2_SPORE3,
+  CHAPTER2_SPORE2_0,
   CHAPTER2_SPORE4,
 ] as const;
 

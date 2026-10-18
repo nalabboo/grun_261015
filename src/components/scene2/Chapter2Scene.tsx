@@ -14,6 +14,7 @@ import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2PropEditorPanel from "@/components/scene2/Chapter2PropEditorPanel";
 import {
   CHAPTER2_PROPS,
+  CHAPTER2_TUNABLE_PROP_IDS,
   getChapter2PropDefaultEdit,
   isChapter2PropTunable,
   sanitizeChapter2PropEdit,
@@ -67,7 +68,7 @@ export default function Chapter2Scene() {
 
   const [editor, setEditor] = useState<Chapter2PropEditorState>({
     enabled: false,
-    selectedId: "spore4",
+    selectedId: "spore2_0",
     mode: "translate",
   });
   const [propEdits, setPropEdits] = useState(defaultChapter2PropEdits);
@@ -205,7 +206,12 @@ export default function Chapter2Scene() {
   const maxForegroundScale = Math.max(...foregroundScales, 1);
 
   const berg4Layer = CHAPTER2_BERG_LAYERS.find((layer) => layer.id === "berg4");
-  const foregroundProps = CHAPTER2_PROPS.filter((prop) => prop.stack === "foreground");
+  const aboveBerg4Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "aboveBerg4").sort(
+    (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
+  );
+  const aboveBerg3Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "aboveBerg3").sort(
+    (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
+  );
   const behindBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "behindBerg2");
 
   const renderPropLayer = (prop: Chapter2PropConfig) => {
@@ -264,6 +270,8 @@ export default function Chapter2Scene() {
         );
       })()}
 
+      {aboveBerg4Props.map((prop) => renderPropLayer(prop))}
+
       {foregroundLayers.map((layer, index) => {
         const shiftX = smooth.x * layer.parallax;
         const shiftY = smooth.y * layer.parallax * 0.65;
@@ -283,11 +291,10 @@ export default function Chapter2Scene() {
               scale={scale}
               edit={edit}
             />
+            {layer.id === "berg3" && aboveBerg3Props.map((prop) => renderPropLayer(prop))}
           </Fragment>
         );
       })}
-
-      {foregroundProps.map((prop) => renderPropLayer(prop))}
 
       <div
         className="chapter2-synesthesia-veil"
@@ -308,6 +315,7 @@ export default function Chapter2Scene() {
           onResetSelected={() => {
             setPropEdits((prev) => {
               const id = editor.selectedId;
+              if (!isChapter2PropTunable(id)) return prev;
               const next = { ...prev, [id]: getChapter2PropDefaultEdit(id) };
               saveChapter2PropEdits(next);
               return next;
@@ -315,7 +323,10 @@ export default function Chapter2Scene() {
           }}
           onResetAll={() => {
             setPropEdits((prev) => {
-              const next = { ...prev, spore4: getChapter2PropDefaultEdit("spore4") };
+              const next = { ...prev };
+              for (const id of CHAPTER2_TUNABLE_PROP_IDS) {
+                next[id] = getChapter2PropDefaultEdit(id);
+              }
               saveChapter2PropEdits(next);
               return next;
             });

@@ -3,6 +3,7 @@ import { CHAPTER2_BERG_LAYOUT_STORAGE_KEY } from "@/constants/chapter2Layout";
 import {
   CHAPTER2_PROP_IDS,
   CHAPTER2_PROPS_LAYOUT_LOCKED,
+  CHAPTER2_SPORE1_LAYOUT_LOCKED,
   CHAPTER2_SPORE4_LAYOUT_LOCKED,
   CHAPTER2_TUNABLE_PROP_IDS,
   getChapter2PropDefaultEdit,
@@ -69,14 +70,22 @@ function storedLockedLayoutLooksInvalid(
   });
 }
 
-function pruneStoredSpore4Layout() {
-  if (typeof window === "undefined" || !CHAPTER2_SPORE4_LAYOUT_LOCKED) return;
+function pruneStoredProductionPropLayouts() {
+  if (typeof window === "undefined") return;
   try {
     const raw = window.localStorage.getItem(CHAPTER2_PROP_LAYOUT_STORAGE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    if (!("spore4" in parsed)) return;
-    delete parsed.spore4;
+    let changed = false;
+    if (CHAPTER2_SPORE1_LAYOUT_LOCKED && "spore1" in parsed) {
+      delete parsed.spore1;
+      changed = true;
+    }
+    if (CHAPTER2_SPORE4_LAYOUT_LOCKED && "spore4" in parsed) {
+      delete parsed.spore4;
+      changed = true;
+    }
+    if (!changed) return;
     window.localStorage.setItem(CHAPTER2_PROP_LAYOUT_STORAGE_KEY, JSON.stringify(parsed, null, 2));
   } catch {
     /* ignore */
@@ -84,7 +93,7 @@ function pruneStoredSpore4Layout() {
 }
 
 export function loadChapter2PropEdits(): Record<Chapter2PropId, Chapter2PropEdit> {
-  pruneStoredSpore4Layout();
+  pruneStoredProductionPropLayouts();
   const base = layoutsFromFixedConfig();
   const stored = readStoredPropLayouts();
 
@@ -100,6 +109,10 @@ export function loadChapter2PropEdits(): Record<Chapter2PropId, Chapter2PropEdit
 
   for (const id of CHAPTER2_TUNABLE_PROP_IDS as readonly Chapter2PropId[]) {
     base[id] = sanitizeChapter2PropEdit(stored?.[id], base[id]);
+  }
+
+  if (CHAPTER2_SPORE1_LAYOUT_LOCKED) {
+    base.spore1 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("spore1"));
   }
 
   if (CHAPTER2_SPORE4_LAYOUT_LOCKED) {
@@ -129,7 +142,7 @@ export function saveChapter2PropEdits(edits: Record<Chapter2PropId, Chapter2Prop
 export function formatChapter2PropLayout(
   edits: Partial<Record<Chapter2PropId, Chapter2PropEdit>>,
 ) {
-  const tunableOnly: Partial<Record<Chapter2PropId, Chapter2PropEdit>> = {};
+  const tunableOnly = {} as Record<Chapter2TunablePropId, Chapter2PropEdit>;
   for (const id of CHAPTER2_TUNABLE_PROP_IDS) {
     tunableOnly[id] = edits[id] ?? getChapter2PropDefaultEdit(id);
   }
@@ -138,12 +151,11 @@ export function formatChapter2PropLayout(
 
 export const DEV_CHAPTER2_PROP_EDITOR =
   CHAPTER2_TUNABLE_PROP_IDS.length > 0 &&
-  !CHAPTER2_SPORE4_LAYOUT_LOCKED &&
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_CHAPTER2_EDIT !== "0";
 
 export type Chapter2PropEditorState = {
   enabled: boolean;
-  selectedId: Chapter2PropId;
+  selectedId: Chapter2TunablePropId;
   mode: EditorMode;
 };
