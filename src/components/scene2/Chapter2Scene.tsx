@@ -19,6 +19,13 @@ import {
   getChapter2PropScrollScaleMultiplier,
   getChapter2ScrollSegments,
 } from "@/constants/chapter2ScrollMotion";
+import {
+  CHAPTER2_EXIT_SCROLL_MAX,
+  CHAPTER2_EXIT_WHEEL_GAIN,
+  getChapter2PlaybackScrollRaw,
+  isChapter2PlaybackComplete,
+  type Chapter2SubscenePlaybackPhase,
+} from "@/constants/chapter2SubscenePlayback";
 import Chapter2BergLayer from "@/components/scene2/Chapter2BergLayer";
 import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2PropEditorPanel from "@/components/scene2/Chapter2PropEditorPanel";
@@ -57,6 +64,7 @@ type Point = { x: number; y: number };
 
 const SMOOTH = 0.07;
 const SCROLL_SMOOTH = 0.09;
+const SCROLL_WHEEL_START_MIN = 10;
 
 type PropDragState = {
   id: Chapter2TunablePropId;
@@ -73,20 +81,42 @@ function getChapter2DepthFactor(viewportHeight: number, depthRatio: number) {
   return 1 + (full - 1) * CHAPTER2_DEPTH_SIZE_STRENGTH;
 }
 
+type Chapter2SceneProps = {
+  /** All 2-2 motions finished (auto playback). */
+  onSequenceComplete?: () => void;
+  /** User scrolled after complete — ready for next chapter UI. */
+  onExitScrollComplete?: () => void;
+};
+
 /** Chapter 2 — stacked berg layers with mouse parallax. */
-export default function Chapter2Scene() {
+export default function Chapter2Scene({
+  onSequenceComplete,
+  onExitScrollComplete,
+}: Chapter2SceneProps) {
   const targetRef = useRef<Point>({ x: 0, y: 0 });
   const smoothRef = useRef<Point>({ x: 0, y: 0 });
   const propDragRef = useRef<PropDragState | null>(null);
   const scrollTargetRef = useRef(0);
   const scrollSmoothRef = useRef(0);
+  const playbackPhaseRef = useRef<Chapter2SubscenePlaybackPhase>("2-1");
+  const playbackStartMsRef = useRef(0);
+  const exitScrollRef = useRef(0);
+  const sequenceCompleteFiredRef = useRef(false);
+  const exitScrollCompleteFiredRef = useRef(false);
+  const onSequenceCompleteRef = useRef(onSequenceComplete);
+  const onExitScrollCompleteRef = useRef(onExitScrollComplete);
+  const editorEnabledRef = useRef(false);
   const [frame, setFrame] = useState(0);
+
+  onSequenceCompleteRef.current = onSequenceComplete;
+  onExitScrollCompleteRef.current = onExitScrollComplete;
 
   const [editor, setEditor] = useState<Chapter2PropEditorState>({
     enabled: false,
     selectedId: "spore2_0",
     mode: "translate",
   });
+  editorEnabledRef.current = editor.enabled;
   const [propEdits, setPropEdits] = useState(defaultChapter2PropEdits);
   const [propEditsReady, setPropEditsReady] = useState(false);
 
@@ -136,14 +166,45 @@ export default function Chapter2Scene() {
 
   useEffect(() => {
     const onWheel = (event: WheelEvent) => {
-      if (editor.enabled) return;
+      if (editor.enabled) {
+        event.preventDefault();
+        const next =
+          scrollTargetRef.current + event.deltaY * CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN;
+        scrollTargetRef.current = Math.min(
+          CHAPTER2_SUBSCENE_SCROLL_MAX,
+          Math.max(0, next),
+        );
+        return;
+      }
+
       event.preventDefault();
-      const next =
-        scrollTargetRef.current + event.deltaY * CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN;
-      scrollTargetRef.current = Math.min(
-        CHAPTER2_SUBSCENE_SCROLL_MAX,
-        Math.max(0, next),
-      );
+      const phase = playbackPhaseRef.current;
+
+      if (phase === "2-1") {
+        if (event.deltaY > SCROLL_WHEEL_START_MIN) {
+          playbackPhaseRef.current = "2-2-playing";
+          playbackStartMsRef.current = performance.now();
+        }
+        return;
+      }
+
+      if (phase === "2-2-playing") {
+        return;
+      }
+
+      if (phase === "2-2-complete" && event.deltaY > 0) {
+        exitScrollRef.current = Math.min(
+          CHAPTER2_EXIT_SCROLL_MAX,
+          exitScrollRef.current + event.deltaY * CHAPTER2_EXIT_WHEEL_GAIN,
+        );
+        if (
+          exitScrollRef.current >= CHAPTER2_EXIT_SCROLL_MAX &&
+          !exitScrollCompleteFiredRef.current
+        ) {
+          exitScrollCompleteFiredRef.current = true;
+          onExitScrollCompleteRef.current?.();
+        }
+      }
     };
 
     window.addEventListener("wheel", onWheel, { passive: false });
@@ -158,8 +219,33 @@ export default function Chapter2Scene() {
       smooth.x += (target.x - smooth.x) * SMOOTH;
       smooth.y += (target.y - smooth.y) * SMOOTH;
 
-      scrollSmoothRef.current +=
-        (scrollTargetRef.current - scrollSmoothRef.current) * SCROLL_SMOOTH;
+      const playbackPhase = playbackPhaseRef.current;
+      if (playbackPhase === "2-2-playing") {
+        const elapsedSec = (performance.now() - playbackStartMsRef.current) / 1000;
+        const raw = getChapter2PlaybackScrollRaw(elapsedSec);
+        scrollTargetRef.current = raw;
+        scrollSmoothRef.current = raw;
+
+        if (isChapter2PlaybackComplete(elapsedSec)) {
+          playbackPhaseRef.current = "2-2-complete";
+          scrollTargetRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+          scrollSmoothRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+          if (!sequenceCompleteFiredRef.current) {
+            sequenceCompleteFiredRef.current = true;
+            onSequenceCompleteRef.current?.();
+          }
+        }
+      } else if (playbackPhase === "2-1") {
+        scrollTargetRef.current = 0;
+        scrollSmoothRef.current += (0 - scrollSmoothRef.current) * SCROLL_SMOOTH;
+      } else if (!editorEnabledRef.current) {
+        scrollTargetRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+        scrollSmoothRef.current +=
+          (CHAPTER2_SUBSCENE_SCROLL_MAX - scrollSmoothRef.current) * SCROLL_SMOOTH;
+      } else {
+        scrollSmoothRef.current +=
+          (scrollTargetRef.current - scrollSmoothRef.current) * SCROLL_SMOOTH;
+      }
 
       setFrame((f) => f + 1);
       raf = requestAnimationFrame(tick);

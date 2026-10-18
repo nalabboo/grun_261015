@@ -118,12 +118,14 @@ export default function SceneStage() {
     DEV_START_CHAPTER2 ? "play" : null,
   );
   const [chapter2PlayReady, setChapter2PlayReady] = useState(false);
+  const [chapter2ExitScrollReady, setChapter2ExitScrollReady] = useState(false);
   const chapterRef = useRef<Chapter>(DEV_START_CHAPTER2 ? 2 : 1);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
 
   useEffect(() => {
     if (chapter !== 2 || chapter2Step !== "play") {
       setChapter2PlayReady(false);
+      setChapter2ExitScrollReady(false);
       return;
     }
     let cancelled = false;
@@ -646,7 +648,19 @@ export default function SceneStage() {
     {showChapter1Tableau && tableauRevealed && (
       <PageTurnButton onTurn={handlePageTurn} />
     )}
-    {chapter === 2 && chapter2Step === "play" && chapter2PlayReady && <Chapter2Scene />}
+    {chapter === 2 && chapter2Step === "play" && chapter2PlayReady && (
+      <Chapter2Scene
+        onExitScrollComplete={() => setChapter2ExitScrollReady(true)}
+      />
+    )}
+    {chapter === 2 && chapter2Step === "play" && chapter2ExitScrollReady && (
+      <PageTurnButton
+        label="3장"
+        onTurn={() => {
+          /* next chapter hook — wire when scene 3 exists */
+        }}
+      />
+    )}
     {chapter === 2 && chapter2Step === "intro" && (
       <Chapter2Intro onComplete={handleChapter2IntroComplete} />
     )}

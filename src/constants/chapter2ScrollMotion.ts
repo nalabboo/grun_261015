@@ -124,9 +124,9 @@ export function getChapter2PropScrollScaleMultiplier(
   }
 
   if (prop.id === "grun_v") {
-    const { green } = getChapter2SceneColorRatios(segments);
-    const mul = characterScaleForColorRatio(green, CHAPTER2_GRUN_MIN_SCALE);
-    return Math.max(CHAPTER2_GRUN_MIN_SCALE, mul);
+    // Shrink after berg y2 finishes (`segments.grun`), not during berg crossfade.
+    const t = segments.grun;
+    return 1 - t * (1 - CHAPTER2_GRUN_MIN_SCALE);
   }
 
   if (prop.id.startsWith("spore") && segments.spore > 0) {
