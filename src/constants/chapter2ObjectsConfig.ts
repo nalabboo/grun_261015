@@ -27,6 +27,8 @@ export type Chapter2PropConfig = {
   blurRatio: number;
   brightness: number;
   defaultLayout: Chapter2BergEditTransform;
+  /** Move/scale with this berg layer (same parallax + depth scale). */
+  attachToBergId?: "berg2";
 };
 
 export const CHAPTER2_PROP_IDS = [
@@ -37,6 +39,7 @@ export const CHAPTER2_PROP_IDS = [
   "spore3",
   "spore4",
   "grun_v",
+  "worm_g",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -60,6 +63,8 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   spore3: { x: 237.6, y: -604.8, scale: 1.56, scaleY: 1.56, rotate: 0 },
   spore4: { x: -370, y: -35, scale: 1.58, scaleY: 1.58, rotate: 0 },
   grun_v: { x: -250, y: -2, scale: 1.9, scaleY: 1.9, rotate: 0 },
+  /** 벌레 — bottom-right, in front of berg2 */
+  worm_g: { x: 450, y: -244, scale: 1.12, scaleY: 1.12, rotate: 0 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -84,6 +89,9 @@ export const CHAPTER2_SPORE4_LAYOUT_LOCKED = true;
 /** When true, grun_v uses fixed layout/blur (not localStorage). */
 export const CHAPTER2_GRUN_V_LAYOUT_LOCKED = true;
 
+/** When true, worm_g (벌레) uses fixed layout/blur (not localStorage). */
+export const CHAPTER2_WORM_G_LAYOUT_LOCKED = true;
+
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
 const SPORE1_DEPTH_PX = -180;
 /** Between spore4 (35) and berg2 (90); in front of berg2. */
@@ -94,6 +102,8 @@ const SPORE3_DEPTH_PX = -120;
 const SPORE4_DEPTH_PX = 35;
 /** Between spore4 and berg2 foreground ridge. */
 const GRUN_V_DEPTH_PX = 58;
+/** Foreground critter on berg2 (벌레). */
+const WORM_G_DEPTH_PX = 72;
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -206,6 +216,23 @@ export const CHAPTER2_GRUN_V: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.grun_v,
 };
 
+/** 벌레 */
+export const CHAPTER2_WORM_G: Chapter2PropConfig = {
+  id: "worm_g",
+  file: "grun objekt/worm_g.png",
+  width: 604,
+  height: 700,
+  zIndex: 5,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  parallax: 16,
+  heightVh: 0.26,
+  depthPx: WORM_G_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(WORM_G_DEPTH_PX),
+  brightness: getDepthBrightness(WORM_G_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.worm_g,
+};
+
 export const CHAPTER2_PROPS = [
   CHAPTER2_SPORE1,
   CHAPTER2_SPORE1_1,
@@ -214,6 +241,7 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_SPORE2_0,
   CHAPTER2_SPORE4,
   CHAPTER2_GRUN_V,
+  CHAPTER2_WORM_G,
 ] as const;
 
 export function chapter2PropAssetUrl(file: string) {

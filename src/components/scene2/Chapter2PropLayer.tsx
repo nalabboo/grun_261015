@@ -15,6 +15,8 @@ type Props = {
   viewportHeight: number;
   shiftX: number;
   shiftY: number;
+  /** Multiplier when prop is fixed to a berg layer depth scale. */
+  bergScale?: number;
   layout: Chapter2PropEdit;
   editorActive?: boolean;
   isSelected?: boolean;
@@ -28,6 +30,7 @@ export default function Chapter2PropLayer({
   viewportHeight,
   shiftX,
   shiftY,
+  bergScale = 1,
   layout,
   editorActive = false,
   isSelected = true,
@@ -76,7 +79,7 @@ export default function Chapter2PropLayer({
           : undefined,
         filter: filterParts.join(" "),
         transformOrigin: "50% 100%",
-        transform: `translate(calc(-50% + ${shiftX + layout.x}px), calc(-100% + ${shiftY + layout.y}px)) scale(${layout.scale}, ${layout.scaleY}) rotate(${layout.rotate}deg)`,
+        transform: `translate(calc(-50% + ${shiftX + layout.x}px), calc(-100% + ${shiftY + layout.y}px)) scale(${layout.scale * bergScale}, ${layout.scaleY * bergScale}) rotate(${layout.rotate}deg)`,
       }}
       onPointerDown={(event) => {
         if (!editorActive) return;

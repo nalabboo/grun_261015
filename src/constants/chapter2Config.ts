@@ -170,6 +170,7 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("grun objekt/marimo1.png"),
     chapter2AssetUrl("grun objekt/marimo2.png"),
     chapter2AssetUrl("charactor/grun_v.png"),
+    chapter2AssetUrl("grun objekt/worm_g.png"),
   ];
   return Promise.all(urls.map((src) => loadImage(src))).then(() => undefined);
 }

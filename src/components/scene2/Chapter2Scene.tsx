@@ -219,9 +219,13 @@ export default function Chapter2Scene() {
     (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
   );
 
-  const renderPropLayer = (prop: Chapter2PropConfig) => {
-    const shiftX = smooth.x * prop.parallax;
-    const shiftY = smooth.y * prop.parallax * 0.65;
+  type BergPropMotion = { shiftX: number; shiftY: number; bergScale: number };
+
+  const renderPropLayer = (prop: Chapter2PropConfig, bergMotion?: BergPropMotion) => {
+    const attached = bergMotion && prop.attachToBergId === "berg2";
+    const shiftX = attached ? bergMotion.shiftX : smooth.x * prop.parallax;
+    const shiftY = attached ? bergMotion.shiftY : smooth.y * prop.parallax * 0.65;
+    const bergScale = attached ? bergMotion.bergScale : 1;
     const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultEdit(prop.id);
     const tunable = isChapter2PropTunable(prop.id);
     const isSelected = tunable && editor.selectedId === prop.id;
@@ -232,6 +236,7 @@ export default function Chapter2Scene() {
         viewportHeight={viewportHeight}
         shiftX={shiftX}
         shiftY={shiftY}
+        bergScale={bergScale}
         layout={layout}
         editorActive={editor.enabled && tunable}
         isSelected={isSelected}
@@ -297,7 +302,14 @@ export default function Chapter2Scene() {
               scale={scale}
               edit={edit}
             />
-            {layer.id === "berg2" && aboveBerg2Props.map((prop) => renderPropLayer(prop))}
+            {layer.id === "berg2" &&
+              aboveBerg2Props.map((prop) =>
+                renderPropLayer(prop, {
+                  shiftX,
+                  shiftY,
+                  bergScale: scale * edit.scale,
+                }),
+              )}
             {layer.id === "berg3" && aboveBerg3Props.map((prop) => renderPropLayer(prop))}
           </Fragment>
         );
