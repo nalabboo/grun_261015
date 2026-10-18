@@ -2,7 +2,12 @@ import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
 import { chapter2AssetUrl } from "@/constants/chapter2Config";
 import { getDepthBlurRatio, getDepthBrightness } from "@/constants/sceneConfig";
 
-export type Chapter2PropStack = "aboveBerg4" | "aboveBerg3" | "behindBerg2";
+export type Chapter2PropStack =
+  | "aboveBerg4"
+  | "aboveBerg3"
+  | "behindBerg2"
+  | "midBerg2"
+  | "aboveBerg2";
 
 export type Chapter2PropEdit = Chapter2BergEditTransform & {
   blurRatio?: number;
@@ -24,7 +29,15 @@ export type Chapter2PropConfig = {
   defaultLayout: Chapter2BergEditTransform;
 };
 
-export const CHAPTER2_PROP_IDS = ["spore1", "spore2_0", "spore2_1", "spore3", "spore4"] as const;
+export const CHAPTER2_PROP_IDS = [
+  "spore1",
+  "spore1_1",
+  "spore2_0",
+  "spore2_1",
+  "spore3",
+  "spore4",
+  "grun_v",
+] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
 /** Dev-tunable props (spore1 + spore4 are production-fixed). */
@@ -41,10 +54,12 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   Chapter2BergEditTransform
 > = {
   spore1: { x: 620, y: 40, scale: 2.56, scaleY: 2.56, rotate: 0 },
+  spore1_1: { x: 125, y: 100, scale: 2, scaleY: 2, rotate: 0 },
   spore2_0: { x: 97.6, y: -564.8, scale: 1.44, scaleY: 1.44, rotate: 0 },
   spore2_1: { x: 286.6, y: -564.8, scale: 1.44, scaleY: 1.44, rotate: 0 },
   spore3: { x: 237.6, y: -604.8, scale: 1.56, scaleY: 1.56, rotate: 0 },
   spore4: { x: -370, y: -35, scale: 1.58, scaleY: 1.58, rotate: 0 },
+  grun_v: { x: -250, y: -2, scale: 1.9, scaleY: 1.9, rotate: 0 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -60,15 +75,25 @@ export const CHAPTER2_PROPS_LAYOUT_LOCKED = true;
 /** When true, spore1 uses fixed layout/blur (not localStorage). */
 export const CHAPTER2_SPORE1_LAYOUT_LOCKED = true;
 
+/** When true, spore1_1 uses fixed layout/blur (not localStorage). */
+export const CHAPTER2_SPORE1_1_LAYOUT_LOCKED = true;
+
 /** When true, spore4 uses fixed layout/blur (not localStorage). */
 export const CHAPTER2_SPORE4_LAYOUT_LOCKED = true;
 
+/** When true, grun_v uses fixed layout/blur (not localStorage). */
+export const CHAPTER2_GRUN_V_LAYOUT_LOCKED = true;
+
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
 const SPORE1_DEPTH_PX = -180;
+/** Between spore4 (35) and berg2 (90); in front of berg2. */
+const SPORE1_1_DEPTH_PX = 62;
 const SPORE2_0_DEPTH_PX = -210;
 const SPORE2_1_DEPTH_PX = -150;
 const SPORE3_DEPTH_PX = -120;
 const SPORE4_DEPTH_PX = 35;
+/** Between spore4 and berg2 foreground ridge. */
+const GRUN_V_DEPTH_PX = 58;
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -89,6 +114,21 @@ export const CHAPTER2_SPORE1: Chapter2PropConfig = {
   blurRatio: SPORE4_BLUR,
   brightness: getDepthBrightness(SPORE1_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.spore1,
+};
+
+export const CHAPTER2_SPORE1_1: Chapter2PropConfig = {
+  id: "spore1_1",
+  file: "grun objekt/spore1.png",
+  width: 180,
+  height: 693,
+  zIndex: 4,
+  stack: "aboveBerg2",
+  parallax: 28,
+  heightVh: 0.34,
+  depthPx: SPORE1_1_DEPTH_PX,
+  blurRatio: SPORE4_BLUR,
+  brightness: getDepthBrightness(SPORE1_1_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.spore1_1,
 };
 
 export const CHAPTER2_SPORE2_0: Chapter2PropConfig = {
@@ -151,12 +191,29 @@ export const CHAPTER2_SPORE4: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.spore4,
 };
 
+export const CHAPTER2_GRUN_V: Chapter2PropConfig = {
+  id: "grun_v",
+  file: "charactor/grun_v.png",
+  width: 500,
+  height: 750,
+  zIndex: 2,
+  stack: "midBerg2",
+  parallax: 20,
+  heightVh: 0.42,
+  depthPx: GRUN_V_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(GRUN_V_DEPTH_PX),
+  brightness: getDepthBrightness(GRUN_V_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.grun_v,
+};
+
 export const CHAPTER2_PROPS = [
   CHAPTER2_SPORE1,
+  CHAPTER2_SPORE1_1,
   CHAPTER2_SPORE2_1,
   CHAPTER2_SPORE3,
   CHAPTER2_SPORE2_0,
   CHAPTER2_SPORE4,
+  CHAPTER2_GRUN_V,
 ] as const;
 
 export function chapter2PropAssetUrl(file: string) {

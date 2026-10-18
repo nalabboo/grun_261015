@@ -12,6 +12,7 @@ import {
 import Chapter2BergLayer from "@/components/scene2/Chapter2BergLayer";
 import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2PropEditorPanel from "@/components/scene2/Chapter2PropEditorPanel";
+import Chapter2FloatingMarimos from "@/components/scene2/Chapter2FloatingMarimos";
 import {
   CHAPTER2_PROPS,
   CHAPTER2_TUNABLE_PROP_IDS,
@@ -213,6 +214,10 @@ export default function Chapter2Scene() {
     (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
   );
   const behindBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "behindBerg2");
+  const midBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "midBerg2");
+  const aboveBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "aboveBerg2").sort(
+    (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
+  );
 
   const renderPropLayer = (prop: Chapter2PropConfig) => {
     const shiftX = smooth.x * prop.parallax;
@@ -283,6 +288,7 @@ export default function Chapter2Scene() {
         return (
           <Fragment key={layer.id}>
             {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
+            {layer.id === "berg2" && midBerg2Props.map((prop) => renderPropLayer(prop))}
             <Chapter2BergLayer
               layer={layer}
               viewportHeight={viewportHeight}
@@ -291,10 +297,13 @@ export default function Chapter2Scene() {
               scale={scale}
               edit={edit}
             />
+            {layer.id === "berg2" && aboveBerg2Props.map((prop) => renderPropLayer(prop))}
             {layer.id === "berg3" && aboveBerg3Props.map((prop) => renderPropLayer(prop))}
           </Fragment>
         );
       })}
+
+      <Chapter2FloatingMarimos />
 
       <div
         className="chapter2-synesthesia-veil"

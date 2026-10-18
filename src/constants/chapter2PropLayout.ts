@@ -4,7 +4,9 @@ import {
   CHAPTER2_PROP_IDS,
   CHAPTER2_PROPS_LAYOUT_LOCKED,
   CHAPTER2_SPORE1_LAYOUT_LOCKED,
+  CHAPTER2_SPORE1_1_LAYOUT_LOCKED,
   CHAPTER2_SPORE4_LAYOUT_LOCKED,
+  CHAPTER2_GRUN_V_LAYOUT_LOCKED,
   CHAPTER2_TUNABLE_PROP_IDS,
   getChapter2PropDefaultEdit,
   isChapter2PropTunable,
@@ -81,8 +83,16 @@ function pruneStoredProductionPropLayouts() {
       delete parsed.spore1;
       changed = true;
     }
+    if (CHAPTER2_SPORE1_1_LAYOUT_LOCKED && "spore1_1" in parsed) {
+      delete parsed.spore1_1;
+      changed = true;
+    }
     if (CHAPTER2_SPORE4_LAYOUT_LOCKED && "spore4" in parsed) {
       delete parsed.spore4;
+      changed = true;
+    }
+    if (CHAPTER2_GRUN_V_LAYOUT_LOCKED && "grun_v" in parsed) {
+      delete parsed.grun_v;
       changed = true;
     }
     if (!changed) return;
@@ -115,8 +125,16 @@ export function loadChapter2PropEdits(): Record<Chapter2PropId, Chapter2PropEdit
     base.spore1 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("spore1"));
   }
 
+  if (CHAPTER2_SPORE1_1_LAYOUT_LOCKED) {
+    base.spore1_1 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("spore1_1"));
+  }
+
   if (CHAPTER2_SPORE4_LAYOUT_LOCKED) {
     base.spore4 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("spore4"));
+  }
+
+  if (CHAPTER2_GRUN_V_LAYOUT_LOCKED) {
+    base.grun_v = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("grun_v"));
   }
 
   return base;
