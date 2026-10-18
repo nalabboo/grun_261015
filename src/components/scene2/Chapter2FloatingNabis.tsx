@@ -9,14 +9,21 @@ import {
 
 type Props = {
   sporeProgress: number;
+  /** Scene 2-3 yellow gelb exit (1 = visible, 0 = gone). */
+  yellowExitVisibility?: number;
 };
 
-export default function Chapter2FloatingNabis({ sporeProgress }: Props) {
+export default function Chapter2FloatingNabis({
+  sporeProgress,
+  yellowExitVisibility = 1,
+}: Props) {
   const anchorRefs = useRef<(HTMLDivElement | null)[]>([]);
   const sporeRef = useRef(sporeProgress);
+  const yellowVisRef = useRef(yellowExitVisibility);
   const sizeRef = useRef({ width: 0, height: 0 });
 
   sporeRef.current = sporeProgress;
+  yellowVisRef.current = yellowExitVisibility;
 
   useEffect(() => {
     const syncSize = () => {
@@ -40,7 +47,8 @@ export default function Chapter2FloatingNabis({ sporeProgress }: Props) {
           if (!el) continue;
 
           const base = getChapter2NabiBasePosition(spec, spore, width, height);
-          const opacity = getChapter2NabiOpacity(spec, spore);
+          const opacity =
+            getChapter2NabiOpacity(spec, spore) * yellowVisRef.current;
           const phase = spec.flutterPhase;
 
           const driftPx = (spec.driftRadiusVw / 100) * width;

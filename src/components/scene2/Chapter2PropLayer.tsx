@@ -21,6 +21,8 @@ type Props = {
   scrollScaleMul?: number;
   /** Scroll-driven opacity (nari reveal). */
   scrollOpacity?: number;
+  /** Scene 2-3 extra Y (px, downward). */
+  layoutYOffset?: number;
   layout: Chapter2PropEdit;
   editorActive?: boolean;
   isSelected?: boolean;
@@ -37,6 +39,7 @@ export default function Chapter2PropLayer({
   bergScale = 1,
   scrollScaleMul = 1,
   scrollOpacity = 1,
+  layoutYOffset = 0,
   layout,
   editorActive = false,
   isSelected = true,
@@ -89,7 +92,7 @@ export default function Chapter2PropLayer({
           : undefined,
         filter: filterParts.join(" "),
         transformOrigin: "50% 100%",
-        transform: `translate(calc(-50% + ${shiftX + layout.x}px), calc(-100% + ${shiftY + layout.y}px)) scale(${layout.scale * bergScale * scrollScaleMul}, ${layout.scaleY * bergScale * scrollScaleMul}) rotate(${layout.rotate}deg)`,
+        transform: `translate(calc(-50% + ${shiftX + layout.x}px), calc(-100% + ${shiftY + layout.y + layoutYOffset}px)) scale(${layout.scale * bergScale * scrollScaleMul}, ${layout.scaleY * bergScale * scrollScaleMul}) rotate(${layout.rotate}deg)`,
       }}
       onPointerDown={(event) => {
         if (!editorActive) return;

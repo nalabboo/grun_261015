@@ -3,10 +3,6 @@ import { CHAPTER2_SUBSCENE_SCROLL_MAX } from "@/constants/chapter2ScrollMotion";
 /** One-shot 2-1 → 2-2 timeline length (seconds). */
 export const CHAPTER2_SUBSCENE_PLAYBACK_SEC = 11.5;
 
-/** Wheel travel after playback completes (unlocks page turn). */
-export const CHAPTER2_EXIT_SCROLL_MAX = 1;
-export const CHAPTER2_EXIT_WHEEL_GAIN = 0.0016;
-
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
 }
@@ -16,7 +12,13 @@ function easeInOutCubic(t: number) {
   return u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2;
 }
 
-export type Chapter2SubscenePlaybackPhase = "2-1" | "2-2-playing" | "2-2-complete";
+export type Chapter2SubscenePlaybackPhase =
+  | "2-1"
+  | "2-2-playing"
+  /** 2-2 end state — scroll raw at max; wait for scroll to begin 2-3. */
+  | "2-2-complete"
+  /** 2-3 timeline (implement in `chapter2ScrollMotion` / playback). */
+  | "2-3-playing";
 
 /** Maps playback elapsed time → scroll raw (drives segment order: nari → berg → grun → spore). */
 export function getChapter2PlaybackScrollRaw(elapsedSec: number) {

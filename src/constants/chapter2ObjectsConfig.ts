@@ -31,6 +31,8 @@ export type Chapter2PropConfig = {
   attachToBergId?: "berg2";
   /** Opacity follows scroll nari segment (before berg y2). */
   revealOnScroll?: boolean;
+  /** Scene 2-3 reveal (see `getChapter2LaublRevealOpacity`). */
+  revealOnSubscene23?: boolean;
 };
 
 export const CHAPTER2_PROP_IDS = [
@@ -43,6 +45,7 @@ export const CHAPTER2_PROP_IDS = [
   "grun_v",
   "worm_g",
   "nari",
+  "laubl",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -69,6 +72,8 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   /** 벌레 — bottom-right, in front of berg2 */
   worm_g: { x: 450, y: -244, scale: 1.12, scaleY: 1.12, rotate: 0 },
   nari: { x: 360, y: -392, scale: 1.35, scaleY: 1.35, rotate: 0 },
+  /** 라우블 — same slot as worm_g (scene 2-3). */
+  laubl: { x: 450, y: -144, scale: 3.024, scaleY: 3.024, rotate: 0 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -98,6 +103,9 @@ export const CHAPTER2_WORM_G_LAYOUT_LOCKED = true;
 
 /** When true, nari uses fixed layout/blur (not localStorage). */
 export const CHAPTER2_NARI_LAYOUT_LOCKED = true;
+
+/** When true, laubl (라우블) uses fixed layout/blur (not localStorage). */
+export const CHAPTER2_LAUBL_LAYOUT_LOCKED = true;
 
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
 const SPORE1_DEPTH_PX = -180;
@@ -258,6 +266,24 @@ export const CHAPTER2_WORM_G: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.worm_g,
 };
 
+/** 라우블 — scene 2-3, worm_g position, in front of berg2. */
+export const CHAPTER2_LAUBL: Chapter2PropConfig = {
+  id: "laubl",
+  file: "charactor/laubl.png",
+  width: 700,
+  height: 1046,
+  zIndex: 6,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealOnSubscene23: true,
+  parallax: 16,
+  heightVh: 0.26,
+  depthPx: WORM_G_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(WORM_G_DEPTH_PX),
+  brightness: getDepthBrightness(WORM_G_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.laubl,
+};
+
 export const CHAPTER2_PROPS = [
   CHAPTER2_SPORE1,
   CHAPTER2_SPORE1_1,
@@ -268,6 +294,7 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_GRUN_V,
   CHAPTER2_NARI,
   CHAPTER2_WORM_G,
+  CHAPTER2_LAUBL,
 ] as const;
 
 export function chapter2PropAssetUrl(file: string) {

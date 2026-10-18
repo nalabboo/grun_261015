@@ -147,6 +147,8 @@ type Props = {
   scrollYOffset?: number;
   /** 0 = scene 2-1 texture, 1 = scrollAltFile (scene 2-2). */
   scrollBlend?: number;
+  /** 0 = scroll alt, 1 = subscene23AltFile (scene 2-3). */
+  subscene23Blend?: number;
   scale: number;
   edit?: Chapter2BergEditTransform;
   editorActive?: boolean;
@@ -164,6 +166,7 @@ export default function Chapter2BergLayer({
   shiftY,
   scrollYOffset = 0,
   scrollBlend = 0,
+  subscene23Blend = 0,
   scale,
   edit = DEFAULT_CHAPTER2_BERG_EDIT,
   editorActive = false,
@@ -174,6 +177,8 @@ export default function Chapter2BergLayer({
 }: Props) {
   const base = useBakedBergSrc(layer, layer.file);
   const alt = useBakedBergSrc(layer, layer.scrollAltFile ?? layer.file);
+  const sub23File = layer.subscene23AltFile;
+  const sub23 = useBakedBergSrc(layer, sub23File ?? layer.file);
 
   const aspect = layer.width / layer.height;
   const scaleY = layer.scaleY ?? 1;
@@ -198,8 +203,10 @@ export default function Chapter2BergLayer({
   const blend = layer.scrollAltFile
     ? Math.min(1, Math.max(0, scrollBlend))
     : 0;
-  const baseOpacity = 1 - blend;
-  const altOpacity = blend;
+  const s23 = sub23File ? Math.min(1, Math.max(0, subscene23Blend)) : 0;
+  const baseOpacity = (1 - blend) * (1 - s23);
+  const altOpacity = blend * (1 - s23);
+  const sub23Opacity = blend * s23;
 
   const renderImage = (
     key: string,
@@ -264,13 +271,15 @@ export default function Chapter2BergLayer({
     );
   };
 
-  const pointerOnAlt = blend >= 0.5;
+  const pointerOnTop = s23 >= 0.5 || (s23 <= 0 && blend >= 0.5);
 
   return (
     <>
-      {renderImage("base", base.src, base.layerAssetUrl, baseOpacity, !pointerOnAlt)}
+      {renderImage("base", base.src, base.layerAssetUrl, baseOpacity, !pointerOnTop)}
       {layer.scrollAltFile &&
-        renderImage("alt", alt.src, alt.layerAssetUrl, altOpacity, pointerOnAlt)}
+        renderImage("alt", alt.src, alt.layerAssetUrl, altOpacity, !pointerOnTop && blend >= 0.5)}
+      {sub23File &&
+        renderImage("sub23", sub23.src, sub23.layerAssetUrl, sub23Opacity, pointerOnTop)}
     </>
   );
 }

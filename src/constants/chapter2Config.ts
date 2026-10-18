@@ -10,17 +10,10 @@ import {
 } from "@/constants/chapter2Layout";
 export const CHAPTER2_ID = "scene2";
 
-/**
- * Chapter 2 **play** sub-scenes (berg stack + props in `Chapter2Scene`).
- *
- * - **2-1** — Baseline as of 2026-10-18: berg4→berg3→berg2 stack, spores, grun_v,
- *   worm_g (berg2-fixed), floating marimos. Layouts in `chapter2ObjectsConfig.ts`.
- * - **2-2** — Scroll segments (see `chapter2ScrollMotion.ts`): berg y2 → grun shrink → spore scale.
- */
+/** @deprecated Use `CHAPTER2_PLAY_SUBSCENE_2_1` from `chapter2PlaySubscenes.ts`. */
 export const CHAPTER2_PLAY_SUBSCENE_BASELINE = "2-1" as const;
-export type Chapter2PlaySubscene = "2-1" | "2-2";
 
-/** Wheel delta → scroll progress (0 = scene 2-1, 1 = full 2-1→2-2 shift). */
+/** Sub-scene docs: `chapter2PlaySubscenes.ts`. Dev editor only — manual 2-1↔2-2 scrub. */
 export const CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN = 0.0018;
 
 /** Extra Y (px) at scroll progress 1 — scene 2-1 → 2-2 berg drift. */
@@ -111,6 +104,8 @@ export type Chapter2BergLayerConfig = {
   objectPosition?: string;
   /** Scene 2-2 PNG crossfaded in at scroll progress 1. */
   scrollAltFile?: string;
+  /** Scene 2-3 PNG crossfaded from scrollAlt at intro progress 1. */
+  subscene23AltFile?: string;
 };
 
 export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
@@ -118,6 +113,7 @@ export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
     id: "berg4",
     file: "background/2_berg4.png",
     scrollAltFile: "background/y2_berg4.png",
+    subscene23AltFile: "background/b2_berg4.png",
     width: CH2_BG_BERG.width,
     height: CH2_BG_BERG.height,
     anchor: "bottom",
@@ -138,6 +134,7 @@ export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
     id: "berg3",
     file: "background/2_berg3.png",
     scrollAltFile: "background/y2_berg3.png",
+    subscene23AltFile: "background/b2_berg3.png",
     width: CH2_BG_BERG.width,
     height: CH2_BG_BERG.height,
     scaleY: 1.12,
@@ -190,6 +187,7 @@ export function preloadChapter2BergAssets(): Promise<void> {
     ...CHAPTER2_BERG_LAYERS.flatMap((layer) => [
       chapter2LayerAssetUrl(layer),
       ...(layer.scrollAltFile ? [chapter2AssetUrl(layer.scrollAltFile)] : []),
+      ...(layer.subscene23AltFile ? [chapter2AssetUrl(layer.subscene23AltFile)] : []),
     ]),
     chapter2AssetUrl("grun objekt/spore1.png"),
     chapter2AssetUrl("grun objekt/spore2.png"),
@@ -199,6 +197,7 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("grun objekt/marimo2.png"),
     chapter2AssetUrl("charactor/grun_v.png"),
     chapter2AssetUrl("charactor/nari.png"),
+    chapter2AssetUrl("charactor/laubl.png"),
     chapter2AssetUrl("grun objekt/worm_g.png"),
     chapter2AssetUrl("gelb objekt/g_nabi1.png"),
     chapter2AssetUrl("gelb objekt/g_nabi2.png"),

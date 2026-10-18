@@ -16,6 +16,8 @@ type Props = {
   shiftY: number;
   /** Scene 2-2 — same scroll segment as Nari reveal (0–1). */
   nariProgress: number;
+  /** Scene 2-3 yellow gelb exit (1 = visible, 0 = gone). */
+  yellowExitVisibility?: number;
 };
 
 function smoothstep(t: number) {
@@ -28,14 +30,17 @@ export default function Chapter2VogelFlyby({
   shiftX,
   shiftY,
   nariProgress,
+  yellowExitVisibility = 1,
 }: Props) {
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const shiftRef = useRef({ shiftX, shiftY });
   const nariRef = useRef(nariProgress);
+  const yellowVisRef = useRef(yellowExitVisibility);
   const landedAtRef = useRef<number | null>(null);
 
   shiftRef.current = { shiftX, shiftY };
   nariRef.current = nariProgress;
+  yellowVisRef.current = yellowExitVisibility;
 
   useEffect(() => {
     let raf = 0;
@@ -80,7 +85,7 @@ export default function Chapter2VogelFlyby({
         const x = startX + (rest.x - startX) * ease;
         const y = startY + (rest.y - startY) * ease + flyBob + idleBob;
 
-        el.style.opacity = String(flyOpacity);
+        el.style.opacity = String(flyOpacity * yellowVisRef.current);
         el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
       }
       raf = requestAnimationFrame(tick);

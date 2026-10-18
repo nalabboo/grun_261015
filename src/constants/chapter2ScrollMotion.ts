@@ -17,9 +17,12 @@ const SCROLL_SPORE_LENGTH = 3.4;
 const SCROLL_GRUN_START = SCROLL_BERG_START + SCROLL_BERG_LENGTH;
 const SCROLL_SPORE_START = SCROLL_GRUN_START + SCROLL_GRUN_LENGTH;
 
-/** Total wheel travel (nari → berg → grun → spore). */
-export const CHAPTER2_SUBSCENE_SCROLL_MAX =
+/** Total scroll raw at end of **scene 2-2** (nari → berg → grun → spore). 2-3 adds beyond this later. */
+export const CHAPTER2_SUBSCENE_2_2_SCROLL_MAX =
   SCROLL_SPORE_START + SCROLL_SPORE_LENGTH;
+
+/** @deprecated Alias — end of 2-2 auto-playback. */
+export const CHAPTER2_SUBSCENE_SCROLL_MAX = CHAPTER2_SUBSCENE_2_2_SCROLL_MAX;
 
 /** Grun: at most 20% smaller than layout scale (color + scroll combined). */
 export const CHAPTER2_GRUN_MIN_SCALE = 0.8;

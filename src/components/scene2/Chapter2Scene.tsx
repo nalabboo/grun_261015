@@ -20,12 +20,23 @@ import {
   getChapter2ScrollSegments,
 } from "@/constants/chapter2ScrollMotion";
 import {
-  CHAPTER2_EXIT_SCROLL_MAX,
-  CHAPTER2_EXIT_WHEEL_GAIN,
   getChapter2PlaybackScrollRaw,
   isChapter2PlaybackComplete,
   type Chapter2SubscenePlaybackPhase,
 } from "@/constants/chapter2SubscenePlayback";
+import {
+  canChapter2ScrollStartSubscene23,
+  CHAPTER2_SUBSCENE_23_SCROLL_ACCUM_MAX,
+  CHAPTER2_SUBSCENE_23_SCROLL_WHEEL_GAIN,
+  getChapter2BergSubscene23YOffset,
+  isChapter2Subscene23ScrollAccumReady,
+  getChapter2LaublRevealOpacity,
+  getChapter2GrunSubscene23ScaleMul,
+  getChapter2NariSubscene23ScaleMul,
+  getChapter2SporeSubscene23Motion,
+  getChapter2Subscene23IntroProgress,
+  getChapter2YellowGelbExitVisibility,
+} from "@/constants/chapter2Subscene23Motion";
 import Chapter2BergLayer from "@/components/scene2/Chapter2BergLayer";
 import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2PropEditorPanel from "@/components/scene2/Chapter2PropEditorPanel";
@@ -84,14 +95,14 @@ function getChapter2DepthFactor(viewportHeight: number, depthRatio: number) {
 type Chapter2SceneProps = {
   /** All 2-2 motions finished (auto playback). */
   onSequenceComplete?: () => void;
-  /** User scrolled after complete — ready for next chapter UI. */
-  onExitScrollComplete?: () => void;
+  /** First scroll after 2-2 hold — begin scene 2-3 (motion TBD). */
+  onSubscene23ScrollStart?: () => void;
 };
 
 /** Chapter 2 — stacked berg layers with mouse parallax. */
 export default function Chapter2Scene({
   onSequenceComplete,
-  onExitScrollComplete,
+  onSubscene23ScrollStart,
 }: Chapter2SceneProps) {
   const targetRef = useRef<Point>({ x: 0, y: 0 });
   const smoothRef = useRef<Point>({ x: 0, y: 0 });
@@ -100,16 +111,18 @@ export default function Chapter2Scene({
   const scrollSmoothRef = useRef(0);
   const playbackPhaseRef = useRef<Chapter2SubscenePlaybackPhase>("2-1");
   const playbackStartMsRef = useRef(0);
-  const exitScrollRef = useRef(0);
+  const subscene22CompleteAtMsRef = useRef(0);
+  const subscene23StartMsRef = useRef(0);
   const sequenceCompleteFiredRef = useRef(false);
-  const exitScrollCompleteFiredRef = useRef(false);
+  const subscene23StartFiredRef = useRef(false);
+  const subscene23ScrollAccumRef = useRef(0);
   const onSequenceCompleteRef = useRef(onSequenceComplete);
-  const onExitScrollCompleteRef = useRef(onExitScrollComplete);
+  const onSubscene23ScrollStartRef = useRef(onSubscene23ScrollStart);
   const editorEnabledRef = useRef(false);
   const [frame, setFrame] = useState(0);
 
   onSequenceCompleteRef.current = onSequenceComplete;
-  onExitScrollCompleteRef.current = onExitScrollComplete;
+  onSubscene23ScrollStartRef.current = onSubscene23ScrollStart;
 
   const [editor, setEditor] = useState<Chapter2PropEditorState>({
     enabled: false,
@@ -188,22 +201,28 @@ export default function Chapter2Scene({
         return;
       }
 
-      if (phase === "2-2-playing") {
+      if (phase === "2-2-playing" || phase === "2-3-playing") {
         return;
       }
 
       if (phase === "2-2-complete" && event.deltaY > 0) {
-        exitScrollRef.current = Math.min(
-          CHAPTER2_EXIT_SCROLL_MAX,
-          exitScrollRef.current + event.deltaY * CHAPTER2_EXIT_WHEEL_GAIN,
-        );
-        if (
-          exitScrollRef.current >= CHAPTER2_EXIT_SCROLL_MAX &&
-          !exitScrollCompleteFiredRef.current
-        ) {
-          exitScrollCompleteFiredRef.current = true;
-          onExitScrollCompleteRef.current?.();
+        if (canChapter2ScrollStartSubscene23(subscene22CompleteAtMsRef.current)) {
+          subscene23ScrollAccumRef.current = Math.min(
+            CHAPTER2_SUBSCENE_23_SCROLL_ACCUM_MAX,
+            subscene23ScrollAccumRef.current +
+              event.deltaY * CHAPTER2_SUBSCENE_23_SCROLL_WHEEL_GAIN,
+          );
+          if (
+            !subscene23StartFiredRef.current &&
+            isChapter2Subscene23ScrollAccumReady(subscene23ScrollAccumRef.current)
+          ) {
+            subscene23StartFiredRef.current = true;
+            playbackPhaseRef.current = "2-3-playing";
+            subscene23StartMsRef.current = performance.now();
+            onSubscene23ScrollStartRef.current?.();
+          }
         }
+        return;
       }
     };
 
@@ -230,11 +249,23 @@ export default function Chapter2Scene({
           playbackPhaseRef.current = "2-2-complete";
           scrollTargetRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
           scrollSmoothRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+          if (subscene22CompleteAtMsRef.current === 0) {
+            subscene22CompleteAtMsRef.current = performance.now();
+          }
           if (!sequenceCompleteFiredRef.current) {
             sequenceCompleteFiredRef.current = true;
             onSequenceCompleteRef.current?.();
           }
         }
+      } else if (playbackPhase === "2-2-complete") {
+        scrollTargetRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+        scrollSmoothRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+        if (subscene22CompleteAtMsRef.current === 0) {
+          subscene22CompleteAtMsRef.current = performance.now();
+        }
+      } else if (playbackPhase === "2-3-playing") {
+        scrollTargetRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+        scrollSmoothRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
       } else if (playbackPhase === "2-1") {
         scrollTargetRef.current = 0;
         scrollSmoothRef.current += (0 - scrollSmoothRef.current) * SCROLL_SMOOTH;
@@ -309,9 +340,23 @@ export default function Chapter2Scene({
   const scrollSegments = getChapter2ScrollSegments(scrollAmount);
   void frame;
 
+  const playbackPhase = playbackPhaseRef.current;
+  const subscene23ElapsedSec =
+    playbackPhase === "2-3-playing" && subscene23StartMsRef.current > 0
+      ? (performance.now() - subscene23StartMsRef.current) / 1000
+      : 0;
+  const subscene23IntroProgress = getChapter2Subscene23IntroProgress(
+    playbackPhase,
+    subscene23ElapsedSec,
+  );
+
   const berg4ScrollY = scrollSegments.berg * CHAPTER2_SCROLL_BERG4_Y;
   const berg3ScrollY = scrollSegments.berg * CHAPTER2_SCROLL_BERG3_Y;
-  const bergScrollBlend = scrollSegments.berg;
+  /** 2-2 hold / 2-3: keep y2 bergs visible for b2 crossfade (scroll raw already at max). */
+  const bergY2ScrollBlend =
+    playbackPhase === "2-2-complete" || playbackPhase === "2-3-playing"
+      ? 1
+      : scrollSegments.berg;
 
   const breathe = 1 + Math.hypot(smooth.x, smooth.y) * 0.012;
   const motion = Math.hypot(smooth.x, smooth.y);
@@ -346,14 +391,34 @@ export default function Chapter2Scene({
     const shiftY = attached ? bergMotion.shiftY : smooth.y * prop.parallax * 0.65;
     const bergScale = attached ? bergMotion.bergScale : 1;
     const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultEdit(prop.id);
-    const scrollScaleMul = getChapter2PropScrollScaleMultiplier(
+    let scrollScaleMul = getChapter2PropScrollScaleMultiplier(
       prop,
       layout,
       viewportHeight,
       bergScale,
       scrollSegments,
     );
-    const scrollOpacity = getChapter2PropScrollOpacity(prop, scrollSegments);
+    let scrollOpacity = getChapter2PropScrollOpacity(prop, scrollSegments);
+    if (prop.revealOnSubscene23) {
+      scrollOpacity *= getChapter2LaublRevealOpacity(playbackPhase, subscene23ElapsedSec);
+    }
+    let layoutYOffset = 0;
+    const spore23 = getChapter2SporeSubscene23Motion(
+      prop.id,
+      playbackPhase,
+      subscene23ElapsedSec,
+    );
+    if (spore23) {
+      scrollScaleMul *= spore23.scaleMul;
+      scrollOpacity *= spore23.opacity;
+      layoutYOffset = spore23.yOffsetPx;
+    }
+    if (prop.id === "grun_v") {
+      scrollScaleMul *= getChapter2GrunSubscene23ScaleMul(playbackPhase, subscene23ElapsedSec);
+    }
+    if (prop.id === "nari") {
+      scrollScaleMul *= getChapter2NariSubscene23ScaleMul(playbackPhase, subscene23ElapsedSec);
+    }
     const tunable = isChapter2PropTunable(prop.id);
     const isSelected = tunable && editor.selectedId === prop.id;
     return (
@@ -366,6 +431,7 @@ export default function Chapter2Scene({
         bergScale={bergScale}
         scrollScaleMul={scrollScaleMul}
         scrollOpacity={scrollOpacity}
+        layoutYOffset={layoutYOffset}
         layout={layout}
         editorActive={editor.enabled && tunable}
         isSelected={isSelected}
@@ -411,8 +477,12 @@ export default function Chapter2Scene({
             viewportHeight={viewportHeight}
             shiftX={berg4ShiftX}
             shiftY={berg4ShiftY}
-            scrollYOffset={berg4ScrollY}
-            scrollBlend={bergScrollBlend}
+            scrollYOffset={
+              berg4ScrollY +
+              getChapter2BergSubscene23YOffset("berg4", subscene23IntroProgress)
+            }
+            scrollBlend={bergY2ScrollBlend}
+            subscene23Blend={subscene23IntroProgress}
             scale={1}
             edit={berg4Edit}
           />
@@ -437,6 +507,10 @@ export default function Chapter2Scene({
                 shiftX={smooth.x * CHAPTER2_VOGEL.parallax}
                 shiftY={smooth.y * CHAPTER2_VOGEL.parallax * 0.65}
                 nariProgress={scrollSegments.nari}
+                yellowExitVisibility={getChapter2YellowGelbExitVisibility(
+                  playbackPhase,
+                  subscene23ElapsedSec,
+                )}
               />
             )}
             {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
@@ -446,8 +520,16 @@ export default function Chapter2Scene({
               viewportHeight={viewportHeight}
               shiftX={shiftX}
               shiftY={shiftY}
-              scrollYOffset={layer.id === "berg3" ? berg3ScrollY : 0}
-              scrollBlend={layer.id === "berg3" ? bergScrollBlend : 0}
+              scrollYOffset={
+                layer.id === "berg3"
+                  ? berg3ScrollY +
+                    getChapter2BergSubscene23YOffset("berg3", subscene23IntroProgress)
+                  : layer.id === "berg2"
+                    ? getChapter2BergSubscene23YOffset("berg2", subscene23IntroProgress)
+                    : 0
+              }
+              scrollBlend={layer.id === "berg3" ? bergY2ScrollBlend : 0}
+              subscene23Blend={layer.id === "berg3" ? subscene23IntroProgress : 0}
               scale={scale}
               edit={edit}
             />
@@ -466,7 +548,13 @@ export default function Chapter2Scene({
 
       <Chapter2FloatingMarimos sporeProgress={scrollSegments.spore} />
 
-      <Chapter2FloatingNabis sporeProgress={scrollSegments.spore} />
+      <Chapter2FloatingNabis
+        sporeProgress={scrollSegments.spore}
+        yellowExitVisibility={getChapter2YellowGelbExitVisibility(
+          playbackPhase,
+          subscene23ElapsedSec,
+        )}
+      />
 
       {DEV_CHAPTER2_PROP_EDITOR && (
         <Chapter2PropEditorPanel
