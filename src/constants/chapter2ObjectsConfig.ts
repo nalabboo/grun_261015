@@ -33,6 +33,8 @@ export type Chapter2PropConfig = {
   revealOnScroll?: boolean;
   /** Scene 2-3 reveal (see `getChapter2LaublRevealOpacity`). */
   revealOnSubscene23?: boolean;
+  /** After Laubl — rise from below viewport (`getChapter2BlauSteinReveal`). */
+  revealFromBottomAfterLaubl?: boolean;
 };
 
 export const CHAPTER2_PROP_IDS = [
@@ -46,6 +48,8 @@ export const CHAPTER2_PROP_IDS = [
   "worm_g",
   "nari",
   "laubl",
+  "stein1",
+  "stein2",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -74,6 +78,9 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   nari: { x: 360, y: -392, scale: 1.35, scaleY: 1.35, rotate: 0 },
   /** 라우블 — same slot as worm_g (scene 2-3). */
   laubl: { x: 450, y: -144, scale: 3.024, scaleY: 3.024, rotate: 0 },
+  /** Blau 돌 — ref layout 2026-10-24 (stein2 right of stein1). */
+  stein1: { x: -528, y: 90, scale: 2.138, scaleY: 2.138, rotate: 0 },
+  stein2: { x: -68, y: 100, scale: 1.53, scaleY: 1.53, rotate: 0 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -107,6 +114,9 @@ export const CHAPTER2_NARI_LAYOUT_LOCKED = true;
 /** When true, laubl (라우블) uses fixed layout/blur (not localStorage). */
 export const CHAPTER2_LAUBL_LAYOUT_LOCKED = true;
 
+export const CHAPTER2_STEIN1_LAYOUT_LOCKED = true;
+export const CHAPTER2_STEIN2_LAYOUT_LOCKED = true;
+
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
 const SPORE1_DEPTH_PX = -180;
 /** Between spore4 (35) and berg2 (90); in front of berg2. */
@@ -120,6 +130,8 @@ const GRUN_V_DEPTH_PX = 58;
 const NARI_DEPTH_PX = 55;
 /** Foreground critter on berg2 (벌레). */
 const WORM_G_DEPTH_PX = 72;
+/** Floor blau steins — in front of berg2 ridge. */
+const BLAU_STEIN_DEPTH_PX = 78;
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -284,6 +296,38 @@ export const CHAPTER2_LAUBL: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.laubl,
 };
 
+export const CHAPTER2_STEIN1: Chapter2PropConfig = {
+  id: "stein1",
+  file: "blau objekt/b_stein1.png",
+  width: 793,
+  height: 1072,
+  zIndex: 4,
+  stack: "aboveBerg2",
+  revealFromBottomAfterLaubl: true,
+  parallax: 14,
+  heightVh: 0.22,
+  depthPx: BLAU_STEIN_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(BLAU_STEIN_DEPTH_PX),
+  brightness: getDepthBrightness(BLAU_STEIN_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.stein1,
+};
+
+export const CHAPTER2_STEIN2: Chapter2PropConfig = {
+  id: "stein2",
+  file: "blau objekt/b_stein2.png",
+  width: 602,
+  height: 719,
+  zIndex: 4,
+  stack: "aboveBerg2",
+  revealFromBottomAfterLaubl: true,
+  parallax: 14,
+  heightVh: 0.18,
+  depthPx: BLAU_STEIN_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(BLAU_STEIN_DEPTH_PX),
+  brightness: getDepthBrightness(BLAU_STEIN_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.stein2,
+};
+
 export const CHAPTER2_PROPS = [
   CHAPTER2_SPORE1,
   CHAPTER2_SPORE1_1,
@@ -295,6 +339,8 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_NARI,
   CHAPTER2_WORM_G,
   CHAPTER2_LAUBL,
+  CHAPTER2_STEIN1,
+  CHAPTER2_STEIN2,
 ] as const;
 
 export function chapter2PropAssetUrl(file: string) {

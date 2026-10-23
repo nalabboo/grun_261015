@@ -8,6 +8,7 @@ import {
   CHAPTER2_BERG_LAYERS,
   CHAPTER2_BERG4_FIXED_LAYOUT,
   CHAPTER2_DEPTH_SIZE_STRENGTH,
+  CHAPTER2_MOUSE_PARALLAX_GAIN,
   CHAPTER2_SCROLL_BERG3_Y,
   CHAPTER2_SCROLL_BERG4_Y,
   CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN,
@@ -33,7 +34,8 @@ import {
   getChapter2LaublRevealOpacity,
   getChapter2GrunSubscene23ScaleMul,
   getChapter2NariSubscene23ScaleMul,
-  getChapter2SporeSubscene23Motion,
+  getChapter2BlauSteinReveal,
+  getChapter2LaublRevealPropMotion,
   getChapter2Subscene23IntroProgress,
   getChapter2YellowGelbExitVisibility,
 } from "@/constants/chapter2Subscene23Motion";
@@ -336,6 +338,8 @@ export default function Chapter2Scene({
   );
 
   const smooth = smoothRef.current;
+  const mouseX = smooth.x * CHAPTER2_MOUSE_PARALLAX_GAIN;
+  const mouseY = smooth.y * CHAPTER2_MOUSE_PARALLAX_GAIN;
   const scrollAmount = scrollSmoothRef.current;
   const scrollSegments = getChapter2ScrollSegments(scrollAmount);
   void frame;
@@ -358,8 +362,8 @@ export default function Chapter2Scene({
       ? 1
       : scrollSegments.berg;
 
-  const breathe = 1 + Math.hypot(smooth.x, smooth.y) * 0.012;
-  const motion = Math.hypot(smooth.x, smooth.y);
+  const motion = Math.hypot(mouseX, mouseY);
+  const breathe = 1 + motion * 0.014;
   const parallaxBreathe = breathe + motion * 0.004;
 
   const foregroundLayers = CHAPTER2_BERG_LAYERS.filter((layer) => layer.id !== "berg4");
@@ -387,8 +391,8 @@ export default function Chapter2Scene({
 
   const renderPropLayer = (prop: Chapter2PropConfig, bergMotion?: BergPropMotion) => {
     const attached = bergMotion && prop.attachToBergId === "berg2";
-    const shiftX = attached ? bergMotion.shiftX : smooth.x * prop.parallax;
-    const shiftY = attached ? bergMotion.shiftY : smooth.y * prop.parallax * 0.65;
+    const shiftX = attached ? bergMotion.shiftX : mouseX * prop.parallax;
+    const shiftY = attached ? bergMotion.shiftY : mouseY * prop.parallax * 0.65;
     const bergScale = attached ? bergMotion.bergScale : 1;
     const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultEdit(prop.id);
     let scrollScaleMul = getChapter2PropScrollScaleMultiplier(
@@ -403,15 +407,26 @@ export default function Chapter2Scene({
       scrollOpacity *= getChapter2LaublRevealOpacity(playbackPhase, subscene23ElapsedSec);
     }
     let layoutYOffset = 0;
-    const spore23 = getChapter2SporeSubscene23Motion(
+    if (prop.revealFromBottomAfterLaubl) {
+      const steinReveal = getChapter2BlauSteinReveal(
+        prop.id,
+        playbackPhase,
+        subscene23ElapsedSec,
+      );
+      if (steinReveal) {
+        scrollOpacity *= steinReveal.opacity;
+        layoutYOffset += steinReveal.riseYOffsetPx;
+      }
+    }
+    const laublBeat = getChapter2LaublRevealPropMotion(
       prop.id,
       playbackPhase,
       subscene23ElapsedSec,
     );
-    if (spore23) {
-      scrollScaleMul *= spore23.scaleMul;
-      scrollOpacity *= spore23.opacity;
-      layoutYOffset = spore23.yOffsetPx;
+    if (laublBeat) {
+      scrollScaleMul *= laublBeat.scaleMul;
+      scrollOpacity *= laublBeat.opacity;
+      layoutYOffset = laublBeat.yOffsetPx;
     }
     if (prop.id === "grun_v") {
       scrollScaleMul *= getChapter2GrunSubscene23ScaleMul(playbackPhase, subscene23ElapsedSec);
@@ -468,8 +483,8 @@ export default function Chapter2Scene({
         const berg4Edit = devEditsReady
           ? tunableEdits.berg4
           : CHAPTER2_BERG4_FIXED_LAYOUT;
-        const berg4ShiftX = smooth.x * berg4Layer.parallax;
-        const berg4ShiftY = smooth.y * berg4Layer.parallax * 0.65;
+        const berg4ShiftX = mouseX * berg4Layer.parallax;
+        const berg4ShiftY = mouseY * berg4Layer.parallax * 0.65;
         return (
           <Chapter2BergLayer
             key={berg4Layer.id}
@@ -492,8 +507,8 @@ export default function Chapter2Scene({
       {aboveBerg4Props.map((prop) => renderPropLayer(prop))}
 
       {foregroundLayers.map((layer, index) => {
-        const shiftX = smooth.x * layer.parallax;
-        const shiftY = smooth.y * layer.parallax * 0.65;
+        const shiftX = mouseX * layer.parallax;
+        const shiftY = mouseY * layer.parallax * 0.65;
         const scale = foregroundScales[index] / maxForegroundScale;
         const tunableId = layer.id as Chapter2TunableId;
         const edit = devEditsReady
@@ -504,13 +519,11 @@ export default function Chapter2Scene({
             {layer.id === "berg2" && (
               <Chapter2VogelFlyby
                 viewportHeight={viewportHeight}
-                shiftX={smooth.x * CHAPTER2_VOGEL.parallax}
-                shiftY={smooth.y * CHAPTER2_VOGEL.parallax * 0.65}
+                shiftX={mouseX * CHAPTER2_VOGEL.parallax}
+                shiftY={mouseY * CHAPTER2_VOGEL.parallax * 0.65}
                 nariProgress={scrollSegments.nari}
-                yellowExitVisibility={getChapter2YellowGelbExitVisibility(
-                  playbackPhase,
-                  subscene23ElapsedSec,
-                )}
+                subscene23Phase={playbackPhase}
+                subscene23ElapsedSec={subscene23ElapsedSec}
               />
             )}
             {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
@@ -546,7 +559,11 @@ export default function Chapter2Scene({
         );
       })}
 
-      <Chapter2FloatingMarimos sporeProgress={scrollSegments.spore} />
+      <Chapter2FloatingMarimos
+        sporeProgress={scrollSegments.spore}
+        subscene23Phase={playbackPhase}
+        subscene23ElapsedSec={subscene23ElapsedSec}
+      />
 
       <Chapter2FloatingNabis
         sporeProgress={scrollSegments.spore}

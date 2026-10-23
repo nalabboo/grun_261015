@@ -9,6 +9,8 @@ import {
   getChapter2SaRestCenterPx,
   getChapter2SaShouldMount,
 } from "@/constants/chapter2VogelConfig";
+import { getChapter2VogelLaublExitMotion } from "@/constants/chapter2Subscene23Motion";
+import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
 
 type Props = {
   viewportHeight: number;
@@ -16,8 +18,8 @@ type Props = {
   shiftY: number;
   /** Scene 2-2 — same scroll segment as Nari reveal (0–1). */
   nariProgress: number;
-  /** Scene 2-3 yellow gelb exit (1 = visible, 0 = gone). */
-  yellowExitVisibility?: number;
+  subscene23Phase?: Chapter2SubscenePlaybackPhase;
+  subscene23ElapsedSec?: number;
 };
 
 function smoothstep(t: number) {
@@ -30,17 +32,20 @@ export default function Chapter2VogelFlyby({
   shiftX,
   shiftY,
   nariProgress,
-  yellowExitVisibility = 1,
+  subscene23Phase = "2-1",
+  subscene23ElapsedSec = 0,
 }: Props) {
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const shiftRef = useRef({ shiftX, shiftY });
   const nariRef = useRef(nariProgress);
-  const yellowVisRef = useRef(yellowExitVisibility);
+  const sub23PhaseRef = useRef(subscene23Phase);
+  const sub23ElapsedRef = useRef(subscene23ElapsedSec);
   const landedAtRef = useRef<number | null>(null);
 
   shiftRef.current = { shiftX, shiftY };
   nariRef.current = nariProgress;
-  yellowVisRef.current = yellowExitVisibility;
+  sub23PhaseRef.current = subscene23Phase;
+  sub23ElapsedRef.current = subscene23ElapsedSec;
 
   useEffect(() => {
     let raf = 0;
@@ -82,10 +87,19 @@ export default function Chapter2VogelFlyby({
             ? Math.sin((now - landedAtRef.current) / 1000 * 1.2) * height * 0.003
             : 0;
 
-        const x = startX + (rest.x - startX) * ease;
-        const y = startY + (rest.y - startY) * ease + flyBob + idleBob;
+        let x = startX + (rest.x - startX) * ease;
+        let y = startY + (rest.y - startY) * ease + flyBob + idleBob;
 
-        el.style.opacity = String(flyOpacity * yellowVisRef.current);
+        const laublExit = getChapter2VogelLaublExitMotion(
+          sub23PhaseRef.current,
+          sub23ElapsedRef.current,
+        );
+        if (laublExit.active) {
+          x += laublExit.driftXNorm * width;
+          y += laublExit.driftYNorm * height + laublExit.bobPx;
+        }
+
+        el.style.opacity = String(flyOpacity * laublExit.opacityMul);
         el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
       }
       raf = requestAnimationFrame(tick);

@@ -1,5 +1,6 @@
 import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
 import type { Chapter2PropId } from "@/constants/chapter2ObjectsConfig";
+import type { Chapter2MarimoInstance } from "@/constants/chapter2MarimoConfig";
 
 /** After 2-2 hold — ignore scroll until this delay, then wheel starts 2-3. */
 export const CHAPTER2_SUBSCENE_23_SCROLL_GATE_DELAY_MS = 3000;
@@ -20,6 +21,9 @@ export function isChapter2Subscene23ScrollAccumReady(scrollAccum: number) {
 /** 라우블 fade-in duration after 2-3 starts (seconds). */
 export const CHAPTER2_LAUBL_REVEAL_SEC = 1.1;
 
+/** Spore / worm / bird beats start after Laubl fade-in completes. */
+export const CHAPTER2_LAUBL_PROPS_MOTION_START_SEC = CHAPTER2_LAUBL_REVEAL_SEC;
+
 /** Berg drop + y2→b2 crossfade (with Laubl intro). */
 export const CHAPTER2_SUBSCENE_23_INTRO_MOTION_SEC = 1.35;
 
@@ -27,44 +31,64 @@ export const CHAPTER2_BERG2_SUBSCENE_23_Y = 20;
 export const CHAPTER2_BERG3_SUBSCENE_23_Y = 50;
 export const CHAPTER2_BERG4_SUBSCENE_23_Y = 70;
 
-/** Spore 2-3 motions begin after berg intro finishes. */
-export const CHAPTER2_SUBSCENE_23_SPORE_START_SEC = CHAPTER2_SUBSCENE_23_INTRO_MOTION_SEC;
-/** Normalized timeline length for spore stagger (seconds). */
-export const CHAPTER2_SUBSCENE_23_SPORE_MOTION_SEC = 2.25;
-
-type Spore23Spec = {
-  delay: number;
-  span: number;
-  mode: "exit" | "shrink";
-  /** Final scale multiplier at progress 1 (shrink only). */
-  scaleEnd?: number;
-  dropPx?: number;
-};
-
-const CHAPTER2_SPORE_23_MOTION: Partial<Record<Chapter2PropId, Spore23Spec>> = {
-  spore2_0: { delay: 0, span: 0.48, mode: "exit", dropPx: 140 },
-  spore2_1: { delay: 0.14, span: 0.52, mode: "exit", dropPx: 130 },
-  spore3: { delay: 0.26, span: 0.5, mode: "exit", dropPx: 150 },
-  spore4: { delay: 0.1, span: 0.58, mode: "shrink", scaleEnd: 0.72, dropPx: 55 },
-  spore1: { delay: 0.2, span: 0.62, mode: "shrink", scaleEnd: 0.82, dropPx: 45 },
-  spore1_1: { delay: 0.32, span: 0.54, mode: "shrink", scaleEnd: 0.9, dropPx: 38 },
-  worm_g: { delay: 0.18, span: 0.55, mode: "exit", dropPx: 90 },
-};
-
-/** 초록이 — 20% smaller when green assets finish exiting. */
-export const CHAPTER2_GRUN_SUBSCENE_23_SCALE = 0.8;
-
-/** 나리 — 10% smaller when yellow assets finish exiting. */
-export const CHAPTER2_NARI_SUBSCENE_23_SCALE = 0.9;
-
-const GREEN_EXIT_ON_TIMELINE = { delay: 0.12, span: 0.82 };
-const YELLOW_EXIT_SEC = { delay: 0.35, span: 1.85 };
-
-export type Chapter2SporeSubscene23Motion = {
+export type Chapter2LaublRevealPropMotion = {
   scaleMul: number;
   opacity: number;
   yOffsetPx: number;
 };
+
+export type Chapter2VogelLaublExitMotion = {
+  active: boolean;
+  driftXNorm: number;
+  driftYNorm: number;
+  bobPx: number;
+  opacityMul: number;
+};
+
+const LAUBL_SPORE_IDS = [
+  "spore1",
+  "spore1_1",
+  "spore2_0",
+  "spore2_1",
+  "spore3",
+  "spore4",
+] as const satisfies readonly Chapter2PropId[];
+
+type LaublSporeShrinkSpec = {
+  delaySec: number;
+  spanSec: number;
+  scaleEnd: number;
+  dropPx: number;
+};
+
+type LaublWormExitSpec = {
+  delaySec: number;
+  spanSec: number;
+  scaleEnd: number;
+  dropPx: number;
+};
+
+/** Worm fades only after Laubl is on screen (extra beat delay). */
+const CHAPTER2_LAUBL_WORM_EXIT: LaublWormExitSpec = {
+  delaySec: 0.42,
+  spanSec: 1.15,
+  scaleEnd: 0.78,
+  dropPx: 40,
+};
+
+const CHAPTER2_VOGEL_LAUBL_EXIT = {
+  delaySec: 0.15,
+  spanSec: 8.2,
+  /** Viewport widths — enough to clear the right edge from rest position. */
+  driftXNorm: 1.05,
+  driftYNorm: 0.11,
+};
+
+export const CHAPTER2_GRUN_LAUBL_SCALE = 0.8;
+export const CHAPTER2_NARI_LAUBL_SCALE = 0.9;
+
+const CHAPTER2_GRUN_LAUBL_SCALE_BEAT = { delaySec: 0.2, spanSec: 1.05 };
+const CHAPTER2_NARI_LAUBL_SCALE_BEAT = { delaySec: 0.95, spanSec: 1.1 };
 
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
@@ -74,107 +98,219 @@ function easeInOutSine(t: number) {
   return -(Math.cos(Math.PI * clamp01(t)) - 1) / 2;
 }
 
-function easeInCubic(t: number) {
+function easeOutCubic(t: number) {
   const u = clamp01(t);
-  return u * u * u;
+  return 1 - (1 - u) ** 3;
 }
 
-function spore23TimelineProgress(elapsedSince23Sec: number) {
-  if (elapsedSince23Sec <= CHAPTER2_SUBSCENE_23_SPORE_START_SEC) return 0;
-  return clamp01(
-    (elapsedSince23Sec - CHAPTER2_SUBSCENE_23_SPORE_START_SEC) /
-      CHAPTER2_SUBSCENE_23_SPORE_MOTION_SEC,
-  );
+function laublBeatProgress(elapsedSec: number, delaySec: number, spanSec: number) {
+  if (elapsedSec <= delaySec) return 0;
+  return clamp01((elapsedSec - delaySec) / Math.max(0.12, spanSec));
 }
 
-function spore23ItemProgress(timeline: number, spec: Spore23Spec) {
-  if (timeline <= spec.delay) return 0;
-  return clamp01((timeline - spec.delay) / Math.max(0.1, spec.span));
-}
-
-export function getChapter2SporeSubscene23Motion(
-  propId: Chapter2PropId,
-  phase: Chapter2SubscenePlaybackPhase,
-  elapsedSince23Sec: number,
-): Chapter2SporeSubscene23Motion | null {
-  const spec = CHAPTER2_SPORE_23_MOTION[propId];
-  if (!spec || phase !== "2-3-playing") return null;
-
-  const timeline = spore23TimelineProgress(elapsedSince23Sec);
-  if (timeline <= 0) {
-    return { scaleMul: 1, opacity: 1, yOffsetPx: 0 };
-  }
-
-  const p = easeInOutSine(spore23ItemProgress(timeline, spec));
-  const drop = spec.dropPx ?? 80;
-
-  if (spec.mode === "exit") {
-    const shrink = 1 - easeInCubic(p);
-    return {
-      scaleMul: shrink,
-      opacity: 1 - p,
-      yOffsetPx: p * drop,
-    };
-  }
-
-  const end = spec.scaleEnd ?? 0.85;
-  return {
-    scaleMul: 1 - p * (1 - end),
-    opacity: 1 - p * 0.92,
-    yOffsetPx: p * drop,
+function seededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+    return state / 0x1_0000_0000;
   };
 }
 
-/** 0→1 while green spores / worm exit (scene 2-3 spore phase). */
-export function getChapter2GreenAssetsExitProgress(
+function buildLaublSporeShrinkSpecs(): Record<Chapter2PropId, LaublSporeShrinkSpec> {
+  const specs = {} as Record<Chapter2PropId, LaublSporeShrinkSpec>;
+  for (let i = 0; i < LAUBL_SPORE_IDS.length; i++) {
+    const id = LAUBL_SPORE_IDS[i];
+    const rand = seededRandom(91_700 + i * 509);
+    specs[id] = {
+      delaySec: rand() * 0.48,
+      spanSec: 0.34 + rand() * 0.92,
+      scaleEnd: 0.5 + rand() * 0.4,
+      dropPx: 6 + rand() * 42,
+    };
+  }
+  return specs;
+}
+
+const CHAPTER2_LAUBL_SPORE_SHRINK = buildLaublSporeShrinkSpecs();
+
+function isLaublSporeId(propId: Chapter2PropId) {
+  return (LAUBL_SPORE_IDS as readonly string[]).includes(propId);
+}
+
+function laublPropsBeatElapsed(elapsedSince23Sec: number) {
+  return elapsedSince23Sec - CHAPTER2_LAUBL_PROPS_MOTION_START_SEC;
+}
+
+/** Spore shrink + worm fade — after Laubl fade-in completes. */
+export function getChapter2LaublRevealPropMotion(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+): Chapter2LaublRevealPropMotion | null {
+  if (phase !== "2-3-playing") return null;
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) return null;
+
+  if (isLaublSporeId(propId)) {
+    const spec = CHAPTER2_LAUBL_SPORE_SHRINK[propId];
+    const p = easeInOutSine(
+      laublBeatProgress(beatElapsed, spec.delaySec, spec.spanSec),
+    );
+    if (p <= 0) return { scaleMul: 1, opacity: 1, yOffsetPx: 0 };
+    return {
+      scaleMul: 1 - p * (1 - spec.scaleEnd),
+      opacity: 1,
+      yOffsetPx: p * spec.dropPx,
+    };
+  }
+
+  if (propId === "worm_g") {
+    const spec = CHAPTER2_LAUBL_WORM_EXIT;
+    const p = easeInOutSine(
+      laublBeatProgress(beatElapsed, spec.delaySec, spec.spanSec),
+    );
+    if (p <= 0) return { scaleMul: 1, opacity: 1, yOffsetPx: 0 };
+    const fade = easeOutCubic(p);
+    return {
+      scaleMul: 1 - fade * (1 - spec.scaleEnd),
+      opacity: 1 - fade,
+      yOffsetPx: fade * spec.dropPx,
+    };
+  }
+
+  return null;
+}
+
+/** Bird drifts right + bob after Laubl has appeared. */
+export function getChapter2VogelLaublExitMotion(
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+): Chapter2VogelLaublExitMotion {
+  const idle = {
+    active: false,
+    driftXNorm: 0,
+    driftYNorm: 0,
+    bobPx: 0,
+    opacityMul: 1,
+  };
+  if (phase !== "2-3-playing") return idle;
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) return idle;
+
+  const spec = CHAPTER2_VOGEL_LAUBL_EXIT;
+  const driftRaw = laublBeatProgress(beatElapsed, spec.delaySec, spec.spanSec);
+  if (driftRaw <= 0) return idle;
+
+  const tSec = beatElapsed;
+  const bobPx =
+    Math.sin(tSec * 1.85) * 13 * (1 - driftRaw * 0.2) +
+    Math.sin(tSec * 1.05 + 0.5) * 6;
+
+  return {
+    active: true,
+    driftXNorm: driftRaw * spec.driftXNorm,
+    driftYNorm: easeInOutSine(driftRaw) * spec.driftYNorm,
+    bobPx,
+    /** No fade — clip once drift finishes (bird is past the right edge). */
+    opacityMul: driftRaw >= 1 ? 0 : 1,
+  };
+}
+
+type BlauSteinRevealSpec = {
+  delaySec: number;
+  spanSec: number;
+  /** Extra Y below rest (px) at progress 0 — slides up to 0. */
+  risePx: number;
+};
+
+/** Starts after Laubl fade-in (`CHAPTER2_LAUBL_PROPS_MOTION_START_SEC`). */
+const CHAPTER2_BLAU_STEIN_REVEAL: Record<"stein1" | "stein2", BlauSteinRevealSpec> = {
+  stein1: { delaySec: 0.06, spanSec: 1.15, risePx: 420 },
+  stein2: { delaySec: 0.22, spanSec: 1.05, risePx: 480 },
+};
+
+export type Chapter2BlauSteinReveal = {
+  opacity: number;
+  riseYOffsetPx: number;
+};
+
+/** Rise from below viewport after Laubl has appeared. */
+export function getChapter2BlauSteinReveal(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+): Chapter2BlauSteinReveal | null {
+  if (propId !== "stein1" && propId !== "stein2") return null;
+  const spec = CHAPTER2_BLAU_STEIN_REVEAL[propId];
+  if (phase !== "2-3-playing") {
+    return { opacity: 0, riseYOffsetPx: spec.risePx };
+  }
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) {
+    return { opacity: 0, riseYOffsetPx: spec.risePx };
+  }
+  const linear = laublBeatProgress(beatElapsed, spec.delaySec, spec.spanSec);
+  if (linear <= 0) {
+    return { opacity: 0, riseYOffsetPx: spec.risePx };
+  }
+  const surge = easeOutCubic(linear);
+  return {
+    opacity: Math.min(1, surge * 1.08),
+    riseYOffsetPx: (1 - surge) * spec.risePx,
+  };
+}
+
+export function getChapter2MarimoLaublExitProgress(
+  spec: Chapter2MarimoInstance,
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ) {
-  if (phase !== "2-3-playing") return 0;
-  const timeline = spore23TimelineProgress(elapsedSince23Sec);
-  if (timeline <= GREEN_EXIT_ON_TIMELINE.delay) return 0;
-  return easeInOutSine(
-    clamp01(
-      (timeline - GREEN_EXIT_ON_TIMELINE.delay) / Math.max(0.1, GREEN_EXIT_ON_TIMELINE.span),
-    ),
-  );
+  if (!spec.laublExit || phase !== "2-3-playing") return 0;
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) return 0;
+  const { delaySec, spanSec } = spec.laublExit;
+  return laublBeatProgress(beatElapsed, delaySec, spanSec);
+}
+
+export function getChapter2MarimoLaublExitOpacity(
+  spec: Chapter2MarimoInstance,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+) {
+  const exit = getChapter2MarimoLaublExitProgress(spec, phase, elapsedSince23Sec);
+  if (exit <= 0) return 1;
+  return 1 - easeInOutSine(exit);
 }
 
 export function getChapter2GrunSubscene23ScaleMul(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ) {
-  const t = getChapter2GreenAssetsExitProgress(phase, elapsedSince23Sec);
-  return 1 - t * (1 - CHAPTER2_GRUN_SUBSCENE_23_SCALE);
-}
-
-/** 0→1 while yellow gelb assets exit (nabi, bird). */
-export function getChapter2YellowAssetsExitProgress(
-  phase: Chapter2SubscenePlaybackPhase,
-  elapsedSince23Sec: number,
-) {
-  if (phase !== "2-3-playing") return 0;
-  const t0 = CHAPTER2_SUBSCENE_23_SPORE_START_SEC + YELLOW_EXIT_SEC.delay;
-  if (elapsedSince23Sec <= t0) return 0;
-  return easeInOutSine(
-    clamp01((elapsedSince23Sec - t0) / Math.max(0.1, YELLOW_EXIT_SEC.span)),
-  );
+  if (phase !== "2-3-playing") return 1;
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) return 1;
+  const { delaySec, spanSec } = CHAPTER2_GRUN_LAUBL_SCALE_BEAT;
+  const t = easeInOutSine(laublBeatProgress(beatElapsed, delaySec, spanSec));
+  return 1 - t * (1 - CHAPTER2_GRUN_LAUBL_SCALE);
 }
 
 export function getChapter2NariSubscene23ScaleMul(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ) {
-  const t = getChapter2YellowAssetsExitProgress(phase, elapsedSince23Sec);
-  return 1 - t * (1 - CHAPTER2_NARI_SUBSCENE_23_SCALE);
+  if (phase !== "2-3-playing") return 1;
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) return 1;
+  const { delaySec, spanSec } = CHAPTER2_NARI_LAUBL_SCALE_BEAT;
+  const t = easeInOutSine(laublBeatProgress(beatElapsed, delaySec, spanSec));
+  return 1 - t * (1 - CHAPTER2_NARI_LAUBL_SCALE);
 }
 
-/** Multiply on nabi / bird opacity during yellow exit. */
 export function getChapter2YellowGelbExitVisibility(
-  phase: Chapter2SubscenePlaybackPhase,
-  elapsedSince23Sec: number,
+  _phase: Chapter2SubscenePlaybackPhase,
+  _elapsedSince23Sec: number,
 ) {
-  return 1 - getChapter2YellowAssetsExitProgress(phase, elapsedSince23Sec);
+  return 1;
 }
 
 export function getChapter2Subscene23IntroProgress(

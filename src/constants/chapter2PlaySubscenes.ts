@@ -12,7 +12,7 @@
  *
  * ## 2-3
  * **3 s** after 2-2 hold, **scroll down** (accumulated wheel) → `2-3-playing`.
- * First beat: **라우블**, berg y2→b2 + drop, spore / gelb exits — `chapter2Subscene23Motion.ts`.
+ * Laubl fade-in, then spore / worm / slow bird exit; grun −20% then nari −10% (staggered).
  */
 
 export const CHAPTER2_PLAY_SUBSCENES = ["2-1", "2-2", "2-3"] as const;

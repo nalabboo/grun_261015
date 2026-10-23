@@ -57,7 +57,7 @@ type Chapter = 1 | 2;
 type Chapter1Phase = "scroll" | "tableau";
 type Chapter2Step = "intro" | "play";
 
-/** Local dev: open chapter 2 berg scene on load (set NEXT_PUBLIC_DEV_CHAPTER2=0 to disable). */
+/** Local dev: open chapter 2 play on load (set NEXT_PUBLIC_DEV_CHAPTER2=0 for chapter 1). */
 const DEV_START_CHAPTER2 =
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_CHAPTER2 !== "0";

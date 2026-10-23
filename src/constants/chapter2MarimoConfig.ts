@@ -1,6 +1,6 @@
 import { chapter2AssetUrl } from "@/constants/chapter2Config";
 
-export const CHAPTER2_MARIMO_COUNT = 7;
+export const CHAPTER2_MARIMO_COUNT = 21;
 
 const MARIMO_ASSETS = {
   marimo1: { file: "grun objekt/marimo1.png", width: 300, height: 299 },
@@ -32,13 +32,24 @@ export type Chapter2MarimoInstance = {
     span: number;
     exitAngleRad: number;
   };
+  /** Drift off-screen after Laubl appears (scene 2-3). */
+  laublExit?: {
+    delaySec: number;
+    spanSec: number;
+    exitAngleRad: number;
+  };
 };
 
-export const CHAPTER2_MARIMO_SPORE_EXIT_IDS = new Set([
-  "marimo_0",
-  "marimo_3",
-  "marimo_5",
-]);
+/** Same exit slots as the original 7-pack (0, 3, 5) repeated per block of 7. */
+export function chapter2MarimoHasSporeExit(index: number) {
+  const slot = index % 7;
+  return slot === 0 || slot === 3 || slot === 5;
+}
+
+/** >50% of marimos exit when Laubl beat starts (even indices → 11 / 21). */
+export function chapter2MarimoHasLaublExit(index: number) {
+  return index % 2 === 0;
+}
 
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
@@ -94,10 +105,18 @@ function buildMarimoInstances(): Chapter2MarimoInstance[] {
 
     const id = `marimo_${index}`;
     const exitAngleRad = Math.atan2(yNorm - 0.5, xNorm - 0.5);
-    const sporeExit = CHAPTER2_MARIMO_SPORE_EXIT_IDS.has(id)
+    const sporeExit = chapter2MarimoHasSporeExit(index)
       ? {
           delay: 0.04 + (index % 3) * 0.07,
           span: 0.58,
+          exitAngleRad,
+        }
+      : undefined;
+
+    const laublExit = chapter2MarimoHasLaublExit(index)
+      ? {
+          delaySec: 0.08 + (index % 5) * 0.14,
+          spanSec: 0.72 + (index % 4) * 0.22,
           exitAngleRad,
         }
       : undefined;
@@ -117,6 +136,7 @@ function buildMarimoInstances(): Chapter2MarimoInstance[] {
       opacity,
       zIndex: 5 + (index % 3),
       sporeExit,
+      laublExit,
     };
   });
 }

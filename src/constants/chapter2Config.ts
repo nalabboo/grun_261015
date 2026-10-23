@@ -26,6 +26,9 @@ export const CHAPTER2_ASSET_VERSION = "20261018-scene2-y2-berg";
 /** Base fit scale (contain + parallax headroom). Transform depth is normalized on top. */
 export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
 
+/** Mouse parallax strength for all berg layers and props (1 = legacy). */
+export const CHAPTER2_MOUSE_PARALLAX_GAIN = 1.45;
+
 /**
  * How much layers shrink/grow with depth (0 = same size, 1 = full scene-1 perspective).
  * Kept low so stacked PNGs stay aligned and do not clip.
@@ -198,6 +201,8 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("charactor/grun_v.png"),
     chapter2AssetUrl("charactor/nari.png"),
     chapter2AssetUrl("charactor/laubl.png"),
+    chapter2AssetUrl("blau objekt/b_stein1.png"),
+    chapter2AssetUrl("blau objekt/b_stein2.png"),
     chapter2AssetUrl("grun objekt/worm_g.png"),
     chapter2AssetUrl("gelb objekt/g_nabi1.png"),
     chapter2AssetUrl("gelb objekt/g_nabi2.png"),
