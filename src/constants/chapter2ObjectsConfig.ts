@@ -1,5 +1,6 @@
 import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
 import {
+  CHAPTER2_BERG3_LAYER_Z,
   CHAPTER2_PROP_Z_BEHIND_BERG3,
   CHAPTER2_PROP_Z_BEHIND_BERG4,
   CHAPTER2_PROP_Z_BETWEEN_BERG3_AND_BERG2,
@@ -36,7 +37,7 @@ export type Chapter2PropConfig = {
   brightness: number;
   defaultLayout: Chapter2BergEditTransform;
   /** Move/scale with this berg layer (same parallax + depth scale). */
-  attachToBergId?: "berg2" | "berg4";
+  attachToBergId?: "berg2" | "berg3" | "berg4";
   /** Opacity follows scroll nari segment (before berg y2). */
   revealOnScroll?: boolean;
   /** Scene 2-3 reveal (see `getChapter2LaublRevealOpacity`). */
@@ -47,6 +48,8 @@ export type Chapter2PropConfig = {
   revealFromLeftAfterLaubl?: boolean;
   /** After Laubl — emerge at berg4 peak (`getChapter2Berg4PeakReveal`). */
   revealFromBerg4PeakAfterLaubl?: boolean;
+  /** After Laubl — in-place fade (+ optional scale), no slide/rise. */
+  revealFadeAfterLaubl?: boolean;
 };
 
 export const CHAPTER2_PROP_IDS = [
@@ -69,6 +72,9 @@ export const CHAPTER2_PROP_IDS = [
   "coral4",
   "coral5",
   "coral6",
+  "ikki1",
+  "ikki2",
+  "ikki3",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -112,7 +118,13 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   /** berg3 앞 · berg2 뒤 (`betweenBerg3AndBerg2`). */
   coral5: { x: 560, y: -160, scale: 3.5, scaleY: 3, rotate: -5 },
   /** berg2 앞 (aboveBerg2). */
-  coral6: { x: 300, y: 100, scale: 4, scaleY: 5, rotate: -10 },
+  coral6: { x: 320, y: 100, scale: 4, scaleY: 5, rotate: -10 },
+  /** 이끼1 (b_moss1) — berg3 레이어 (initial layout). */
+  ikki1: { x: -950, y: -457, scale: 1.8, scaleY: 2.6, rotate: 0 },
+  /** 이끼2 (b_moss2) — berg3 (initial layout). */
+  ikki2: { x: -320, y: -500, scale: 2.1, scaleY: 2.1, rotate: -15 },
+  /** 이끼3 (b_moss3) — berg2 (initial layout). */
+  ikki3: { x: 640, y: -183, scale: 1.2, scaleY: 2.4, rotate: -23 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -155,6 +167,9 @@ export const CHAPTER2_CORAL3_LAYOUT_LOCKED = true;
 export const CHAPTER2_CORAL4_LAYOUT_LOCKED = true;
 export const CHAPTER2_CORAL5_LAYOUT_LOCKED = true;
 export const CHAPTER2_CORAL6_LAYOUT_LOCKED = true;
+export const CHAPTER2_IKKI1_LAYOUT_LOCKED = true;
+export const CHAPTER2_IKKI2_LAYOUT_LOCKED = true;
+export const CHAPTER2_IKKI3_LAYOUT_LOCKED = true;
 
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
 const SPORE1_DEPTH_PX = -180;
@@ -176,6 +191,10 @@ const STEIN2_DEPTH_PX = 74;
 const STEIN3_DEPTH_PX = 5;
 const CORAL1_DEPTH_PX = 76;
 const CORAL6_DEPTH_PX = 78;
+const IKKI1_DEPTH_PX = -72;
+const IKKI2_DEPTH_PX = -74;
+/** Same depth plane as berg2 (90) — moss blur matches the mountain bake. */
+const IKKI3_DEPTH_PX = 90;
 /** Just in front of berg4 plane, in front of coral3. */
 const CORAL2_DEPTH_PX = -175;
 /** Behind berg4 ridge, in front of far spores. */
@@ -397,6 +416,60 @@ export const CHAPTER2_STEIN3: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.stein3,
 };
 
+/** 이끼1 (b_moss1) — 산3 PNG 위, berg3 motion에 부착. */
+export const CHAPTER2_IKKI1: Chapter2PropConfig = {
+  id: "ikki1",
+  file: "blau objekt/b_moss1.png",
+  width: 533,
+  height: 257,
+  zIndex: CHAPTER2_BERG3_LAYER_Z,
+  stack: "aboveBerg3",
+  attachToBergId: "berg3",
+  revealFadeAfterLaubl: true,
+  parallax: 32,
+  heightVh: 0.09,
+  depthPx: IKKI1_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(IKKI1_DEPTH_PX),
+  brightness: getDepthBrightness(IKKI1_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.ikki1,
+};
+
+/** 이끼2 (b_moss2) — 산3 PNG 위, berg3 motion에 부착. */
+export const CHAPTER2_IKKI2: Chapter2PropConfig = {
+  id: "ikki2",
+  file: "blau objekt/b_moss2.png",
+  width: 533,
+  height: 257,
+  zIndex: CHAPTER2_BERG3_LAYER_Z,
+  stack: "aboveBerg3",
+  attachToBergId: "berg3",
+  revealFadeAfterLaubl: true,
+  parallax: 32,
+  heightVh: 0.09,
+  depthPx: IKKI2_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(IKKI2_DEPTH_PX),
+  brightness: getDepthBrightness(IKKI2_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.ikki2,
+};
+
+/** 이끼3 (b_moss3) — 산2 PNG 위, berg2 motion에 부착. */
+export const CHAPTER2_IKKI3: Chapter2PropConfig = {
+  id: "ikki3",
+  file: "blau objekt/b_moss3.png",
+  width: 533,
+  height: 257,
+  zIndex: 5,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealFadeAfterLaubl: true,
+  parallax: 16,
+  heightVh: 0.09,
+  depthPx: IKKI3_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(IKKI3_DEPTH_PX),
+  brightness: getDepthBrightness(IKKI3_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.ikki3,
+};
+
 /** 코랄6 — berg2 PNG 앞, above Laubl (z 6). */
 export const CHAPTER2_CORAL6: Chapter2PropConfig = {
   id: "coral6",
@@ -522,6 +595,9 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_CORAL4,
   CHAPTER2_CORAL5,
   CHAPTER2_CORAL6,
+  CHAPTER2_IKKI1,
+  CHAPTER2_IKKI2,
+  CHAPTER2_IKKI3,
 ] as const;
 
 export function chapter2PropAssetUrl(file: string) {

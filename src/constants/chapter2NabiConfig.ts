@@ -17,6 +17,10 @@ export type Chapter2NabiInstance = {
   patrol: { x: number; y: number };
   flutterPhase: number;
   driftRadiusVw: number;
+  /** Skip scroll-22 drift-off (stay on screen after Laubl / 2-3). */
+  keepAfterLaubl?: boolean;
+  /** Drift off when scene 2-3 starts (visible through full 2-2). */
+  exitAtSubscene23?: boolean;
 };
 
 export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
@@ -33,6 +37,7 @@ export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
     patrol: { x: 0.28, y: 0.34 },
     flutterPhase: 0,
     driftRadiusVw: 2.8,
+    keepAfterLaubl: true,
   },
   {
     id: "nabi2",
@@ -47,6 +52,7 @@ export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
     patrol: { x: 0.72, y: 0.3 },
     flutterPhase: 1.7,
     driftRadiusVw: 2.4,
+    exitAtSubscene23: true,
   },
   {
     id: "nabi3",
@@ -61,6 +67,7 @@ export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
     patrol: { x: 0.56, y: 0.42 },
     flutterPhase: 3.1,
     driftRadiusVw: 3,
+    keepAfterLaubl: true,
   },
 ] as const;
 

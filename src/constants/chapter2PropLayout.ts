@@ -19,6 +19,9 @@ import {
   CHAPTER2_CORAL4_LAYOUT_LOCKED,
   CHAPTER2_CORAL5_LAYOUT_LOCKED,
   CHAPTER2_CORAL6_LAYOUT_LOCKED,
+  CHAPTER2_IKKI1_LAYOUT_LOCKED,
+  CHAPTER2_IKKI2_LAYOUT_LOCKED,
+  CHAPTER2_IKKI3_LAYOUT_LOCKED,
   CHAPTER2_TUNABLE_PROP_IDS,
   getChapter2PropDefaultEdit,
   isChapter2PropTunable,
@@ -159,6 +162,22 @@ function pruneStoredProductionPropLayouts() {
       delete parsed.coral6;
       changed = true;
     }
+    if (CHAPTER2_IKKI1_LAYOUT_LOCKED && "ikki1" in parsed) {
+      delete parsed.ikki1;
+      changed = true;
+    }
+    if (CHAPTER2_IKKI2_LAYOUT_LOCKED && "ikki2" in parsed) {
+      delete parsed.ikki2;
+      changed = true;
+    }
+    if (CHAPTER2_IKKI3_LAYOUT_LOCKED && "ikki3" in parsed) {
+      delete parsed.ikki3;
+      changed = true;
+    }
+    if ("moss1" in parsed) {
+      delete parsed.moss1;
+      changed = true;
+    }
     if (!changed) return;
     window.localStorage.setItem(CHAPTER2_PROP_LAYOUT_STORAGE_KEY, JSON.stringify(parsed, null, 2));
   } catch {
@@ -247,6 +266,18 @@ export function loadChapter2PropEdits(): Record<Chapter2PropId, Chapter2PropEdit
 
   if (CHAPTER2_CORAL6_LAYOUT_LOCKED) {
     base.coral6 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("coral6"));
+  }
+
+  if (CHAPTER2_IKKI1_LAYOUT_LOCKED) {
+    base.ikki1 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("ikki1"));
+  }
+
+  if (CHAPTER2_IKKI2_LAYOUT_LOCKED) {
+    base.ikki2 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("ikki2"));
+  }
+
+  if (CHAPTER2_IKKI3_LAYOUT_LOCKED) {
+    base.ikki3 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("ikki3"));
   }
 
   return base;

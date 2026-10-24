@@ -37,6 +37,7 @@ import {
   getChapter2GrunSubscene23ScaleMul,
   getChapter2NariSubscene23ScaleMul,
   getChapter2BlauSteinReveal,
+  getChapter2BlauFadeAfterLaublReveal,
   getChapter2BlauSlideFromLeftReveal,
   getChapter2Berg4PeakReveal,
   getChapter2LaublRevealPropMotion,
@@ -440,24 +441,32 @@ export default function Chapter2Scene({
     prop: Chapter2PropConfig,
     berg2Motion?: BergPropMotion,
     berg4Motion?: BergPropMotion,
+    berg3Motion?: BergPropMotion,
   ) => {
     const attachedBerg2 = berg2Motion && prop.attachToBergId === "berg2";
+    const attachedBerg3 = berg3Motion && prop.attachToBergId === "berg3";
     const attachedBerg4 = berg4Motion && prop.attachToBergId === "berg4";
     const shiftX = attachedBerg2
       ? berg2Motion.shiftX
-      : attachedBerg4
-        ? berg4Motion.shiftX
-        : mouseX * prop.parallax;
+      : attachedBerg3
+        ? berg3Motion.shiftX
+        : attachedBerg4
+          ? berg4Motion.shiftX
+          : mouseX * prop.parallax;
     const shiftY = attachedBerg2
       ? berg2Motion.shiftY
-      : attachedBerg4
-        ? berg4Motion.shiftY
-        : mouseY * prop.parallax * 0.65;
+      : attachedBerg3
+        ? berg3Motion.shiftY
+        : attachedBerg4
+          ? berg4Motion.shiftY
+          : mouseY * prop.parallax * 0.65;
     const bergScale = attachedBerg2
       ? berg2Motion.bergScale
-      : attachedBerg4
-        ? berg4Motion.bergScale
-        : 1;
+      : attachedBerg3
+        ? berg3Motion.bergScale
+        : attachedBerg4
+          ? berg4Motion.bergScale
+          : 1;
     const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultEdit(prop.id);
     let scrollScaleMul = getChapter2PropScrollScaleMultiplier(
       prop,
@@ -481,6 +490,17 @@ export default function Chapter2Scene({
       if (steinReveal) {
         scrollOpacity *= steinReveal.opacity;
         layoutYOffset += steinReveal.riseYOffsetPx;
+      }
+    }
+    if (prop.revealFadeAfterLaubl) {
+      const fadeReveal = getChapter2BlauFadeAfterLaublReveal(
+        prop.id,
+        playbackPhase,
+        subscene23ElapsedSec,
+      );
+      if (fadeReveal) {
+        scrollOpacity *= fadeReveal.opacity;
+        scrollScaleMul *= fadeReveal.scaleMul;
       }
     }
     if (prop.revealFromLeftAfterLaubl) {
@@ -609,6 +629,18 @@ export default function Chapter2Scene({
         const edit = devEditsReady
           ? tunableEdits[tunableId]
           : DEFAULT_CHAPTER2_BERG_EDIT;
+        const berg3PropMotion: BergPropMotion | undefined =
+          layer.id === "berg3"
+            ? {
+                shiftX: shiftX + edit.x,
+                shiftY:
+                  shiftY +
+                  edit.y +
+                  berg3ScrollY +
+                  getChapter2BergSubscene23YOffset("berg3", subscene23IntroProgress),
+                bergScale: scale * edit.scale,
+              }
+            : undefined;
         return (
           <Fragment key={layer.id}>
             {layer.id === "berg2" && (
@@ -624,7 +656,9 @@ export default function Chapter2Scene({
             {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
             {layer.id === "berg2" && midBerg2Props.map((prop) => renderPropLayer(prop))}
             {layer.id === "berg3" &&
-              behindBerg3Props.map((prop) => renderPropLayer(prop))}
+              behindBerg3Props.map((prop) =>
+                renderPropLayer(prop, undefined, undefined, berg3PropMotion),
+              )}
             <Chapter2BergLayer
               layer={layer}
               viewportHeight={viewportHeight}
@@ -651,7 +685,10 @@ export default function Chapter2Scene({
                   bergScale: scale * edit.scale,
                 }),
               )}
-            {layer.id === "berg3" && aboveBerg3Props.map((prop) => renderPropLayer(prop))}
+            {layer.id === "berg3" &&
+              aboveBerg3Props.map((prop) =>
+                renderPropLayer(prop, undefined, undefined, berg3PropMotion),
+              )}
             {/* 산3 → 돌3 → 산2: after berg3 stack, before berg2 PNG (see CHAPTER2_PROP_Z_*). */}
             {layer.id === "berg3" &&
               betweenBerg3AndBerg2Props.map((prop) => renderPropLayer(prop))}
@@ -671,6 +708,8 @@ export default function Chapter2Scene({
       <Chapter2FloatingNabis
         sporeProgress={scrollSegments.spore}
         scroll22Progress={scroll22Progress}
+        subscene23Phase={playbackPhase}
+        subscene23ElapsedSec={subscene23ElapsedSec}
         yellowExitVisibility={getChapter2YellowGelbExitVisibility(
           playbackPhase,
           subscene23ElapsedSec,

@@ -7,10 +7,14 @@ import {
   getChapter2NabiOpacity,
 } from "@/constants/chapter2NabiConfig";
 import { getChapter2NabiScroll22ExitOpacity } from "@/constants/chapter2Scroll22Motion";
+import { getChapter2NabiSubscene23ExitOpacity } from "@/constants/chapter2Subscene23Motion";
+import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
 
 type Props = {
   sporeProgress: number;
   scroll22Progress: number;
+  subscene23Phase?: Chapter2SubscenePlaybackPhase;
+  subscene23ElapsedSec?: number;
   /** Scene 2-3 yellow gelb exit (1 = visible, 0 = gone). */
   yellowExitVisibility?: number;
 };
@@ -18,16 +22,22 @@ type Props = {
 export default function Chapter2FloatingNabis({
   sporeProgress,
   scroll22Progress,
+  subscene23Phase = "2-1",
+  subscene23ElapsedSec = 0,
   yellowExitVisibility = 1,
 }: Props) {
   const anchorRefs = useRef<(HTMLDivElement | null)[]>([]);
   const sporeRef = useRef(sporeProgress);
   const scroll22Ref = useRef(scroll22Progress);
+  const sub23PhaseRef = useRef(subscene23Phase);
+  const sub23ElapsedRef = useRef(subscene23ElapsedSec);
   const yellowVisRef = useRef(yellowExitVisibility);
   const sizeRef = useRef({ width: 0, height: 0 });
 
   sporeRef.current = sporeProgress;
   scroll22Ref.current = scroll22Progress;
+  sub23PhaseRef.current = subscene23Phase;
+  sub23ElapsedRef.current = subscene23ElapsedSec;
   yellowVisRef.current = yellowExitVisibility;
 
   useEffect(() => {
@@ -54,8 +64,14 @@ export default function Chapter2FloatingNabis({
           const scroll22 = scroll22Ref.current;
           const base = getChapter2NabiBasePosition(spec, spore, width, height);
           const scroll22ExitMul = getChapter2NabiScroll22ExitOpacity(spec, scroll22, spore);
+          const sub23ExitMul = getChapter2NabiSubscene23ExitOpacity(
+            spec,
+            sub23PhaseRef.current,
+            sub23ElapsedRef.current,
+          );
+          const stayMul = scroll22ExitMul * sub23ExitMul;
           const exitPush =
-            (1 - scroll22ExitMul) *
+            (1 - stayMul) *
             Math.max(width, height) *
             0.38;
           const exitAngle = Math.atan2(
@@ -65,7 +81,7 @@ export default function Chapter2FloatingNabis({
           const opacity =
             getChapter2NabiOpacity(spec, spore) *
             yellowVisRef.current *
-            scroll22ExitMul;
+            stayMul;
           const baseX =
             base.x + Math.cos(exitAngle) * exitPush;
           const baseY =

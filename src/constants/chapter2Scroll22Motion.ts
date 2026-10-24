@@ -38,6 +38,7 @@ export function getChapter2NabiScroll22ExitProgress(
   scroll22: number,
   sporeProgress: number,
 ) {
+  if (spec.keepAfterLaubl || spec.exitAtSubscene23) return 0;
   const entry = getChapter2NabiEntryProgress(spec, sporeProgress);
   if (entry < 0.55) return 0;
   const delay = 0.42 + spec.entryDelay * 0.12;

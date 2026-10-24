@@ -1,6 +1,7 @@
 import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
 import type { Chapter2PropId } from "@/constants/chapter2ObjectsConfig";
 import type { Chapter2MarimoInstance } from "@/constants/chapter2MarimoConfig";
+import type { Chapter2NabiInstance } from "@/constants/chapter2NabiConfig";
 
 /** After 2-2 hold — ignore scroll until this delay, then wheel starts 2-3. */
 export const CHAPTER2_SUBSCENE_23_SCROLL_GATE_DELAY_MS = 3000;
@@ -235,6 +236,51 @@ const CHAPTER2_BLAU_STEIN_REVEAL: Partial<
   coral6: { delaySec: 0.44, spanSec: 1.12, risePx: 440 },
 };
 
+type BlauFadeAfterLaublSpec = {
+  delaySec: number;
+  spanSec: number;
+  startScaleMul: number;
+};
+
+/** In-place emerge on berg (e.g. ikki) after Laubl beat. */
+const CHAPTER2_BLAU_FADE_AFTER_LAUBL: Partial<
+  Record<Chapter2PropId, BlauFadeAfterLaublSpec>
+> = {
+  ikki1: { delaySec: 0.52, spanSec: 1.45, startScaleMul: 0.9 },
+  ikki2: { delaySec: 0.58, spanSec: 1.45, startScaleMul: 0.9 },
+  ikki3: { delaySec: 0.64, spanSec: 1.45, startScaleMul: 0.9 },
+};
+
+export type Chapter2BlauFadeAfterLaublReveal = {
+  opacity: number;
+  scaleMul: number;
+};
+
+export function getChapter2BlauFadeAfterLaublReveal(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+): Chapter2BlauFadeAfterLaublReveal | null {
+  const spec = CHAPTER2_BLAU_FADE_AFTER_LAUBL[propId];
+  if (!spec) return null;
+  if (phase !== "2-3-playing") {
+    return { opacity: 0, scaleMul: spec.startScaleMul };
+  }
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) {
+    return { opacity: 0, scaleMul: spec.startScaleMul };
+  }
+  const linear = laublBeatProgress(beatElapsed, spec.delaySec, spec.spanSec);
+  if (linear <= 0) {
+    return { opacity: 0, scaleMul: spec.startScaleMul };
+  }
+  const t = easeInOutSine(linear);
+  return {
+    opacity: Math.min(1, t * 1.05),
+    scaleMul: spec.startScaleMul + (1 - spec.startScaleMul) * t,
+  };
+};
+
 export type Chapter2BlauSteinReveal = {
   opacity: number;
   riseYOffsetPx: number;
@@ -407,6 +453,31 @@ export function getChapter2YellowGelbExitVisibility(
   _elapsedSince23Sec: number,
 ) {
   return 1;
+}
+
+/** nabi2 — drift off at 2-3 start (nabi1 / nabi3 stay). */
+const CHAPTER2_NABI_SUB23_EXIT_SPAN_SEC = 1.35;
+
+export function getChapter2NabiSubscene23ExitProgress(
+  spec: Chapter2NabiInstance,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+) {
+  if (!spec.exitAtSubscene23) return 0;
+  if (phase !== "2-3-playing") return 0;
+  const delay = 0.06;
+  if (elapsedSince23Sec <= delay) return 0;
+  return clamp01((elapsedSince23Sec - delay) / CHAPTER2_NABI_SUB23_EXIT_SPAN_SEC);
+}
+
+export function getChapter2NabiSubscene23ExitOpacity(
+  spec: Chapter2NabiInstance,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+) {
+  const exit = getChapter2NabiSubscene23ExitProgress(spec, phase, elapsedSince23Sec);
+  if (exit <= 0) return 1;
+  return 1 - easeInOutSine(exit);
 }
 
 export function getChapter2Subscene23IntroProgress(
