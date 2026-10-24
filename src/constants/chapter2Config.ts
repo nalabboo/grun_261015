@@ -30,13 +30,12 @@ export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
 export const CHAPTER2_MOUSE_PARALLAX_GAIN = 1.45;
 
 /**
- * Dev (with chapter 2 on load): refresh → scroll at 2-2 end + `2-3-playing`.
- * Set `NEXT_PUBLIC_DEV_CHAPTER2_START_23=0` to play from 2-1 again.
+ * Dev skip: jump to 2-2 end + `2-3-playing` on refresh.
+ * Opt in with `NEXT_PUBLIC_DEV_CHAPTER2_START_23=1` (default play starts at 2-1).
  */
 export const DEV_CHAPTER2_START_AT_SUBSCENE_23 =
   process.env.NODE_ENV === "development" &&
-  process.env.NEXT_PUBLIC_DEV_CHAPTER2 !== "0" &&
-  process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_23 !== "0";
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_23 === "1";
 
 /** CSS z-index on berg PNGs (`Chapter2BergLayer` uses `layer.depth`). */
 export const CHAPTER2_BERG3_LAYER_Z = 2;

@@ -1,4 +1,7 @@
-import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
+import {
+  isChapter2PlaybackSubscene23OrLater,
+  type Chapter2SubscenePlaybackPhase,
+} from "@/constants/chapter2SubscenePlayback";
 import type { Chapter2PropId } from "@/constants/chapter2ObjectsConfig";
 import type { Chapter2MarimoInstance } from "@/constants/chapter2MarimoConfig";
 import type { Chapter2NabiInstance } from "@/constants/chapter2NabiConfig";
@@ -27,6 +30,14 @@ export const CHAPTER2_LAUBL_PROPS_MOTION_START_SEC = CHAPTER2_LAUBL_REVEAL_SEC;
 
 /** Berg drop + y2→b2 crossfade (with Laubl intro). */
 export const CHAPTER2_SUBSCENE_23_INTRO_MOTION_SEC = 1.35;
+
+/** Elapsed 2-3 time frozen after main blau / Laubl beats (before 2-4 gate). */
+export const CHAPTER2_SUBSCENE_23_HOLD_ELAPSED_SEC =
+  CHAPTER2_LAUBL_PROPS_MOTION_START_SEC + 0.64 + 1.45 + 0.12;
+
+export function isChapter2Subscene23MotionComplete(elapsedSince23Sec: number) {
+  return elapsedSince23Sec >= CHAPTER2_SUBSCENE_23_HOLD_ELAPSED_SEC;
+}
 
 export const CHAPTER2_BERG2_SUBSCENE_23_Y = 20;
 export const CHAPTER2_BERG3_SUBSCENE_23_Y = 50;
@@ -77,12 +88,15 @@ const CHAPTER2_LAUBL_WORM_EXIT: LaublWormExitSpec = {
   dropPx: 40,
 };
 
+/** Steady fly-out to the right once Laubl starts appearing (scene 2-3). */
 const CHAPTER2_VOGEL_LAUBL_EXIT = {
-  delaySec: 0.15,
-  spanSec: 8.2,
-  /** Viewport widths — enough to clear the right edge from rest position. */
-  driftXNorm: 1.05,
-  driftYNorm: 0.11,
+  /** After 2-3 starts (Laubl fade-in begins). */
+  delaySec: 0.06,
+  /** Viewport widths per second. */
+  speedNormPerSec: 0.32,
+  /** Travel from rest until bird is past the right edge. */
+  exitClearNorm: 1.2,
+  driftYNormMax: 0.05,
 };
 
 export const CHAPTER2_GRUN_LAUBL_SCALE = 0.8;
@@ -148,6 +162,7 @@ export function getChapter2LaublRevealPropMotion(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ): Chapter2LaublRevealPropMotion | null {
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) return null;
   if (phase !== "2-3-playing") return null;
   const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
   if (beatElapsed <= 0) return null;
@@ -182,7 +197,7 @@ export function getChapter2LaublRevealPropMotion(
   return null;
 }
 
-/** Bird drifts right + bob after Laubl has appeared. */
+/** Bird flies steadily right after Laubl appears; unmount visually off-screen. */
 export function getChapter2VogelLaublExitMotion(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
@@ -194,26 +209,31 @@ export function getChapter2VogelLaublExitMotion(
     bobPx: 0,
     opacityMul: 1,
   };
-  if (phase !== "2-3-playing") return idle;
-  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
-  if (beatElapsed <= 0) return idle;
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) return idle;
+
+  const elapsed =
+    phase === "2-3-complete" || phase === "2-4-playing"
+      ? CHAPTER2_SUBSCENE_23_HOLD_ELAPSED_SEC
+      : phase === "2-3-playing"
+        ? elapsedSince23Sec
+        : 0;
 
   const spec = CHAPTER2_VOGEL_LAUBL_EXIT;
-  const driftRaw = laublBeatProgress(beatElapsed, spec.delaySec, spec.spanSec);
-  if (driftRaw <= 0) return idle;
+  if (elapsed <= spec.delaySec) return idle;
 
-  const tSec = beatElapsed;
-  const bobPx =
-    Math.sin(tSec * 1.85) * 13 * (1 - driftRaw * 0.2) +
-    Math.sin(tSec * 1.05 + 0.5) * 6;
+  const exitSec = elapsed - spec.delaySec;
+  const driftXNorm = exitSec * spec.speedNormPerSec;
+  const driftYNorm =
+    easeInOutSine(Math.min(1, exitSec / 2.2)) * spec.driftYNormMax;
+  const bobPx = Math.sin(exitSec * 2.4) * 5 * Math.max(0, 1 - exitSec / 3.5);
+  const cleared = driftXNorm >= spec.exitClearNorm;
 
   return {
     active: true,
-    driftXNorm: driftRaw * spec.driftXNorm,
-    driftYNorm: easeInOutSine(driftRaw) * spec.driftYNorm,
+    driftXNorm,
+    driftYNorm,
     bobPx,
-    /** No fade — clip once drift finishes (bird is past the right edge). */
-    opacityMul: driftRaw >= 1 ? 0 : 1,
+    opacityMul: cleared ? 0 : 1,
   };
 }
 
@@ -263,8 +283,11 @@ export function getChapter2BlauFadeAfterLaublReveal(
 ): Chapter2BlauFadeAfterLaublReveal | null {
   const spec = CHAPTER2_BLAU_FADE_AFTER_LAUBL[propId];
   if (!spec) return null;
-  if (phase !== "2-3-playing") {
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) {
     return { opacity: 0, scaleMul: spec.startScaleMul };
+  }
+  if (phase !== "2-3-playing") {
+    return { opacity: 1, scaleMul: 1 };
   }
   const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
   if (beatElapsed <= 0) {
@@ -294,8 +317,11 @@ export function getChapter2BlauSteinReveal(
 ): Chapter2BlauSteinReveal | null {
   const spec = CHAPTER2_BLAU_STEIN_REVEAL[propId];
   if (!spec) return null;
-  if (phase !== "2-3-playing") {
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) {
     return { opacity: 0, riseYOffsetPx: spec.risePx };
+  }
+  if (phase !== "2-3-playing") {
+    return { opacity: 1, riseYOffsetPx: 0 };
   }
   const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
   if (beatElapsed <= 0) {
@@ -358,8 +384,11 @@ export function getChapter2Berg4PeakReveal(
 ): Chapter2Berg4PeakReveal | null {
   const spec = CHAPTER2_BERG4_PEAK_REVEAL[propId];
   if (!spec) return null;
-  if (phase !== "2-3-playing") {
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) {
     return { opacity: 0, riseYOffsetPx: spec.risePx, scaleMul: spec.startScaleMul };
+  }
+  if (phase !== "2-3-playing") {
+    return { opacity: 1, riseYOffsetPx: 0, scaleMul: 1 };
   }
   const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
   if (beatElapsed <= 0) {
@@ -384,8 +413,11 @@ export function getChapter2BlauSlideFromLeftReveal(
 ): Chapter2BlauSlideFromLeftReveal | null {
   const spec = CHAPTER2_BLAU_SLIDE_FROM_LEFT_REVEAL[propId];
   if (!spec) return null;
-  if (phase !== "2-3-playing") {
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) {
     return { opacity: 0, slideXOffsetPx: -spec.slideFromLeftPx };
+  }
+  if (phase !== "2-3-playing") {
+    return { opacity: 1, slideXOffsetPx: 0 };
   }
   const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
   if (beatElapsed <= 0) {
@@ -428,7 +460,13 @@ export function getChapter2GrunSubscene23ScaleMul(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ) {
-  if (phase !== "2-3-playing") return 1;
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) return 1;
+  if (phase !== "2-3-playing") {
+    const beatElapsed = laublPropsBeatElapsed(CHAPTER2_SUBSCENE_23_HOLD_ELAPSED_SEC);
+    const { delaySec, spanSec } = CHAPTER2_GRUN_LAUBL_SCALE_BEAT;
+    const t = easeInOutSine(laublBeatProgress(beatElapsed, delaySec, spanSec));
+    return 1 - t * (1 - CHAPTER2_GRUN_LAUBL_SCALE);
+  }
   const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
   if (beatElapsed <= 0) return 1;
   const { delaySec, spanSec } = CHAPTER2_GRUN_LAUBL_SCALE_BEAT;
@@ -440,7 +478,13 @@ export function getChapter2NariSubscene23ScaleMul(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ) {
-  if (phase !== "2-3-playing") return 1;
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) return 1;
+  if (phase !== "2-3-playing") {
+    const beatElapsed = laublPropsBeatElapsed(CHAPTER2_SUBSCENE_23_HOLD_ELAPSED_SEC);
+    const { delaySec, spanSec } = CHAPTER2_NARI_LAUBL_SCALE_BEAT;
+    const t = easeInOutSine(laublBeatProgress(beatElapsed, delaySec, spanSec));
+    return 1 - t * (1 - CHAPTER2_NARI_LAUBL_SCALE);
+  }
   const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
   if (beatElapsed <= 0) return 1;
   const { delaySec, spanSec } = CHAPTER2_NARI_LAUBL_SCALE_BEAT;
@@ -484,16 +528,39 @@ export function getChapter2Subscene23IntroProgress(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ) {
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) return 0;
+  if (phase === "2-3-complete" || phase === "2-4-playing") return 1;
   if (phase !== "2-3-playing") return 0;
-  return easeInOutSine(elapsedSince23Sec / CHAPTER2_SUBSCENE_23_INTRO_MOTION_SEC);
+  const t = clamp01(elapsedSince23Sec / CHAPTER2_SUBSCENE_23_INTRO_MOTION_SEC);
+  return easeInOutSine(t);
 }
 
 export function getChapter2LaublRevealOpacity(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ) {
-  if (phase !== "2-3-playing") return 0;
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) return 0;
+  if (phase === "2-3-complete" || phase === "2-4-playing") return 1;
   return clamp01(elapsedSince23Sec / CHAPTER2_LAUBL_REVEAL_SEC);
+}
+
+/** Blau bubbles — fade in with scene 2-3 (not 2-2 scroll). */
+const CHAPTER2_BUBBLE_SUB23_FADE_DELAY_SEC = 0.1;
+const CHAPTER2_BUBBLE_SUB23_FADE_SPAN_SEC = 1;
+
+export function getChapter2BubbleSubscene23Visibility(
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+) {
+  if (!isChapter2PlaybackSubscene23OrLater(phase)) return 0;
+  if (phase === "2-3-complete" || phase === "2-4-playing") return 1;
+  if (elapsedSince23Sec <= CHAPTER2_BUBBLE_SUB23_FADE_DELAY_SEC) return 0;
+  return easeInOutSine(
+    clamp01(
+      (elapsedSince23Sec - CHAPTER2_BUBBLE_SUB23_FADE_DELAY_SEC) /
+        CHAPTER2_BUBBLE_SUB23_FADE_SPAN_SEC,
+    ),
+  );
 }
 
 export function getChapter2BergSubscene23YOffset(

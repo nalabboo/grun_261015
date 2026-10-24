@@ -57,7 +57,7 @@ export function getChapter2NabiScroll22ExitOpacity(
   return 1 - easeInOutSine(exit);
 }
 
-/** Bubbles fade in during mid 2-2 scroll (blau atmosphere). */
+/** @deprecated Bubbles use `getChapter2BubbleSubscene23Visibility` (scene 2-3). */
 export function getChapter2BubbleScroll22Visibility(scroll22: number) {
   if (scroll22 <= 0.18) return 0;
   if (scroll22 >= 0.36) return 1;

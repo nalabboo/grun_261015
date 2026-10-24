@@ -52,6 +52,17 @@ export type Chapter2PropConfig = {
   revealFadeAfterLaubl?: boolean;
 };
 
+/** Hidden until scene 2-3 starts (Laubl beat and blau reveals). */
+export function chapter2PropIsSubscene23Exclusive(prop: Chapter2PropConfig): boolean {
+  return Boolean(
+    prop.revealOnSubscene23 ||
+      prop.revealFromBottomAfterLaubl ||
+      prop.revealFromLeftAfterLaubl ||
+      prop.revealFromBerg4PeakAfterLaubl ||
+      prop.revealFadeAfterLaubl,
+  );
+}
+
 export const CHAPTER2_PROP_IDS = [
   "spore1",
   "spore1_1",
@@ -99,16 +110,16 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   spore4: { x: -370, y: -35, scale: 1.58, scaleY: 1.58, rotate: 0 },
   grun_v: { x: -250, y: -2, scale: 1.9, scaleY: 1.9, rotate: 0 },
   /** 벌레 — bottom-right, in front of berg2 */
-  worm_g: { x: 450, y: -244, scale: 1.12, scaleY: 1.12, rotate: 0 },
+  worm_g: { x: 250, y: -350, scale: 1.12, scaleY: 1.12, rotate: 0 },
   nari: { x: 360, y: -392, scale: 1.35, scaleY: 1.35, rotate: 0 },
   /** 라우블 — same slot as worm_g (scene 2-3). */
-  laubl: { x: 450, y: -144, scale: 3.024, scaleY: 3.024, rotate: 0 },
+  laubl: { x: 450, y: -144, scale: 2.000, scaleY: 1.512, rotate: 0 },
   /** Blau 돌 — ref layout 2026-10-24 (stein2 right of stein1). */
-  stein1: { x: -528, y: 90, scale: 2.138, scaleY: 2.138, rotate: 0 },
+  stein1: { x: -650, y: 90, scale: 2.138, scaleY: 2.138, rotate: 0 },
   stein2: { x: -68, y: 100, scale: 1.53, scaleY: 1.53, rotate: 0 },
   /** 돌3 — between berg3/berg2; −30% scale, −100px X. */
   stein3: { x: 280, y: -90, scale: 1.928, scaleY: 1.928, rotate: 0 },
-  coral1: { x: -850, y: -400, scale: 4.05, scaleY: 4.05, rotate: 45 },
+  coral1: { x: -970, y: -400, scale: 4.05, scaleY: 4.05, rotate: 45 },
   /** berg4 peak — in front of 산4 PNG, right of coral3. */
   coral2: { x: -450, y: -380, scale: 2, scaleY: 2, rotate: -10 },
   /** berg4 peak — behind 산4 PNG. */
@@ -118,13 +129,13 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   /** berg3 앞 · berg2 뒤 (`betweenBerg3AndBerg2`). */
   coral5: { x: 560, y: -160, scale: 3.5, scaleY: 3, rotate: -5 },
   /** berg2 앞 (aboveBerg2). */
-  coral6: { x: 320, y: 100, scale: 4, scaleY: 5, rotate: -10 },
+  coral6: { x: 320, y: 100, scale: 3, scaleY: 5, rotate: -10 },
   /** 이끼1 (b_moss1) — berg3 레이어 (initial layout). */
   ikki1: { x: -950, y: -457, scale: 1.8, scaleY: 2.6, rotate: 0 },
   /** 이끼2 (b_moss2) — berg3 (initial layout). */
   ikki2: { x: -320, y: -500, scale: 2.1, scaleY: 2.1, rotate: -15 },
   /** 이끼3 (b_moss3) — berg2 (initial layout). */
-  ikki3: { x: 640, y: -183, scale: 1.2, scaleY: 2.4, rotate: -23 },
+  ikki3: { x: 500, y: -330, scale: 1.2, scaleY: 2.4, rotate: -23 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -190,7 +201,9 @@ const STEIN2_DEPTH_PX = 74;
 /** Between berg3 (−80) and berg2 (90) depth planes. */
 const STEIN3_DEPTH_PX = 5;
 const CORAL1_DEPTH_PX = 76;
-const CORAL6_DEPTH_PX = 78;
+/** In front of berg2 focus (90) — Laubl / coral6 read as foreground. */
+const LAUBL_DEPTH_PX = 102;
+const CORAL6_DEPTH_PX = 118;
 const IKKI1_DEPTH_PX = -72;
 const IKKI2_DEPTH_PX = -74;
 /** Same depth plane as berg2 (90) — moss blur matches the mountain bake. */
@@ -349,7 +362,7 @@ export const CHAPTER2_WORM_G: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.worm_g,
 };
 
-/** 라우블 — scene 2-3, worm_g position, in front of berg2. */
+/** 라우블 — scene 2-3, worm_g slot; independent parallax (not berg2-attached). */
 export const CHAPTER2_LAUBL: Chapter2PropConfig = {
   id: "laubl",
   file: "charactor/laubl.png",
@@ -357,13 +370,12 @@ export const CHAPTER2_LAUBL: Chapter2PropConfig = {
   height: 1046,
   zIndex: 6,
   stack: "aboveBerg2",
-  attachToBergId: "berg2",
   revealOnSubscene23: true,
-  parallax: 16,
+  parallax: 19,
   heightVh: 0.26,
-  depthPx: WORM_G_DEPTH_PX,
-  blurRatio: getDepthBlurRatio(WORM_G_DEPTH_PX),
-  brightness: getDepthBrightness(WORM_G_DEPTH_PX),
+  depthPx: LAUBL_DEPTH_PX,
+  blurRatio: 0,
+  brightness: getDepthBrightness(LAUBL_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.laubl,
 };
 
@@ -470,7 +482,7 @@ export const CHAPTER2_IKKI3: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.ikki3,
 };
 
-/** 코랄6 — berg2 PNG 앞, above Laubl (z 6). */
+/** 코랄6 — above Laubl (z 7); independent parallax (not berg2-attached). */
 export const CHAPTER2_CORAL6: Chapter2PropConfig = {
   id: "coral6",
   file: "blau objekt/b_coral6.png",
@@ -478,9 +490,8 @@ export const CHAPTER2_CORAL6: Chapter2PropConfig = {
   height: 820,
   zIndex: 7,
   stack: "aboveBerg2",
-  attachToBergId: "berg2",
   revealFromBottomAfterLaubl: true,
-  parallax: 16,
+  parallax: 22,
   heightVh: 0.21,
   depthPx: CORAL6_DEPTH_PX,
   blurRatio: getDepthBlurRatio(CORAL6_DEPTH_PX),

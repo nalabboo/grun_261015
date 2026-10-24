@@ -17,8 +17,22 @@ export type Chapter2SubscenePlaybackPhase =
   | "2-2-playing"
   /** 2-2 end state — scroll raw at max; wait for scroll to begin 2-3. */
   | "2-2-complete"
-  /** 2-3 timeline (implement in `chapter2ScrollMotion` / playback). */
-  | "2-3-playing";
+  /** 2-3 timeline (Laubl + blau beats). */
+  | "2-3-playing"
+  /** 2-3 motions finished — wait 3 s, then scroll starts 2-4. */
+  | "2-3-complete"
+  /** Berg drop motion (scene 2-4). */
+  | "2-4-playing";
+
+export function isChapter2PlaybackSubscene23OrLater(
+  phase: Chapter2SubscenePlaybackPhase,
+): boolean {
+  return (
+    phase === "2-3-playing" ||
+    phase === "2-3-complete" ||
+    phase === "2-4-playing"
+  );
+}
 
 /** Maps playback elapsed time → scroll raw (drives segment order: nari → berg → grun → spore). */
 export function getChapter2PlaybackScrollRaw(elapsedSec: number) {

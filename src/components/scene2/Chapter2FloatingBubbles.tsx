@@ -5,10 +5,15 @@ import {
   CHAPTER2_BUBBLE_INSTANCES,
   type Chapter2BubbleInstance,
 } from "@/constants/chapter2BubbleConfig";
-import { getChapter2BubbleScroll22Visibility } from "@/constants/chapter2Scroll22Motion";
+import { getChapter2BubbleSubscene23Visibility } from "@/constants/chapter2Subscene23Motion";
+import {
+  isChapter2PlaybackSubscene23OrLater,
+  type Chapter2SubscenePlaybackPhase,
+} from "@/constants/chapter2SubscenePlayback";
 
 type Props = {
-  scroll22Progress: number;
+  playbackPhase: Chapter2SubscenePlaybackPhase;
+  subscene23ElapsedSec: number;
 };
 
 type SimBody = {
@@ -75,12 +80,17 @@ function bounce(body: SimBody, width: number, height: number) {
   }
 }
 
-export default function Chapter2FloatingBubbles({ scroll22Progress }: Props) {
+export default function Chapter2FloatingBubbles({
+  playbackPhase,
+  subscene23ElapsedSec,
+}: Props) {
   const anchorRefs = useRef<(HTMLDivElement | null)[]>([]);
   const simRef = useRef<SimBody[] | null>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
-  const scroll22Ref = useRef(scroll22Progress);
-  scroll22Ref.current = scroll22Progress;
+  const phaseRef = useRef(playbackPhase);
+  const elapsed23Ref = useRef(subscene23ElapsedSec);
+  phaseRef.current = playbackPhase;
+  elapsed23Ref.current = subscene23ElapsedSec;
 
   useEffect(() => {
     const syncSize = () => {
@@ -103,7 +113,10 @@ export default function Chapter2FloatingBubbles({ scroll22Progress }: Props) {
       const t = (now - start) / 1000;
       const { width, height } = sizeRef.current;
       const sim = simRef.current;
-      const layerVis = getChapter2BubbleScroll22Visibility(scroll22Ref.current);
+      const layerVis = getChapter2BubbleSubscene23Visibility(
+        phaseRef.current,
+        elapsed23Ref.current,
+      );
 
       if (sim && width > 0 && height > 0 && layerVis > 0.01) {
         for (let i = 0; i < sim.length; i++) {
@@ -149,7 +162,7 @@ export default function Chapter2FloatingBubbles({ scroll22Progress }: Props) {
     };
   }, []);
 
-  if (scroll22Progress <= 0.001) {
+  if (!isChapter2PlaybackSubscene23OrLater(playbackPhase)) {
     return null;
   }
 
