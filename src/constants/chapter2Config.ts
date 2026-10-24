@@ -30,6 +30,31 @@ export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
 export const CHAPTER2_MOUSE_PARALLAX_GAIN = 1.45;
 
 /**
+ * Dev (with chapter 2 on load): refresh → scroll at 2-2 end + `2-3-playing`.
+ * Set `NEXT_PUBLIC_DEV_CHAPTER2_START_23=0` to play from 2-1 again.
+ */
+export const DEV_CHAPTER2_START_AT_SUBSCENE_23 =
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2 !== "0" &&
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_23 !== "0";
+
+/** CSS z-index on berg PNGs (`Chapter2BergLayer` uses `layer.depth`). */
+export const CHAPTER2_BERG3_LAYER_Z = 2;
+export const CHAPTER2_BERG2_LAYER_Z = 3;
+/** Props behind 산3 PNG — below berg3 `layer.depth` (2); render before berg3 in DOM. */
+export const CHAPTER2_PROP_Z_BEHIND_BERG3 = 1;
+/**
+ * Props between 산3 and 산2: same z as berg2 but must render before berg2 PNG in DOM
+ * so the nearer mountain paints on top.
+ */
+export const CHAPTER2_PROP_Z_BETWEEN_BERG3_AND_BERG2 = CHAPTER2_BERG2_LAYER_Z;
+/**
+ * Props behind 산4 PNG — same z as berg4 (`layer.depth` 0); must render before
+ * `Chapter2BergLayer` in DOM. Do not use negative z (papier bg is also 0).
+ */
+export const CHAPTER2_PROP_Z_BEHIND_BERG4 = 0;
+
+/**
  * How much layers shrink/grow with depth (0 = same size, 1 = full scene-1 perspective).
  * Kept low so stacked PNGs stay aligned and do not clip.
  */
@@ -203,6 +228,13 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("charactor/laubl.png"),
     chapter2AssetUrl("blau objekt/b_stein1.png"),
     chapter2AssetUrl("blau objekt/b_stein2.png"),
+    chapter2AssetUrl("blau objekt/b_coral1.png"),
+    chapter2AssetUrl("blau objekt/b_coral2.png"),
+    chapter2AssetUrl("blau objekt/b_coral3.png"),
+    chapter2AssetUrl("blau objekt/b_coral4.png"),
+    chapter2AssetUrl("blau objekt/b_coral5.png"),
+    chapter2AssetUrl("blau objekt/b_coral6.png"),
+    chapter2AssetUrl("blau objekt/b_bubble 2.png"),
     chapter2AssetUrl("grun objekt/worm_g.png"),
     chapter2AssetUrl("gelb objekt/g_nabi1.png"),
     chapter2AssetUrl("gelb objekt/g_nabi2.png"),

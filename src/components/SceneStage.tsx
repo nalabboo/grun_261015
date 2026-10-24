@@ -9,6 +9,7 @@ import MossHitTargets from "@/components/MossHitTargets";
 import SceneCanvasLoader from "@/components/canvas/SceneCanvasLoader";
 import Chapter2Intro from "@/components/scene2/Chapter2Intro";
 import Chapter2Scene from "@/components/scene2/Chapter2Scene";
+import { Chapter2LayoutRulerPortal } from "@/components/scene2/Chapter2LayoutRuler";
 import { preloadChapter2BergAssets } from "@/constants/chapter2Config";
 import NextScene from "@/components/scene2/NextScene";
 import PageTurnButton from "@/components/scene2/PageTurnButton";
@@ -647,11 +648,14 @@ export default function SceneStage() {
       <PageTurnButton onTurn={handlePageTurn} />
     )}
     {chapter === 2 && chapter2Step === "play" && chapter2PlayReady && (
-      <Chapter2Scene
-        onSubscene23ScrollStart={() => {
-          /* scene 2-3 motion — wire timeline next */
-        }}
-      />
+      <>
+        <Chapter2Scene
+          onSubscene23ScrollStart={() => {
+            /* scene 2-3 motion — wire timeline next */
+          }}
+        />
+        <Chapter2LayoutRulerPortal />
+      </>
     )}
     {chapter === 2 && chapter2Step === "intro" && (
       <Chapter2Intro onComplete={handleChapter2IntroComplete} />

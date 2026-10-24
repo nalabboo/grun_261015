@@ -12,6 +12,13 @@ import {
   CHAPTER2_LAUBL_LAYOUT_LOCKED,
   CHAPTER2_STEIN1_LAYOUT_LOCKED,
   CHAPTER2_STEIN2_LAYOUT_LOCKED,
+  CHAPTER2_STEIN3_LAYOUT_LOCKED,
+  CHAPTER2_CORAL1_LAYOUT_LOCKED,
+  CHAPTER2_CORAL2_LAYOUT_LOCKED,
+  CHAPTER2_CORAL3_LAYOUT_LOCKED,
+  CHAPTER2_CORAL4_LAYOUT_LOCKED,
+  CHAPTER2_CORAL5_LAYOUT_LOCKED,
+  CHAPTER2_CORAL6_LAYOUT_LOCKED,
   CHAPTER2_TUNABLE_PROP_IDS,
   getChapter2PropDefaultEdit,
   isChapter2PropTunable,
@@ -120,6 +127,38 @@ function pruneStoredProductionPropLayouts() {
       delete parsed.stein2;
       changed = true;
     }
+    if (CHAPTER2_STEIN3_LAYOUT_LOCKED && "stein3" in parsed) {
+      delete parsed.stein3;
+      changed = true;
+    }
+    if (CHAPTER2_CORAL1_LAYOUT_LOCKED && "coral1" in parsed) {
+      delete parsed.coral1;
+      changed = true;
+    }
+    if ("coral1_2" in parsed) {
+      delete parsed.coral1_2;
+      changed = true;
+    }
+    if (CHAPTER2_CORAL2_LAYOUT_LOCKED && "coral2" in parsed) {
+      delete parsed.coral2;
+      changed = true;
+    }
+    if (CHAPTER2_CORAL3_LAYOUT_LOCKED && "coral3" in parsed) {
+      delete parsed.coral3;
+      changed = true;
+    }
+    if (CHAPTER2_CORAL4_LAYOUT_LOCKED && "coral4" in parsed) {
+      delete parsed.coral4;
+      changed = true;
+    }
+    if (CHAPTER2_CORAL5_LAYOUT_LOCKED && "coral5" in parsed) {
+      delete parsed.coral5;
+      changed = true;
+    }
+    if (CHAPTER2_CORAL6_LAYOUT_LOCKED && "coral6" in parsed) {
+      delete parsed.coral6;
+      changed = true;
+    }
     if (!changed) return;
     window.localStorage.setItem(CHAPTER2_PROP_LAYOUT_STORAGE_KEY, JSON.stringify(parsed, null, 2));
   } catch {
@@ -182,6 +221,34 @@ export function loadChapter2PropEdits(): Record<Chapter2PropId, Chapter2PropEdit
     base.stein2 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("stein2"));
   }
 
+  if (CHAPTER2_STEIN3_LAYOUT_LOCKED) {
+    base.stein3 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("stein3"));
+  }
+
+  if (CHAPTER2_CORAL1_LAYOUT_LOCKED) {
+    base.coral1 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("coral1"));
+  }
+
+  if (CHAPTER2_CORAL2_LAYOUT_LOCKED) {
+    base.coral2 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("coral2"));
+  }
+
+  if (CHAPTER2_CORAL3_LAYOUT_LOCKED) {
+    base.coral3 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("coral3"));
+  }
+
+  if (CHAPTER2_CORAL4_LAYOUT_LOCKED) {
+    base.coral4 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("coral4"));
+  }
+
+  if (CHAPTER2_CORAL5_LAYOUT_LOCKED) {
+    base.coral5 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("coral5"));
+  }
+
+  if (CHAPTER2_CORAL6_LAYOUT_LOCKED) {
+    base.coral6 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("coral6"));
+  }
+
   return base;
 }
 
@@ -216,6 +283,9 @@ export const DEV_CHAPTER2_PROP_EDITOR =
   CHAPTER2_TUNABLE_PROP_IDS.length > 0 &&
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_CHAPTER2_EDIT !== "0";
+
+/** Rulers: localhost / dev by default; force with NEXT_PUBLIC_DEV_CHAPTER2_RULER=1|0. */
+export const CHAPTER2_LAYOUT_RULER_ENV = process.env.NEXT_PUBLIC_DEV_CHAPTER2_RULER;
 
 export type Chapter2PropEditorState = {
   enabled: boolean;

@@ -9,6 +9,7 @@ import {
   CHAPTER2_BERG4_FIXED_LAYOUT,
   CHAPTER2_DEPTH_SIZE_STRENGTH,
   CHAPTER2_MOUSE_PARALLAX_GAIN,
+  DEV_CHAPTER2_START_AT_SUBSCENE_23,
   CHAPTER2_SCROLL_BERG3_Y,
   CHAPTER2_SCROLL_BERG4_Y,
   CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN,
@@ -20,6 +21,7 @@ import {
   getChapter2PropScrollScaleMultiplier,
   getChapter2ScrollSegments,
 } from "@/constants/chapter2ScrollMotion";
+import { getChapter2Scroll22Progress } from "@/constants/chapter2Scroll22Motion";
 import {
   getChapter2PlaybackScrollRaw,
   isChapter2PlaybackComplete,
@@ -35,20 +37,21 @@ import {
   getChapter2GrunSubscene23ScaleMul,
   getChapter2NariSubscene23ScaleMul,
   getChapter2BlauSteinReveal,
+  getChapter2BlauSlideFromLeftReveal,
+  getChapter2Berg4PeakReveal,
   getChapter2LaublRevealPropMotion,
   getChapter2Subscene23IntroProgress,
   getChapter2YellowGelbExitVisibility,
 } from "@/constants/chapter2Subscene23Motion";
 import Chapter2BergLayer from "@/components/scene2/Chapter2BergLayer";
 import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
-import Chapter2PropEditorPanel from "@/components/scene2/Chapter2PropEditorPanel";
+import Chapter2FloatingBubbles from "@/components/scene2/Chapter2FloatingBubbles";
 import Chapter2FloatingMarimos from "@/components/scene2/Chapter2FloatingMarimos";
 import Chapter2FloatingNabis from "@/components/scene2/Chapter2FloatingNabis";
 import Chapter2VogelFlyby from "@/components/scene2/Chapter2VogelFlyby";
 import { CHAPTER2_VOGEL } from "@/constants/chapter2VogelConfig";
 import {
   CHAPTER2_PROPS,
-  CHAPTER2_TUNABLE_PROP_IDS,
   getChapter2PropDefaultEdit,
   isChapter2PropTunable,
   sanitizeChapter2PropEdit,
@@ -66,7 +69,6 @@ import {
 } from "@/constants/chapter2Layout";
 import {
   defaultChapter2PropEdits,
-  DEV_CHAPTER2_PROP_EDITOR,
   loadChapter2PropEdits,
   saveChapter2PropEdits,
   type Chapter2PropEditorState,
@@ -109,9 +111,15 @@ export default function Chapter2Scene({
   const targetRef = useRef<Point>({ x: 0, y: 0 });
   const smoothRef = useRef<Point>({ x: 0, y: 0 });
   const propDragRef = useRef<PropDragState | null>(null);
-  const scrollTargetRef = useRef(0);
-  const scrollSmoothRef = useRef(0);
-  const playbackPhaseRef = useRef<Chapter2SubscenePlaybackPhase>("2-1");
+  const scrollTargetRef = useRef(
+    DEV_CHAPTER2_START_AT_SUBSCENE_23 ? CHAPTER2_SUBSCENE_SCROLL_MAX : 0,
+  );
+  const scrollSmoothRef = useRef(
+    DEV_CHAPTER2_START_AT_SUBSCENE_23 ? CHAPTER2_SUBSCENE_SCROLL_MAX : 0,
+  );
+  const playbackPhaseRef = useRef<Chapter2SubscenePlaybackPhase>(
+    DEV_CHAPTER2_START_AT_SUBSCENE_23 ? "2-3-playing" : "2-1",
+  );
   const playbackStartMsRef = useRef(0);
   const subscene22CompleteAtMsRef = useRef(0);
   const subscene23StartMsRef = useRef(0);
@@ -145,6 +153,17 @@ export default function Chapter2Scene({
     setViewportHeight(window.innerHeight);
     setDevEditsReady(true);
     setPropEditsReady(true);
+
+    if (DEV_CHAPTER2_START_AT_SUBSCENE_23) {
+      const now = performance.now();
+      playbackPhaseRef.current = "2-3-playing";
+      scrollTargetRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+      scrollSmoothRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+      subscene22CompleteAtMsRef.current = now;
+      subscene23StartMsRef.current = now;
+      subscene23StartFiredRef.current = true;
+      sequenceCompleteFiredRef.current = true;
+    }
   }, []);
 
   const patchProp = useCallback(
@@ -342,6 +361,7 @@ export default function Chapter2Scene({
   const mouseY = smooth.y * CHAPTER2_MOUSE_PARALLAX_GAIN;
   const scrollAmount = scrollSmoothRef.current;
   const scrollSegments = getChapter2ScrollSegments(scrollAmount);
+  const scroll22Progress = getChapter2Scroll22Progress(scrollSegments.raw);
   void frame;
 
   const playbackPhase = playbackPhaseRef.current;
@@ -375,12 +395,24 @@ export default function Chapter2Scene({
   const maxForegroundScale = Math.max(...foregroundScales, 1);
 
   const berg4Layer = CHAPTER2_BERG_LAYERS.find((layer) => layer.id === "berg4");
-  const aboveBerg4Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "aboveBerg4").sort(
+  const behindBerg4Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "behindBerg4").sort(
+    (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
+  );
+  const attachedInFrontOfBerg4Props = CHAPTER2_PROPS.filter(
+    (prop) => prop.stack === "aboveBerg4" && prop.attachToBergId === "berg4",
+  ).sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id));
+  const aboveBerg4Props = CHAPTER2_PROPS.filter(
+    (prop) => prop.stack === "aboveBerg4" && prop.attachToBergId !== "berg4",
+  ).sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id));
+  const behindBerg3Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "behindBerg3").sort(
     (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
   );
   const aboveBerg3Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "aboveBerg3").sort(
     (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
   );
+  const betweenBerg3AndBerg2Props = CHAPTER2_PROPS.filter(
+    (prop) => prop.stack === "betweenBerg3AndBerg2",
+  ).sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id));
   const behindBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "behindBerg2");
   const midBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "midBerg2");
   const aboveBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "aboveBerg2").sort(
@@ -389,11 +421,43 @@ export default function Chapter2Scene({
 
   type BergPropMotion = { shiftX: number; shiftY: number; bergScale: number };
 
-  const renderPropLayer = (prop: Chapter2PropConfig, bergMotion?: BergPropMotion) => {
-    const attached = bergMotion && prop.attachToBergId === "berg2";
-    const shiftX = attached ? bergMotion.shiftX : mouseX * prop.parallax;
-    const shiftY = attached ? bergMotion.shiftY : mouseY * prop.parallax * 0.65;
-    const bergScale = attached ? bergMotion.bergScale : 1;
+  const berg4EditForProps = devEditsReady
+    ? tunableEdits.berg4
+    : CHAPTER2_BERG4_FIXED_LAYOUT;
+  const berg4PropMotion: BergPropMotion | undefined = berg4Layer
+    ? {
+        shiftX: mouseX * berg4Layer.parallax + berg4EditForProps.x,
+        shiftY:
+          mouseY * berg4Layer.parallax * 0.65 +
+          berg4EditForProps.y +
+          berg4ScrollY +
+          getChapter2BergSubscene23YOffset("berg4", subscene23IntroProgress),
+        bergScale: berg4EditForProps.scale,
+      }
+    : undefined;
+
+  const renderPropLayer = (
+    prop: Chapter2PropConfig,
+    berg2Motion?: BergPropMotion,
+    berg4Motion?: BergPropMotion,
+  ) => {
+    const attachedBerg2 = berg2Motion && prop.attachToBergId === "berg2";
+    const attachedBerg4 = berg4Motion && prop.attachToBergId === "berg4";
+    const shiftX = attachedBerg2
+      ? berg2Motion.shiftX
+      : attachedBerg4
+        ? berg4Motion.shiftX
+        : mouseX * prop.parallax;
+    const shiftY = attachedBerg2
+      ? berg2Motion.shiftY
+      : attachedBerg4
+        ? berg4Motion.shiftY
+        : mouseY * prop.parallax * 0.65;
+    const bergScale = attachedBerg2
+      ? berg2Motion.bergScale
+      : attachedBerg4
+        ? berg4Motion.bergScale
+        : 1;
     const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultEdit(prop.id);
     let scrollScaleMul = getChapter2PropScrollScaleMultiplier(
       prop,
@@ -407,6 +471,7 @@ export default function Chapter2Scene({
       scrollOpacity *= getChapter2LaublRevealOpacity(playbackPhase, subscene23ElapsedSec);
     }
     let layoutYOffset = 0;
+    let layoutXOffset = 0;
     if (prop.revealFromBottomAfterLaubl) {
       const steinReveal = getChapter2BlauSteinReveal(
         prop.id,
@@ -416,6 +481,29 @@ export default function Chapter2Scene({
       if (steinReveal) {
         scrollOpacity *= steinReveal.opacity;
         layoutYOffset += steinReveal.riseYOffsetPx;
+      }
+    }
+    if (prop.revealFromLeftAfterLaubl) {
+      const slideReveal = getChapter2BlauSlideFromLeftReveal(
+        prop.id,
+        playbackPhase,
+        subscene23ElapsedSec,
+      );
+      if (slideReveal) {
+        scrollOpacity *= slideReveal.opacity;
+        layoutXOffset += slideReveal.slideXOffsetPx;
+      }
+    }
+    if (prop.revealFromBerg4PeakAfterLaubl) {
+      const peakReveal = getChapter2Berg4PeakReveal(
+        prop.id,
+        playbackPhase,
+        subscene23ElapsedSec,
+      );
+      if (peakReveal) {
+        scrollOpacity *= peakReveal.opacity;
+        layoutYOffset += peakReveal.riseYOffsetPx;
+        scrollScaleMul *= peakReveal.scaleMul;
       }
     }
     const laublBeat = getChapter2LaublRevealPropMotion(
@@ -447,6 +535,7 @@ export default function Chapter2Scene({
         scrollScaleMul={scrollScaleMul}
         scrollOpacity={scrollOpacity}
         layoutYOffset={layoutYOffset}
+        layoutXOffset={layoutXOffset}
         layout={layout}
         editorActive={editor.enabled && tunable}
         isSelected={isSelected}
@@ -486,6 +575,8 @@ export default function Chapter2Scene({
         const berg4ShiftX = mouseX * berg4Layer.parallax;
         const berg4ShiftY = mouseY * berg4Layer.parallax * 0.65;
         return (
+          <>
+            {behindBerg4Props.map((prop) => renderPropLayer(prop, undefined, berg4PropMotion))}
           <Chapter2BergLayer
             key={berg4Layer.id}
             layer={berg4Layer}
@@ -501,10 +592,14 @@ export default function Chapter2Scene({
             scale={1}
             edit={berg4Edit}
           />
+            {attachedInFrontOfBerg4Props.map((prop) =>
+              renderPropLayer(prop, undefined, berg4PropMotion),
+            )}
+          </>
         );
       })()}
 
-      {aboveBerg4Props.map((prop) => renderPropLayer(prop))}
+      {aboveBerg4Props.map((prop) => renderPropLayer(prop, undefined, berg4PropMotion))}
 
       {foregroundLayers.map((layer, index) => {
         const shiftX = mouseX * layer.parallax;
@@ -528,6 +623,8 @@ export default function Chapter2Scene({
             )}
             {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
             {layer.id === "berg2" && midBerg2Props.map((prop) => renderPropLayer(prop))}
+            {layer.id === "berg3" &&
+              behindBerg3Props.map((prop) => renderPropLayer(prop))}
             <Chapter2BergLayer
               layer={layer}
               viewportHeight={viewportHeight}
@@ -555,53 +652,31 @@ export default function Chapter2Scene({
                 }),
               )}
             {layer.id === "berg3" && aboveBerg3Props.map((prop) => renderPropLayer(prop))}
+            {/* 산3 → 돌3 → 산2: after berg3 stack, before berg2 PNG (see CHAPTER2_PROP_Z_*). */}
+            {layer.id === "berg3" &&
+              betweenBerg3AndBerg2Props.map((prop) => renderPropLayer(prop))}
           </Fragment>
         );
       })}
 
+      <Chapter2FloatingBubbles scroll22Progress={scroll22Progress} />
+
       <Chapter2FloatingMarimos
         sporeProgress={scrollSegments.spore}
+        scroll22Progress={scroll22Progress}
         subscene23Phase={playbackPhase}
         subscene23ElapsedSec={subscene23ElapsedSec}
       />
 
       <Chapter2FloatingNabis
         sporeProgress={scrollSegments.spore}
+        scroll22Progress={scroll22Progress}
         yellowExitVisibility={getChapter2YellowGelbExitVisibility(
           playbackPhase,
           subscene23ElapsedSec,
         )}
       />
 
-      {DEV_CHAPTER2_PROP_EDITOR && (
-        <Chapter2PropEditorPanel
-          editor={editor}
-          edits={propEdits as Record<Chapter2TunablePropId, Chapter2PropEdit>}
-          onToggle={() => setEditor((prev) => ({ ...prev, enabled: !prev.enabled }))}
-          onSelect={(selectedId) => setEditor((prev) => ({ ...prev, selectedId }))}
-          onModeChange={(mode) => setEditor((prev) => ({ ...prev, mode }))}
-          onPatch={patchProp}
-          onResetSelected={() => {
-            setPropEdits((prev) => {
-              const id = editor.selectedId;
-              if (!isChapter2PropTunable(id)) return prev;
-              const next = { ...prev, [id]: getChapter2PropDefaultEdit(id) };
-              saveChapter2PropEdits(next);
-              return next;
-            });
-          }}
-          onResetAll={() => {
-            setPropEdits((prev) => {
-              const next = { ...prev };
-              for (const id of CHAPTER2_TUNABLE_PROP_IDS) {
-                next[id] = getChapter2PropDefaultEdit(id);
-              }
-              saveChapter2PropEdits(next);
-              return next;
-            });
-          }}
-        />
-      )}
     </div>
   );
 }

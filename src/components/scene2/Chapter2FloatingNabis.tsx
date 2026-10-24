@@ -6,23 +6,28 @@ import {
   getChapter2NabiBasePosition,
   getChapter2NabiOpacity,
 } from "@/constants/chapter2NabiConfig";
+import { getChapter2NabiScroll22ExitOpacity } from "@/constants/chapter2Scroll22Motion";
 
 type Props = {
   sporeProgress: number;
+  scroll22Progress: number;
   /** Scene 2-3 yellow gelb exit (1 = visible, 0 = gone). */
   yellowExitVisibility?: number;
 };
 
 export default function Chapter2FloatingNabis({
   sporeProgress,
+  scroll22Progress,
   yellowExitVisibility = 1,
 }: Props) {
   const anchorRefs = useRef<(HTMLDivElement | null)[]>([]);
   const sporeRef = useRef(sporeProgress);
+  const scroll22Ref = useRef(scroll22Progress);
   const yellowVisRef = useRef(yellowExitVisibility);
   const sizeRef = useRef({ width: 0, height: 0 });
 
   sporeRef.current = sporeProgress;
+  scroll22Ref.current = scroll22Progress;
   yellowVisRef.current = yellowExitVisibility;
 
   useEffect(() => {
@@ -46,9 +51,25 @@ export default function Chapter2FloatingNabis({
           const el = anchorRefs.current[i];
           if (!el) continue;
 
+          const scroll22 = scroll22Ref.current;
           const base = getChapter2NabiBasePosition(spec, spore, width, height);
+          const scroll22ExitMul = getChapter2NabiScroll22ExitOpacity(spec, scroll22, spore);
+          const exitPush =
+            (1 - scroll22ExitMul) *
+            Math.max(width, height) *
+            0.38;
+          const exitAngle = Math.atan2(
+            spec.patrol.y - 0.5,
+            spec.patrol.x - 0.5,
+          );
           const opacity =
-            getChapter2NabiOpacity(spec, spore) * yellowVisRef.current;
+            getChapter2NabiOpacity(spec, spore) *
+            yellowVisRef.current *
+            scroll22ExitMul;
+          const baseX =
+            base.x + Math.cos(exitAngle) * exitPush;
+          const baseY =
+            base.y + Math.sin(exitAngle) * exitPush;
           const phase = spec.flutterPhase;
 
           const driftPx = (spec.driftRadiusVw / 100) * width;
@@ -73,7 +94,7 @@ export default function Chapter2FloatingNabis({
             Math.sin(t * 1.35 + phase) * (base.entryComplete ? 4 : 2) + wing * 2.5;
 
           el.style.opacity = String(opacity);
-          el.style.transform = `translate3d(${base.x + driftX}px, ${base.y + driftY}px, 0) translate(-50%, -50%) rotate(${tilt}deg) scale(${scaleX}, ${scaleY})`;
+          el.style.transform = `translate3d(${baseX + driftX}px, ${baseY + driftY}px, 0) translate(-50%, -50%) rotate(${tilt}deg) scale(${scaleX}, ${scaleY})`;
         }
       } else {
         for (let i = 0; i < anchorRefs.current.length; i++) {

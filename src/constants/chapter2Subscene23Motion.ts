@@ -224,9 +224,15 @@ type BlauSteinRevealSpec = {
 };
 
 /** Starts after Laubl fade-in (`CHAPTER2_LAUBL_PROPS_MOTION_START_SEC`). */
-const CHAPTER2_BLAU_STEIN_REVEAL: Record<"stein1" | "stein2", BlauSteinRevealSpec> = {
+const CHAPTER2_BLAU_STEIN_REVEAL: Partial<
+  Record<Chapter2PropId, BlauSteinRevealSpec>
+> = {
   stein1: { delaySec: 0.06, spanSec: 1.15, risePx: 420 },
   stein2: { delaySec: 0.22, spanSec: 1.05, risePx: 480 },
+  stein3: { delaySec: 0.34, spanSec: 1.12, risePx: 380 },
+  coral4: { delaySec: 0.3, spanSec: 1.15, risePx: 340 },
+  coral5: { delaySec: 0.38, spanSec: 1.1, risePx: 360 },
+  coral6: { delaySec: 0.44, spanSec: 1.12, risePx: 440 },
 };
 
 export type Chapter2BlauSteinReveal = {
@@ -240,8 +246,8 @@ export function getChapter2BlauSteinReveal(
   phase: Chapter2SubscenePlaybackPhase,
   elapsedSince23Sec: number,
 ): Chapter2BlauSteinReveal | null {
-  if (propId !== "stein1" && propId !== "stein2") return null;
   const spec = CHAPTER2_BLAU_STEIN_REVEAL[propId];
+  if (!spec) return null;
   if (phase !== "2-3-playing") {
     return { opacity: 0, riseYOffsetPx: spec.risePx };
   }
@@ -257,6 +263,96 @@ export function getChapter2BlauSteinReveal(
   return {
     opacity: Math.min(1, surge * 1.08),
     riseYOffsetPx: (1 - surge) * spec.risePx,
+  };
+}
+
+type BlauSlideFromLeftSpec = {
+  delaySec: number;
+  spanSec: number;
+  /** Extra X left of rest (px) at progress 0 — slides right to 0. */
+  slideFromLeftPx: number;
+};
+
+/** Blau props that enter from off-screen left after Laubl (with stein beat). */
+const CHAPTER2_BLAU_SLIDE_FROM_LEFT_REVEAL: Partial<
+  Record<Chapter2PropId, BlauSlideFromLeftSpec>
+> = {
+  coral1: { delaySec: 0.42, spanSec: 1.2, slideFromLeftPx: 1200 },
+};
+
+export type Chapter2BlauSlideFromLeftReveal = {
+  opacity: number;
+  slideXOffsetPx: number;
+};
+
+type Berg4PeakRevealSpec = {
+  delaySec: number;
+  spanSec: number;
+  /** Start below rest anchor (px) — grows up the peak. */
+  risePx: number;
+  startScaleMul: number;
+};
+
+/** Laubl beat — corals emerge at berg4 (산4) peak. */
+const CHAPTER2_BERG4_PEAK_REVEAL: Partial<Record<Chapter2PropId, Berg4PeakRevealSpec>> = {
+  coral3: { delaySec: 0.1, spanSec: 1.2, risePx: 260, startScaleMul: 0.22 },
+  coral2: { delaySec: 0.22, spanSec: 1.05, risePx: 200, startScaleMul: 0.3 },
+};
+
+export type Chapter2Berg4PeakReveal = {
+  opacity: number;
+  riseYOffsetPx: number;
+  scaleMul: number;
+};
+
+export function getChapter2Berg4PeakReveal(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+): Chapter2Berg4PeakReveal | null {
+  const spec = CHAPTER2_BERG4_PEAK_REVEAL[propId];
+  if (!spec) return null;
+  if (phase !== "2-3-playing") {
+    return { opacity: 0, riseYOffsetPx: spec.risePx, scaleMul: spec.startScaleMul };
+  }
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) {
+    return { opacity: 0, riseYOffsetPx: spec.risePx, scaleMul: spec.startScaleMul };
+  }
+  const linear = laublBeatProgress(beatElapsed, spec.delaySec, spec.spanSec);
+  if (linear <= 0) {
+    return { opacity: 0, riseYOffsetPx: spec.risePx, scaleMul: spec.startScaleMul };
+  }
+  const surge = easeOutCubic(linear);
+  return {
+    opacity: Math.min(1, surge * 1.08),
+    riseYOffsetPx: (1 - surge) * spec.risePx,
+    scaleMul: spec.startScaleMul + (1 - spec.startScaleMul) * surge,
+  };
+}
+
+export function getChapter2BlauSlideFromLeftReveal(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince23Sec: number,
+): Chapter2BlauSlideFromLeftReveal | null {
+  const spec = CHAPTER2_BLAU_SLIDE_FROM_LEFT_REVEAL[propId];
+  if (!spec) return null;
+  if (phase !== "2-3-playing") {
+    return { opacity: 0, slideXOffsetPx: -spec.slideFromLeftPx };
+  }
+  const beatElapsed = laublPropsBeatElapsed(elapsedSince23Sec);
+  if (beatElapsed <= 0) {
+    return { opacity: 0, slideXOffsetPx: -spec.slideFromLeftPx };
+  }
+  const linear = laublBeatProgress(beatElapsed, spec.delaySec, spec.spanSec);
+  if (linear <= 0) {
+    return { opacity: 0, slideXOffsetPx: -spec.slideFromLeftPx };
+  }
+  const surge = easeOutCubic(linear);
+  return {
+    opacity: Math.min(1, surge * 1.06),
+    slideXOffsetPx: -(1 - surge) * spec.slideFromLeftPx,
   };
 }
 

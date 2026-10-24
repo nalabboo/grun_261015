@@ -14,9 +14,15 @@ import {
   getChapter2MarimoLaublExitProgress,
 } from "@/constants/chapter2Subscene23Motion";
 import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
+import {
+  getChapter2MarimoScroll22ExitAngleRad,
+  getChapter2MarimoScroll22ExitOpacity,
+  getChapter2MarimoScroll22ExitProgress,
+} from "@/constants/chapter2Scroll22Motion";
 
 type Props = {
   sporeProgress: number;
+  scroll22Progress: number;
   subscene23Phase?: Chapter2SubscenePlaybackPhase;
   subscene23ElapsedSec?: number;
 };
@@ -103,6 +109,7 @@ function isOffScreen(body: SimBody, width: number, height: number) {
 
 export default function Chapter2FloatingMarimos({
   sporeProgress,
+  scroll22Progress,
   subscene23Phase = "2-1",
   subscene23ElapsedSec = 0,
 }: Props) {
@@ -110,11 +117,13 @@ export default function Chapter2FloatingMarimos({
   const simRef = useRef<SimBody[] | null>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
   const sporeRef = useRef(sporeProgress);
+  const scroll22Ref = useRef(scroll22Progress);
   const sub23PhaseRef = useRef(subscene23Phase);
   const sub23ElapsedRef = useRef(subscene23ElapsedSec);
   const [viewportHeight, setViewportHeight] = useState(SCENE_REFERENCE_HEIGHT);
 
   sporeRef.current = sporeProgress;
+  scroll22Ref.current = scroll22Progress;
   sub23PhaseRef.current = subscene23Phase;
   sub23ElapsedRef.current = subscene23ElapsedSec;
 
@@ -173,26 +182,44 @@ export default function Chapter2FloatingMarimos({
           body.halfH = (spec.heightVh * height) / 2;
           body.halfW = (body.halfH * spec.width) / spec.height;
 
+          const scroll22 = scroll22Ref.current;
           const sporeExitProgress = getChapter2MarimoSporeExitProgress(spec, spore);
+          const scroll22ExitProgress = getChapter2MarimoScroll22ExitProgress(i, scroll22);
           const laublExitProgress = getChapter2MarimoLaublExitProgress(
             spec,
             sub23PhaseRef.current,
             sub23ElapsedRef.current,
           );
-          const exitProgress = Math.max(sporeExitProgress, laublExitProgress);
-          const exitOpacity =
-            laublExitProgress >= sporeExitProgress && laublExitProgress > 0
-              ? getChapter2MarimoLaublExitOpacity(
-                  spec,
-                  sub23PhaseRef.current,
-                  sub23ElapsedRef.current,
-                )
-              : getChapter2MarimoSporeExitOpacity(spec, spore);
+          const exitProgress = Math.max(
+            sporeExitProgress,
+            laublExitProgress,
+            scroll22ExitProgress,
+          );
+
+          let exitOpacity = getChapter2MarimoScroll22ExitOpacity(i, scroll22);
+          if (sporeExitProgress > 0 && spec.sporeExit) {
+            exitOpacity = Math.min(exitOpacity, getChapter2MarimoSporeExitOpacity(spec, spore));
+          }
+          if (laublExitProgress > 0 && spec.laublExit) {
+            exitOpacity = Math.min(
+              exitOpacity,
+              getChapter2MarimoLaublExitOpacity(
+                spec,
+                sub23PhaseRef.current,
+                sub23ElapsedRef.current,
+              ),
+            );
+          }
 
           const exitAngleRad =
-            laublExitProgress >= sporeExitProgress && spec.laublExit
+            laublExitProgress >= sporeExitProgress &&
+            laublExitProgress >= scroll22ExitProgress &&
+            spec.laublExit
               ? spec.laublExit.exitAngleRad
-              : spec.sporeExit?.exitAngleRad;
+              : scroll22ExitProgress >= sporeExitProgress &&
+                  scroll22ExitProgress > 0
+                ? getChapter2MarimoScroll22ExitAngleRad(spec.xNorm, spec.yNorm)
+                : spec.sporeExit?.exitAngleRad;
 
           if (exitProgress > 0 && exitAngleRad !== undefined) {
             const drift = exitProgress * exitProgress;

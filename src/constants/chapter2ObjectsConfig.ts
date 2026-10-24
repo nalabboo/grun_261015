@@ -1,10 +1,18 @@
 import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
-import { chapter2AssetUrl } from "@/constants/chapter2Config";
+import {
+  CHAPTER2_PROP_Z_BEHIND_BERG3,
+  CHAPTER2_PROP_Z_BEHIND_BERG4,
+  CHAPTER2_PROP_Z_BETWEEN_BERG3_AND_BERG2,
+  chapter2AssetUrl,
+} from "@/constants/chapter2Config";
 import { getDepthBlurRatio, getDepthBrightness } from "@/constants/sceneConfig";
 
 export type Chapter2PropStack =
+  | "behindBerg4"
   | "aboveBerg4"
+  | "behindBerg3"
   | "aboveBerg3"
+  | "betweenBerg3AndBerg2"
   | "behindBerg2"
   | "midBerg2"
   | "aboveBerg2";
@@ -28,13 +36,17 @@ export type Chapter2PropConfig = {
   brightness: number;
   defaultLayout: Chapter2BergEditTransform;
   /** Move/scale with this berg layer (same parallax + depth scale). */
-  attachToBergId?: "berg2";
+  attachToBergId?: "berg2" | "berg4";
   /** Opacity follows scroll nari segment (before berg y2). */
   revealOnScroll?: boolean;
   /** Scene 2-3 reveal (see `getChapter2LaublRevealOpacity`). */
   revealOnSubscene23?: boolean;
   /** After Laubl — rise from below viewport (`getChapter2BlauSteinReveal`). */
   revealFromBottomAfterLaubl?: boolean;
+  /** After Laubl — slide in from left (`getChapter2BlauSlideFromLeftReveal`). */
+  revealFromLeftAfterLaubl?: boolean;
+  /** After Laubl — emerge at berg4 peak (`getChapter2Berg4PeakReveal`). */
+  revealFromBerg4PeakAfterLaubl?: boolean;
 };
 
 export const CHAPTER2_PROP_IDS = [
@@ -50,6 +62,13 @@ export const CHAPTER2_PROP_IDS = [
   "laubl",
   "stein1",
   "stein2",
+  "stein3",
+  "coral1",
+  "coral2",
+  "coral3",
+  "coral4",
+  "coral5",
+  "coral6",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -81,6 +100,19 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   /** Blau 돌 — ref layout 2026-10-24 (stein2 right of stein1). */
   stein1: { x: -528, y: 90, scale: 2.138, scaleY: 2.138, rotate: 0 },
   stein2: { x: -68, y: 100, scale: 1.53, scaleY: 1.53, rotate: 0 },
+  /** 돌3 — between berg3/berg2; −30% scale, −100px X. */
+  stein3: { x: 280, y: -90, scale: 1.928, scaleY: 1.928, rotate: 0 },
+  coral1: { x: -850, y: -400, scale: 4.05, scaleY: 4.05, rotate: 45 },
+  /** berg4 peak — in front of 산4 PNG, right of coral3. */
+  coral2: { x: -450, y: -380, scale: 2, scaleY: 2, rotate: -10 },
+  /** berg4 peak — behind 산4 PNG. */
+  coral3: { x: -350, y: -250, scale: 2.44, scaleY: 2.44, rotate: 15 },
+  /** berg3 — behind 산3 PNG (initial layout). */
+  coral4: { x: 120, y: -180, scale: 2.2, scaleY: 2.2, rotate: 0 },
+  /** berg3 앞 · berg2 뒤 (`betweenBerg3AndBerg2`). */
+  coral5: { x: 560, y: -160, scale: 3.5, scaleY: 3, rotate: -5 },
+  /** berg2 앞 (aboveBerg2). */
+  coral6: { x: 300, y: 100, scale: 4, scaleY: 5, rotate: -10 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -116,6 +148,13 @@ export const CHAPTER2_LAUBL_LAYOUT_LOCKED = true;
 
 export const CHAPTER2_STEIN1_LAYOUT_LOCKED = true;
 export const CHAPTER2_STEIN2_LAYOUT_LOCKED = true;
+export const CHAPTER2_STEIN3_LAYOUT_LOCKED = true;
+export const CHAPTER2_CORAL1_LAYOUT_LOCKED = true;
+export const CHAPTER2_CORAL2_LAYOUT_LOCKED = true;
+export const CHAPTER2_CORAL3_LAYOUT_LOCKED = true;
+export const CHAPTER2_CORAL4_LAYOUT_LOCKED = true;
+export const CHAPTER2_CORAL5_LAYOUT_LOCKED = true;
+export const CHAPTER2_CORAL6_LAYOUT_LOCKED = true;
 
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
 const SPORE1_DEPTH_PX = -180;
@@ -130,8 +169,21 @@ const GRUN_V_DEPTH_PX = 58;
 const NARI_DEPTH_PX = 55;
 /** Foreground critter on berg2 (벌레). */
 const WORM_G_DEPTH_PX = 72;
-/** Floor blau steins — in front of berg2 ridge. */
-const BLAU_STEIN_DEPTH_PX = 78;
+/** Blau 돌 depth planes (px @ 1080p) — nearer = sharper. */
+const STEIN1_DEPTH_PX = 88;
+const STEIN2_DEPTH_PX = 74;
+/** Between berg3 (−80) and berg2 (90) depth planes. */
+const STEIN3_DEPTH_PX = 5;
+const CORAL1_DEPTH_PX = 76;
+const CORAL6_DEPTH_PX = 78;
+/** Just in front of berg4 plane, in front of coral3. */
+const CORAL2_DEPTH_PX = -175;
+/** Behind berg4 ridge, in front of far spores. */
+const CORAL3_DEPTH_PX = -228;
+/** Behind berg3 plane (−80), in front of berg4 stack. */
+const CORAL4_DEPTH_PX = -110;
+/** Between berg3 and berg2 planes (with stein3). */
+const CORAL5_DEPTH_PX = 12;
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -304,11 +356,11 @@ export const CHAPTER2_STEIN1: Chapter2PropConfig = {
   zIndex: 4,
   stack: "aboveBerg2",
   revealFromBottomAfterLaubl: true,
-  parallax: 14,
+  parallax: 15,
   heightVh: 0.22,
-  depthPx: BLAU_STEIN_DEPTH_PX,
-  blurRatio: getDepthBlurRatio(BLAU_STEIN_DEPTH_PX),
-  brightness: getDepthBrightness(BLAU_STEIN_DEPTH_PX),
+  depthPx: STEIN1_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(STEIN1_DEPTH_PX),
+  brightness: getDepthBrightness(STEIN1_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.stein1,
 };
 
@@ -322,10 +374,132 @@ export const CHAPTER2_STEIN2: Chapter2PropConfig = {
   revealFromBottomAfterLaubl: true,
   parallax: 14,
   heightVh: 0.18,
-  depthPx: BLAU_STEIN_DEPTH_PX,
-  blurRatio: getDepthBlurRatio(BLAU_STEIN_DEPTH_PX),
-  brightness: getDepthBrightness(BLAU_STEIN_DEPTH_PX),
+  depthPx: STEIN2_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(STEIN2_DEPTH_PX),
+  brightness: getDepthBrightness(STEIN2_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.stein2,
+};
+
+/** 돌3 — 산3 PNG와 산2 PNG 사이 (`betweenBerg3AndBerg2` + z below berg2 paint). */
+export const CHAPTER2_STEIN3: Chapter2PropConfig = {
+  id: "stein3",
+  file: "blau objekt/b_stein2.png",
+  width: 602,
+  height: 719,
+  zIndex: CHAPTER2_PROP_Z_BETWEEN_BERG3_AND_BERG2,
+  stack: "betweenBerg3AndBerg2",
+  revealFromBottomAfterLaubl: true,
+  parallax: 24,
+  heightVh: 0.18,
+  depthPx: STEIN3_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(STEIN3_DEPTH_PX),
+  brightness: getDepthBrightness(STEIN3_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.stein3,
+};
+
+/** 코랄6 — berg2 PNG 앞, above Laubl (z 6). */
+export const CHAPTER2_CORAL6: Chapter2PropConfig = {
+  id: "coral6",
+  file: "blau objekt/b_coral6.png",
+  width: 600,
+  height: 820,
+  zIndex: 7,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealFromBottomAfterLaubl: true,
+  parallax: 16,
+  heightVh: 0.21,
+  depthPx: CORAL6_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(CORAL6_DEPTH_PX),
+  brightness: getDepthBrightness(CORAL6_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.coral6,
+};
+
+/** 코랄1 — b_coral1, above berg2. */
+export const CHAPTER2_CORAL1: Chapter2PropConfig = {
+  id: "coral1",
+  file: "blau objekt/b_coral1.png",
+  width: 600,
+  height: 820,
+  zIndex: 5,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealFromLeftAfterLaubl: true,
+  parallax: 15,
+  heightVh: 0.22,
+  depthPx: CORAL1_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(CORAL1_DEPTH_PX),
+  brightness: getDepthBrightness(CORAL1_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.coral1,
+};
+
+/** 코랄2 — berg4 봉우리 앞, coral3 오른쪽. */
+export const CHAPTER2_CORAL2: Chapter2PropConfig = {
+  id: "coral2",
+  file: "blau objekt/b_coral2.png",
+  width: 600,
+  height: 820,
+  zIndex: 0,
+  stack: "aboveBerg4",
+  attachToBergId: "berg4",
+  revealFromBerg4PeakAfterLaubl: true,
+  parallax: 52,
+  heightVh: 0.22,
+  depthPx: CORAL2_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(CORAL2_DEPTH_PX),
+  brightness: getDepthBrightness(CORAL2_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.coral2,
+};
+
+/** 코랄5 — 산3 앞 · 산2 뒤 (`betweenBerg3AndBerg2`). */
+export const CHAPTER2_CORAL5: Chapter2PropConfig = {
+  id: "coral5",
+  file: "blau objekt/b_coral5.png",
+  width: 600,
+  height: 820,
+  zIndex: CHAPTER2_PROP_Z_BETWEEN_BERG3_AND_BERG2,
+  stack: "betweenBerg3AndBerg2",
+  revealFromBottomAfterLaubl: true,
+  parallax: 22,
+  heightVh: 0.2,
+  depthPx: CORAL5_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(CORAL5_DEPTH_PX),
+  brightness: getDepthBrightness(CORAL5_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.coral5,
+};
+
+/** 코랄4 — berg3 PNG 뒤. */
+export const CHAPTER2_CORAL4: Chapter2PropConfig = {
+  id: "coral4",
+  file: "blau objekt/b_coral4.png",
+  width: 600,
+  height: 820,
+  zIndex: CHAPTER2_PROP_Z_BEHIND_BERG3,
+  stack: "behindBerg3",
+  revealFromBottomAfterLaubl: true,
+  parallax: 34,
+  heightVh: 0.22,
+  depthPx: CORAL4_DEPTH_PX,
+  blurRatio: 0,
+  brightness: 1,
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.coral4,
+};
+
+/** 코랄3 — berg4 PNG 뒤(z/DOM), 패럴랙스는 산4와 분리. */
+export const CHAPTER2_CORAL3: Chapter2PropConfig = {
+  id: "coral3",
+  file: "blau objekt/b_coral3.png",
+  width: 600,
+  height: 820,
+  zIndex: CHAPTER2_PROP_Z_BEHIND_BERG4,
+  stack: "behindBerg4",
+  revealFromBerg4PeakAfterLaubl: true,
+  parallax: 60,
+  heightVh: 0.22,
+  depthPx: CORAL3_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(CORAL3_DEPTH_PX),
+  brightness: getDepthBrightness(CORAL3_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.coral3,
 };
 
 export const CHAPTER2_PROPS = [
@@ -341,6 +515,13 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_LAUBL,
   CHAPTER2_STEIN1,
   CHAPTER2_STEIN2,
+  CHAPTER2_STEIN3,
+  CHAPTER2_CORAL1,
+  CHAPTER2_CORAL2,
+  CHAPTER2_CORAL3,
+  CHAPTER2_CORAL4,
+  CHAPTER2_CORAL5,
+  CHAPTER2_CORAL6,
 ] as const;
 
 export function chapter2PropAssetUrl(file: string) {

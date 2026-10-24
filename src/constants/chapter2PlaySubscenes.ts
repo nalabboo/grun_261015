@@ -8,7 +8,8 @@
  * ## 2-2 (current production milestone)
  * One wheel down → auto playback (`chapter2SubscenePlayback.ts`) runs scroll raw **0 → max**
  * (`chapter2ScrollMotion.ts`): Nari fade-in, g_vogel, berg y2 + Y drift, grun shrink (after berg),
- * spore stagger shrink, nabi fly-in, marimo exits. Ends on **2-2 hold** (full 2-2 layout).
+ * spore stagger shrink, nabi fly-in; marimos / nabis drift off-screen while blau bubbles float in.
+ * Ends on **2-2 hold** (full 2-2 layout).
  *
  * ## 2-3
  * **3 s** after 2-2 hold, **scroll down** (accumulated wheel) → `2-3-playing`.
