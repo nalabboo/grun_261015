@@ -389,6 +389,83 @@ export function getChapter2RVulkanSubscene24Reveal(
   };
 }
 
+/** When volcano rise motion finishes (berg4 sync). */
+export function getChapter2RVulkanSubscene24CompleteSec() {
+  return (
+    CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC + getChapter2RVulkanSubscene24MotionSpanSec()
+  );
+}
+
+/** r_blume1 — start blooming shortly after volcano is up. */
+export const CHAPTER2_R_BLUME1_AFTER_VULKAN_DELAY_SEC = 0.22;
+export const CHAPTER2_R_BLUME1_BLOOM_SPAN_SEC = 1.4;
+export const CHAPTER2_R_BLUME2_AFTER_VULKAN_DELAY_SEC = 0.58;
+export const CHAPTER2_R_BLUME2_BLOOM_SPAN_SEC = 1.45;
+export const CHAPTER2_R_BLUME3_AFTER_VULKAN_DELAY_SEC = 0.94;
+export const CHAPTER2_R_BLUME3_BLOOM_SPAN_SEC = 1.45;
+
+type RBlumeBloomSpec = {
+  delayAfterVulkanSec: number;
+  spanSec: number;
+};
+
+const CHAPTER2_R_BLUME_SUBSCENE_24_BLOOM: Partial<Record<Chapter2PropId, RBlumeBloomSpec>> = {
+  r_blume1: {
+    delayAfterVulkanSec: CHAPTER2_R_BLUME1_AFTER_VULKAN_DELAY_SEC,
+    spanSec: CHAPTER2_R_BLUME1_BLOOM_SPAN_SEC,
+  },
+  r_blume2: {
+    delayAfterVulkanSec: CHAPTER2_R_BLUME2_AFTER_VULKAN_DELAY_SEC,
+    spanSec: CHAPTER2_R_BLUME2_BLOOM_SPAN_SEC,
+  },
+  r_blume3: {
+    delayAfterVulkanSec: CHAPTER2_R_BLUME3_AFTER_VULKAN_DELAY_SEC,
+    spanSec: CHAPTER2_R_BLUME3_BLOOM_SPAN_SEC,
+  },
+};
+
+export type Chapter2RBlumeSubscene24Bloom = {
+  opacity: number;
+  scaleMul: number;
+  riseYOffsetPx: number;
+};
+
+/** r_blume* — in-place bloom on coral (stem anchor via prop layer origin). */
+export function getChapter2RBlumeSubscene24Bloom(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince24Sec: number,
+): Chapter2RBlumeSubscene24Bloom | null {
+  const spec = CHAPTER2_R_BLUME_SUBSCENE_24_BLOOM[propId];
+  if (!spec) return null;
+
+  const hidden = { opacity: 0, scaleMul: 0.06, riseYOffsetPx: 28 };
+
+  if (phase !== "2-4-playing") {
+    return hidden;
+  }
+
+  const beatStartSec =
+    getChapter2RVulkanSubscene24CompleteSec() + spec.delayAfterVulkanSec;
+  const bloomElapsed = elapsedSince24Sec - beatStartSec;
+  if (bloomElapsed <= 0) {
+    return hidden;
+  }
+
+  const t = easeOutCubic(clamp01(bloomElapsed / Math.max(0.15, spec.spanSec)));
+  if (t <= 0) {
+    return hidden;
+  }
+
+  const surge = 1 - (1 - t) ** 2.2;
+  const scaleMul = 0.06 + 0.94 * surge;
+  return {
+    opacity: Math.min(1, t * 1.08),
+    scaleMul,
+    riseYOffsetPx: (1 - surge) * 28,
+  };
+}
+
 /** Gap after volcano rise before celem1 enters. */
 export const CHAPTER2_R_CELEMEN1_AFTER_VULKAN_DELAY_SEC = 0.28;
 export const CHAPTER2_R_CELEMEN1_ENTER_SPAN_SEC = 1.5;
@@ -403,8 +480,13 @@ export function getChapter2RCelemen1Subscene24BeatStartSec() {
 }
 
 /** Stagger within celem1 enter — celem2 starts rising while celem1 is on screen. */
-export const CHAPTER2_R_CELEMEN2_ENTER_OFFSET_IN_CCELEM1_BEAT_SEC = 0.32;
-export const CHAPTER2_R_CELEMEN2_ENTER_SPAN_SEC = 1.45;
+export const CHAPTER2_R_CELEMEN2_ENTER_OFFSET_IN_CCELEM1_BEAT_SEC = 1.05;
+export const CHAPTER2_R_CELEMEN2_ENTER_SPAN_SEC = 2.05;
+/** Off-screen start — bottom-right corner (vw/vh + px padding). */
+export const CHAPTER2_R_CELEMEN2_SLIDE_FROM_RIGHT_VW = 0.42;
+export const CHAPTER2_R_CELEMEN2_SLIDE_FROM_RIGHT_PX = 240;
+export const CHAPTER2_R_CELEMEN2_SLIDE_FROM_BOTTOM_VH = 0.52;
+export const CHAPTER2_R_CELEMEN2_SLIDE_FROM_BOTTOM_PX = 180;
 
 export type Chapter2RCelemenSubscene24Enter = {
   opacity: number;
@@ -479,8 +561,12 @@ export function getChapter2RCelemen2Subscene24Enter(
 ): Chapter2RCelemen2Subscene24Enter | null {
   if (propId !== "r_celemen2") return null;
 
-  const slideFromRightPx = viewportWidth * 0.28 + 140;
-  const slideFromBottomPx = viewportHeight * 0.22 + 90;
+  const slideFromRightPx =
+    viewportWidth * CHAPTER2_R_CELEMEN2_SLIDE_FROM_RIGHT_VW +
+    CHAPTER2_R_CELEMEN2_SLIDE_FROM_RIGHT_PX;
+  const slideFromBottomPx =
+    viewportHeight * CHAPTER2_R_CELEMEN2_SLIDE_FROM_BOTTOM_VH +
+    CHAPTER2_R_CELEMEN2_SLIDE_FROM_BOTTOM_PX;
 
   const offScreen = {
     opacity: 0 as number,

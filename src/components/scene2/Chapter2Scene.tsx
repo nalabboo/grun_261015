@@ -61,6 +61,7 @@ import {
   getChapter2RCelemen2Subscene24Enter,
   getChapter2RCelemenSubscene24Enter,
   getChapter2RVulkanSubscene24Reveal,
+  getChapter2RBlumeSubscene24Bloom,
   getChapter2Subscene24EarthquakeShake,
   isChapter2Subscene24ScrollAccumReady,
 } from "@/constants/chapter2Subscene24Motion";
@@ -658,6 +659,18 @@ export default function Chapter2Scene({
         layoutXOffset += celem2Enter.slideXOffsetPx;
         layoutYOffset += celem2Enter.slideYOffsetPx;
         scrollScaleMul *= celem2Enter.scaleMul;
+      }
+    }
+    if (prop.revealBloomAfterVulkan) {
+      const blumeBloom = getChapter2RBlumeSubscene24Bloom(
+        prop.id,
+        playbackPhase,
+        subscene24ElapsedSec,
+      );
+      if (blumeBloom) {
+        scrollOpacity *= blumeBloom.opacity;
+        layoutYOffset += blumeBloom.riseYOffsetPx;
+        scrollScaleMul *= blumeBloom.scaleMul;
       }
     }
     if (prop.revealFromBottomAfterLaubl) {

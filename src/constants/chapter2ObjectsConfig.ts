@@ -58,6 +58,8 @@ export type Chapter2PropConfig = {
   revealFromBottomLeftAfterVulkan?: boolean;
   /** Scene 2-4 — slide from bottom-right during celem1 enter (`getChapter2RCelemen2Subscene24Enter`). */
   revealRiseDuringCelem1Enter?: boolean;
+  /** Scene 2-4 — bloom on coral1 after volcano (`getChapter2RBlumeSubscene24Bloom`). */
+  revealBloomAfterVulkan?: boolean;
 };
 
 /** Hidden until scene 2-3 starts (Laubl beat and blau reveals). */
@@ -76,7 +78,8 @@ export function chapter2PropIsSubscene24Exclusive(prop: Chapter2PropConfig): boo
     prop.revealOnSubscene24 ||
       prop.revealWithBerg24Drop ||
       prop.revealFromBottomLeftAfterVulkan ||
-      prop.revealRiseDuringCelem1Enter,
+      prop.revealRiseDuringCelem1Enter ||
+      prop.revealBloomAfterVulkan,
   );
 }
 
@@ -107,6 +110,9 @@ export const CHAPTER2_PROP_IDS = [
   "r_vulkan",
   "r_celemen1",
   "r_celemen2",
+  "r_blume1",
+  "r_blume2",
+  "r_blume3",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -163,6 +169,11 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   r_vulkan: { x: -60, y: 50, scale: 2.50, scaleY: 2.50, rotate: 5 },
   r_celemen1: { x: -540, y: 130, scale: 1.20, scaleY: 1.30, rotate: -15 },
   r_celemen2: { x: 200, y: -500, scale: 0.50, scaleY: 0.50, rotate: 28 },
+  /** On coral1 tip — bloom after volcano (2-4). */
+  r_blume1: { x: -820, y: -620, scale: 2.00, scaleY: 2.00, rotate: -8 },
+  r_blume2: { x: -680, y: -520, scale: 1.00, scaleY: 1.00, rotate: 15 },
+  /** On coral5 — bloom after volcano (2-4). */
+  r_blume3: { x: 650, y: -400, scale: 1.50, scaleY: 1.50, rotate: 6 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -251,6 +262,11 @@ const R_VULKAN_DEPTH_PX = 42;
 const R_CELEMEN1_DEPTH_PX = 66;
 /** Just in front of r_vulkan (42). */
 const R_CELEMEN2_DEPTH_PX = 48;
+/** Slightly in front of coral1 — reads on top of the branch. */
+const R_BLUME1_DEPTH_PX = 84;
+const R_BLUME2_DEPTH_PX = 86;
+/** Slightly in front of coral5. */
+const R_BLUME3_DEPTH_PX = 20;
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -569,6 +585,59 @@ export const CHAPTER2_R_CELEMEN2: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_celemen2,
 };
 
+/** 블루메1 — blooms on coral1 after volcano appears. */
+export const CHAPTER2_R_BLUME1: Chapter2PropConfig = {
+  id: "r_blume1",
+  file: "rot objekt/r_blume1.png",
+  width: 520,
+  height: 480,
+  zIndex: 6,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealBloomAfterVulkan: true,
+  parallax: 15,
+  heightVh: 0.14,
+  depthPx: R_BLUME1_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(R_BLUME1_DEPTH_PX),
+  brightness: getDepthBrightness(R_BLUME1_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_blume1,
+};
+
+/** 블루메2 — second bloom on coral1 (staggered after blume1). */
+export const CHAPTER2_R_BLUME2: Chapter2PropConfig = {
+  id: "r_blume2",
+  file: "rot objekt/r_blume2.png",
+  width: 520,
+  height: 480,
+  zIndex: 7,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealBloomAfterVulkan: true,
+  parallax: 15,
+  heightVh: 0.14,
+  depthPx: R_BLUME2_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(R_BLUME2_DEPTH_PX),
+  brightness: getDepthBrightness(R_BLUME2_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_blume2,
+};
+
+/** 블루메3 — blooms on coral5 after volcano appears. */
+export const CHAPTER2_R_BLUME3: Chapter2PropConfig = {
+  id: "r_blume3",
+  file: "rot objekt/r_blume3.png",
+  width: 520,
+  height: 480,
+  zIndex: CHAPTER2_PROP_Z_BETWEEN_BERG3_AND_BERG2,
+  stack: "betweenBerg3AndBerg2",
+  revealBloomAfterVulkan: true,
+  parallax: 22,
+  heightVh: 0.12,
+  depthPx: R_BLUME3_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(R_BLUME3_DEPTH_PX),
+  brightness: getDepthBrightness(R_BLUME3_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_blume3,
+};
+
 /** 코키 — scene 2-4 first beat (charactor/koki.png). */
 export const CHAPTER2_KOKI: Chapter2PropConfig = {
   id: "koki",
@@ -705,10 +774,13 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_STEIN2,
   CHAPTER2_STEIN3,
   CHAPTER2_CORAL1,
+  CHAPTER2_R_BLUME1,
+  CHAPTER2_R_BLUME2,
   CHAPTER2_CORAL2,
   CHAPTER2_CORAL3,
   CHAPTER2_CORAL4,
   CHAPTER2_CORAL5,
+  CHAPTER2_R_BLUME3,
   CHAPTER2_CORAL6,
   CHAPTER2_R_VULKAN,
   CHAPTER2_R_CELEMEN1,
