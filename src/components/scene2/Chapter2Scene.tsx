@@ -10,6 +10,7 @@ import {
   CHAPTER2_DEPTH_SIZE_STRENGTH,
   CHAPTER2_MOUSE_PARALLAX_GAIN,
   DEV_CHAPTER2_START_AT_SUBSCENE_23,
+  DEV_CHAPTER2_START_AT_SUBSCENE_23_HOLD,
   CHAPTER2_SCROLL_BERG3_Y,
   CHAPTER2_SCROLL_BERG4_Y,
   CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN,
@@ -52,6 +53,12 @@ import {
   CHAPTER2_SUBSCENE_24_SCROLL_ACCUM_MAX,
   CHAPTER2_SUBSCENE_24_SCROLL_WHEEL_GAIN,
   getChapter2BergSubscene24YOffset,
+  getChapter2KokiRevealOpacity,
+  getChapter2CoralSubscene24Shrink,
+  getChapter2Subscene24CharacterShrink,
+  getChapter2SporeSubscene24Exit,
+  getChapter2RVulkanSubscene24Reveal,
+  getChapter2Subscene24EarthquakeShake,
   isChapter2Subscene24ScrollAccumReady,
 } from "@/constants/chapter2Subscene24Motion";
 import Chapter2BergLayer from "@/components/scene2/Chapter2BergLayer";
@@ -64,6 +71,7 @@ import { CHAPTER2_VOGEL } from "@/constants/chapter2VogelConfig";
 import {
   CHAPTER2_PROPS,
   chapter2PropIsSubscene23Exclusive,
+  chapter2PropIsSubscene24Exclusive,
   getChapter2PropDefaultEdit,
   isChapter2PropTunable,
   sanitizeChapter2PropEdit,
@@ -130,14 +138,16 @@ export default function Chapter2Scene({
   const targetRef = useRef<Point>({ x: 0, y: 0 });
   const smoothRef = useRef<Point>({ x: 0, y: 0 });
   const propDragRef = useRef<PropDragState | null>(null);
-  const scrollTargetRef = useRef(
-    DEV_CHAPTER2_START_AT_SUBSCENE_23 ? CHAPTER2_SUBSCENE_SCROLL_MAX : 0,
-  );
-  const scrollSmoothRef = useRef(
-    DEV_CHAPTER2_START_AT_SUBSCENE_23 ? CHAPTER2_SUBSCENE_SCROLL_MAX : 0,
-  );
+  const devChapter2Skip =
+    DEV_CHAPTER2_START_AT_SUBSCENE_23_HOLD || DEV_CHAPTER2_START_AT_SUBSCENE_23;
+  const scrollTargetRef = useRef(devChapter2Skip ? CHAPTER2_SUBSCENE_SCROLL_MAX : 0);
+  const scrollSmoothRef = useRef(devChapter2Skip ? CHAPTER2_SUBSCENE_SCROLL_MAX : 0);
   const playbackPhaseRef = useRef<Chapter2SubscenePlaybackPhase>(
-    DEV_CHAPTER2_START_AT_SUBSCENE_23 ? "2-3-playing" : "2-1",
+    DEV_CHAPTER2_START_AT_SUBSCENE_23_HOLD
+      ? "2-3-complete"
+      : DEV_CHAPTER2_START_AT_SUBSCENE_23
+        ? "2-3-playing"
+        : "2-1",
   );
   const playbackStartMsRef = useRef(0);
   const subscene22CompleteAtMsRef = useRef(0);
@@ -179,8 +189,17 @@ export default function Chapter2Scene({
     setDevEditsReady(true);
     setPropEditsReady(true);
 
-    if (DEV_CHAPTER2_START_AT_SUBSCENE_23) {
-      const now = performance.now();
+    const now = performance.now();
+    if (DEV_CHAPTER2_START_AT_SUBSCENE_23_HOLD) {
+      playbackPhaseRef.current = "2-3-complete";
+      scrollTargetRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+      scrollSmoothRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
+      subscene22CompleteAtMsRef.current = now;
+      subscene23StartMsRef.current = now;
+      subscene23StartFiredRef.current = true;
+      subscene23CompleteAtMsRef.current = now;
+      sequenceCompleteFiredRef.current = true;
+    } else if (DEV_CHAPTER2_START_AT_SUBSCENE_23) {
       playbackPhaseRef.current = "2-3-playing";
       scrollTargetRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
       scrollSmoothRef.current = CHAPTER2_SUBSCENE_SCROLL_MAX;
@@ -438,6 +457,11 @@ export default function Chapter2Scene({
     playbackPhase === "2-4-playing" && subscene24StartMsRef.current > 0
       ? (performance.now() - subscene24StartMsRef.current) / 1000
       : 0;
+  const earthquakeShake = getChapter2Subscene24EarthquakeShake(
+    playbackPhase,
+    subscene24ElapsedSec,
+    performance.now(),
+  );
   const subscene23IntroProgress = getChapter2Subscene23IntroProgress(
     playbackPhase,
     subscene23ElapsedSec,
@@ -556,6 +580,13 @@ export default function Chapter2Scene({
     ) {
       return null;
     }
+    if (
+      !editor.enabled &&
+      chapter2PropIsSubscene24Exclusive(prop) &&
+      playbackPhase !== "2-4-playing"
+    ) {
+      return null;
+    }
 
     const layout = propEditsReady ? propEdits[prop.id] : getChapter2PropDefaultEdit(prop.id);
     let scrollScaleMul = getChapter2PropScrollScaleMultiplier(
@@ -566,11 +597,27 @@ export default function Chapter2Scene({
       scrollSegments,
     );
     let scrollOpacity = getChapter2PropScrollOpacity(prop, scrollSegments);
+    let layoutYOffset = 0;
+    let layoutXOffset = 0;
     if (prop.revealOnSubscene23) {
       scrollOpacity *= getChapter2LaublRevealOpacity(playbackPhase, subscene23ElapsedSec);
     }
-    let layoutYOffset = 0;
-    let layoutXOffset = 0;
+    if (prop.revealOnSubscene24) {
+      scrollOpacity *= getChapter2KokiRevealOpacity(playbackPhase, subscene24ElapsedSec);
+    }
+    if (prop.revealWithBerg24Drop) {
+      const vulkanReveal = getChapter2RVulkanSubscene24Reveal(
+        prop.id,
+        playbackPhase,
+        subscene24ElapsedSec,
+        viewportHeight,
+      );
+      if (vulkanReveal) {
+        scrollOpacity *= vulkanReveal.opacity;
+        layoutYOffset += vulkanReveal.riseYOffsetPx;
+        scrollScaleMul *= vulkanReveal.scaleMul;
+      }
+    }
     if (prop.revealFromBottomAfterLaubl) {
       const steinReveal = getChapter2BlauSteinReveal(
         prop.id,
@@ -626,11 +673,38 @@ export default function Chapter2Scene({
       scrollOpacity *= laublBeat.opacity;
       layoutYOffset = laublBeat.yOffsetPx;
     }
-    if (prop.id === "grun_v") {
-      scrollScaleMul *= getChapter2GrunSubscene23ScaleMul(playbackPhase, subscene23ElapsedSec);
+    const kokiCharacterShrink = getChapter2Subscene24CharacterShrink(
+      prop.id,
+      playbackPhase,
+      subscene24ElapsedSec,
+    );
+    if (kokiCharacterShrink) {
+      scrollScaleMul *= kokiCharacterShrink.scaleMul;
+      layoutYOffset += kokiCharacterShrink.yOffsetPx;
     }
-    if (prop.id === "nari") {
+    const coral24Shrink = getChapter2CoralSubscene24Shrink(
+      prop.id,
+      playbackPhase,
+      subscene24ElapsedSec,
+    );
+    if (coral24Shrink) {
+      scrollScaleMul *= coral24Shrink.scaleMul;
+      layoutYOffset += coral24Shrink.yOffsetPx;
+    }
+    if (!kokiCharacterShrink && prop.id === "grun_v") {
+      scrollScaleMul *= getChapter2GrunSubscene23ScaleMul(playbackPhase, subscene23ElapsedSec);
+    } else if (prop.id === "nari") {
       scrollScaleMul *= getChapter2NariSubscene23ScaleMul(playbackPhase, subscene23ElapsedSec);
+    }
+    const spore24Exit = getChapter2SporeSubscene24Exit(
+      prop.id,
+      playbackPhase,
+      subscene24ElapsedSec,
+    );
+    if (spore24Exit) {
+      scrollOpacity *= spore24Exit.opacity;
+      layoutYOffset += spore24Exit.yOffsetPx;
+      scrollScaleMul *= spore24Exit.scaleMul;
     }
     const tunable = isChapter2PropTunable(prop.id);
     const isSelected = tunable && editor.selectedId === prop.id;
@@ -667,6 +741,7 @@ export default function Chapter2Scene({
       className={`chapter2-scene chapter2-scene--visible${editor.enabled ? " chapter2-scene--editing" : ""}`}
       style={{
         ["--berg-scale" as string]: String(CHAPTER2_BERG_DISPLAY_SCALE),
+        transform: `translate3d(${earthquakeShake.x}px, ${earthquakeShake.y}px, 0)`,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

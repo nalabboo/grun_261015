@@ -50,6 +50,10 @@ export type Chapter2PropConfig = {
   revealFromBerg4PeakAfterLaubl?: boolean;
   /** After Laubl — in-place fade (+ optional scale), no slide/rise. */
   revealFadeAfterLaubl?: boolean;
+  /** Scene 2-4 — first beat (Koki), before berg drop. */
+  revealOnSubscene24?: boolean;
+  /** Scene 2-4 — rise from below while bergs drop (`getChapter2RVulkanSubscene24Reveal`). */
+  revealWithBerg24Drop?: boolean;
 };
 
 /** Hidden until scene 2-3 starts (Laubl beat and blau reveals). */
@@ -61,6 +65,10 @@ export function chapter2PropIsSubscene23Exclusive(prop: Chapter2PropConfig): boo
       prop.revealFromBerg4PeakAfterLaubl ||
       prop.revealFadeAfterLaubl,
   );
+}
+
+export function chapter2PropIsSubscene24Exclusive(prop: Chapter2PropConfig): boolean {
+  return Boolean(prop.revealOnSubscene24 || prop.revealWithBerg24Drop);
 }
 
 export const CHAPTER2_PROP_IDS = [
@@ -86,6 +94,8 @@ export const CHAPTER2_PROP_IDS = [
   "ikki1",
   "ikki2",
   "ikki3",
+  "koki",
+  "r_vulkan",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -135,7 +145,11 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   /** 이끼2 (b_moss2) — berg3 (initial layout). */
   ikki2: { x: -320, y: -500, scale: 2.1, scaleY: 2.1, rotate: -15 },
   /** 이끼3 (b_moss3) — berg2 (initial layout). */
-  ikki3: { x: 500, y: -330, scale: 1.2, scaleY: 2.4, rotate: -23 },
+  ikki3: { x: 530, y: -220, scale: 1.2, scaleY: 2.4, rotate: -23 },
+  /** 코키 — scene 2-4 lead (initial layout). */
+  koki: { x: -500, y: -400, scale: 1.65, scaleY: 1.65, rotate: 0 },
+  /** 불칸 — center-bottom, rises during 2-4 berg drop. */
+  r_vulkan: { x: -60, y: 180, scale: 2.50, scaleY: 2.50, rotate: 5 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -181,6 +195,7 @@ export const CHAPTER2_CORAL6_LAYOUT_LOCKED = true;
 export const CHAPTER2_IKKI1_LAYOUT_LOCKED = true;
 export const CHAPTER2_IKKI2_LAYOUT_LOCKED = true;
 export const CHAPTER2_IKKI3_LAYOUT_LOCKED = true;
+export const CHAPTER2_KOKI_LAYOUT_LOCKED = true;
 
 /** Between berg4 (-260) and berg3 (-80); matched to parallax stacking. */
 const SPORE1_DEPTH_PX = -180;
@@ -201,6 +216,8 @@ const STEIN2_DEPTH_PX = 74;
 /** Between berg3 (−80) and berg2 (90) depth planes. */
 const STEIN3_DEPTH_PX = 5;
 const CORAL1_DEPTH_PX = 76;
+/** Behind coral1 — reads as mid-ground when Koki appears in 2-4. */
+const KOKI_DEPTH_PX = 68;
 /** In front of berg2 focus (90) — Laubl / coral6 read as foreground. */
 const LAUBL_DEPTH_PX = 102;
 const CORAL6_DEPTH_PX = 118;
@@ -216,6 +233,8 @@ const CORAL3_DEPTH_PX = -228;
 const CORAL4_DEPTH_PX = -110;
 /** Between berg3 and berg2 planes (with stein3). */
 const CORAL5_DEPTH_PX = 12;
+/** Mid-plane — volcano between berg3 / berg2 during 2-4 drop. */
+const R_VULKAN_DEPTH_PX = 6;
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -482,6 +501,40 @@ export const CHAPTER2_IKKI3: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.ikki3,
 };
 
+/** 불칸 — rot objekt/r_vulkan.png; rises as bergs drop in 2-4. */
+export const CHAPTER2_R_VULKAN: Chapter2PropConfig = {
+  id: "r_vulkan",
+  file: "rot objekt/r_vulkan.png",
+  width: 1000,
+  height: 677,
+  zIndex: CHAPTER2_PROP_Z_BETWEEN_BERG3_AND_BERG2,
+  stack: "betweenBerg3AndBerg2",
+  revealWithBerg24Drop: true,
+  parallax: 18,
+  heightVh: 0.38,
+  depthPx: R_VULKAN_DEPTH_PX,
+  blurRatio: 0,
+  brightness: getDepthBrightness(R_VULKAN_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_vulkan,
+};
+
+/** 코키 — scene 2-4 first beat (charactor/koki.png). */
+export const CHAPTER2_KOKI: Chapter2PropConfig = {
+  id: "koki",
+  file: "charactor/koki.png",
+  width: 500,
+  height: 683,
+  zIndex: 4,
+  stack: "aboveBerg2",
+  revealOnSubscene24: true,
+  parallax: 20,
+  heightVh: 0.28,
+  depthPx: KOKI_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(KOKI_DEPTH_PX),
+  brightness: getDepthBrightness(KOKI_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.koki,
+};
+
 /** 코랄6 — above Laubl (z 7); independent parallax (not berg2-attached). */
 export const CHAPTER2_CORAL6: Chapter2PropConfig = {
   id: "coral6",
@@ -606,9 +659,11 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_CORAL4,
   CHAPTER2_CORAL5,
   CHAPTER2_CORAL6,
+  CHAPTER2_R_VULKAN,
   CHAPTER2_IKKI1,
   CHAPTER2_IKKI2,
   CHAPTER2_IKKI3,
+  CHAPTER2_KOKI,
 ] as const;
 
 export function chapter2PropAssetUrl(file: string) {

@@ -17,7 +17,7 @@
  *
  * ## 2-4
  * **3 s** after 2-3 main motions, **scroll down** → `2-4-playing`.
- * 산2 +80px, 산3 +50px, 산4 off-screen — each berg random delay/span (`chapter2Subscene24Motion.ts`).
+ * **Koki** (`charactor/koki.png`) fades in first; then 산2/3/4 drop (`chapter2Subscene24Motion.ts`).
  */
 
 export const CHAPTER2_PLAY_SUBSCENES = ["2-1", "2-2", "2-3", "2-4"] as const;

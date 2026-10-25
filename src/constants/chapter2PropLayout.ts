@@ -22,6 +22,7 @@ import {
   CHAPTER2_IKKI1_LAYOUT_LOCKED,
   CHAPTER2_IKKI2_LAYOUT_LOCKED,
   CHAPTER2_IKKI3_LAYOUT_LOCKED,
+  CHAPTER2_KOKI_LAYOUT_LOCKED,
   CHAPTER2_TUNABLE_PROP_IDS,
   getChapter2PropDefaultEdit,
   isChapter2PropTunable,
@@ -174,6 +175,10 @@ function pruneStoredProductionPropLayouts() {
       delete parsed.ikki3;
       changed = true;
     }
+    if (CHAPTER2_KOKI_LAYOUT_LOCKED && "koki" in parsed) {
+      delete parsed.koki;
+      changed = true;
+    }
     if ("moss1" in parsed) {
       delete parsed.moss1;
       changed = true;
@@ -278,6 +283,10 @@ export function loadChapter2PropEdits(): Record<Chapter2PropId, Chapter2PropEdit
 
   if (CHAPTER2_IKKI3_LAYOUT_LOCKED) {
     base.ikki3 = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("ikki3"));
+  }
+
+  if (CHAPTER2_KOKI_LAYOUT_LOCKED) {
+    base.koki = sanitizeChapter2PropEdit(undefined, getChapter2PropDefaultEdit("koki"));
   }
 
   return base;

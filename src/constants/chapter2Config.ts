@@ -30,9 +30,16 @@ export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
 export const CHAPTER2_MOUSE_PARALLAX_GAIN = 1.45;
 
 /**
- * Dev skip: jump to 2-2 end + `2-3-playing` on refresh.
- * Opt in with `NEXT_PUBLIC_DEV_CHAPTER2_START_23=1` (default play starts at 2-1).
+ * Dev: `2-3-complete` (2-3 motions done — scroll after 3 s → 2-4).
+ * Default when chapter 2 dev load is on. Override with `NEXT_PUBLIC_DEV_CHAPTER2_START_2_1=1`.
  */
+export const DEV_CHAPTER2_START_AT_SUBSCENE_23_HOLD =
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2 !== "0" &&
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_2_1 !== "1" &&
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_23 !== "1";
+
+/** Dev: jump to `2-3-playing` (mid Laubl beat). `NEXT_PUBLIC_DEV_CHAPTER2_START_23=1`. */
 export const DEV_CHAPTER2_START_AT_SUBSCENE_23 =
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_23 === "1";
@@ -225,6 +232,8 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("charactor/grun_v.png"),
     chapter2AssetUrl("charactor/nari.png"),
     chapter2AssetUrl("charactor/laubl.png"),
+    chapter2AssetUrl("charactor/koki.png"),
+    chapter2AssetUrl("rot objekt/r_vulkan.png"),
     chapter2AssetUrl("blau objekt/b_stein1.png"),
     chapter2AssetUrl("blau objekt/b_stein2.png"),
     chapter2AssetUrl("blau objekt/b_coral1.png"),
