@@ -6,6 +6,7 @@ import {
   type Chapter2BubbleInstance,
 } from "@/constants/chapter2BubbleConfig";
 import { getChapter2BubbleSubscene23Visibility } from "@/constants/chapter2Subscene23Motion";
+import { getChapter2BubbleSubscene24Exit } from "@/constants/chapter2Subscene24Motion";
 import {
   isChapter2PlaybackSubscene23OrLater,
   type Chapter2SubscenePlaybackPhase,
@@ -14,6 +15,7 @@ import {
 type Props = {
   playbackPhase: Chapter2SubscenePlaybackPhase;
   subscene23ElapsedSec: number;
+  subscene24ElapsedSec: number;
 };
 
 type SimBody = {
@@ -83,14 +85,17 @@ function bounce(body: SimBody, width: number, height: number) {
 export default function Chapter2FloatingBubbles({
   playbackPhase,
   subscene23ElapsedSec,
+  subscene24ElapsedSec,
 }: Props) {
   const anchorRefs = useRef<(HTMLDivElement | null)[]>([]);
   const simRef = useRef<SimBody[] | null>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
   const phaseRef = useRef(playbackPhase);
   const elapsed23Ref = useRef(subscene23ElapsedSec);
+  const elapsed24Ref = useRef(subscene24ElapsedSec);
   phaseRef.current = playbackPhase;
   elapsed23Ref.current = subscene23ElapsedSec;
+  elapsed24Ref.current = subscene24ElapsedSec;
 
   useEffect(() => {
     const syncSize = () => {
@@ -134,12 +139,19 @@ export default function Chapter2FloatingBubbles({
           const bobX = Math.sin(t * 0.35 + i * 0.7) * 14;
           const bobY = Math.cos(t * 0.42 + i * 0.5) * 18;
 
+          const exit24 = getChapter2BubbleSubscene24Exit(
+            i,
+            phaseRef.current,
+            elapsed24Ref.current,
+            width,
+            height,
+          );
           const el = anchorRefs.current[i];
           if (el) {
-            const alpha = spec.opacity * layerVis;
+            const alpha = spec.opacity * layerVis * exit24.opacityMul;
             el.style.opacity = String(alpha);
             el.style.visibility = alpha > 0.01 ? "visible" : "hidden";
-            el.style.transform = `translate3d(${body.x + bobX}px, ${body.y + bobY}px, 0) translate(-50%, -50%) rotate(${body.rot}deg)`;
+            el.style.transform = `translate3d(${body.x + bobX + exit24.offsetX}px, ${body.y + bobY + exit24.offsetY}px, 0) translate(-50%, -50%) rotate(${body.rot}deg)`;
           }
         }
       } else {

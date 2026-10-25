@@ -1,3 +1,11 @@
+import {
+  CHAPTER2_BUBBLE_COUNT,
+  CHAPTER2_BUBBLE_INSTANCES,
+} from "@/constants/chapter2BubbleConfig";
+import {
+  CHAPTER2_NABI_INSTANCES,
+  type Chapter2NabiInstance,
+} from "@/constants/chapter2NabiConfig";
 import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
 import type { Chapter2PropId } from "@/constants/chapter2ObjectsConfig";
 import {
@@ -24,6 +32,9 @@ export function isChapter2Subscene24ScrollAccumReady(scrollAccum: number) {
 
 export const CHAPTER2_BERG2_SUBSCENE_24_Y = 80;
 export const CHAPTER2_BERG3_SUBSCENE_24_Y = 50;
+
+/** Less downward travel for berg2 + grun_v during 2-4 (px at progress 1). */
+export const CHAPTER2_SUBSCENE_24_BERG2_GRUN_DESCENT_LIFT_PX = 50;
 
 /** berg4 — fixed drop while volcano rises (px @ ref layout). */
 export const CHAPTER2_BERG4_SUBSCENE_24_Y = 200;
@@ -75,7 +86,7 @@ function buildChapter2KokiCharacterShrinkSpecs(): Partial<
       scaleEnd: row.scaleEnd,
       dropPx: row.dropPx,
       delaySec: row.delayBaseSec + rand() * row.delayJitterSec,
-      spanSec: 0.78 + rand() * 0.62,
+      spanSec: 1.4 + rand() * 1.2,
     };
   }
   return specs;
@@ -116,9 +127,14 @@ export function getChapter2Subscene24CharacterShrink(
     );
   }
 
+  let yOffsetPx = t * spec.dropPx;
+  if (propId === "grun_v") {
+    yOffsetPx -= t * CHAPTER2_SUBSCENE_24_BERG2_GRUN_DESCENT_LIFT_PX;
+  }
+
   return {
     scaleMul: startScale + (spec.scaleEnd - startScale) * t,
-    yOffsetPx: t * spec.dropPx,
+    yOffsetPx,
   };
 }
 
@@ -175,6 +191,63 @@ export function getChapter2CoralSubscene24Shrink(
 
   return {
     scaleMul: 1 + (spec.scaleEnd - 1) * t,
+    yOffsetPx: t * spec.dropPx,
+  };
+}
+
+const CHAPTER2_SUBSCENE_24_STEIN_DROP_IDS = [
+  "stein1",
+  "stein2",
+  "stein3",
+] as const satisfies readonly Chapter2PropId[];
+
+type Chapter2Stein24DropSpec = {
+  delaySec: number;
+  spanSec: number;
+  dropPx: number;
+};
+
+function buildChapter2Stein24DropSpecs(): Record<Chapter2PropId, Chapter2Stein24DropSpec> {
+  const specs = {} as Record<Chapter2PropId, Chapter2Stein24DropSpec>;
+  for (let i = 0; i < CHAPTER2_SUBSCENE_24_STEIN_DROP_IDS.length; i++) {
+    const id = CHAPTER2_SUBSCENE_24_STEIN_DROP_IDS[i];
+    const rand = seededRandom(0x24057e10 + i * 521);
+    specs[id] = {
+      delaySec: rand() * 0.95,
+      spanSec: 1.05 + rand() * 1.45,
+      dropPx: 12 + rand() * 34,
+    };
+  }
+  return specs;
+}
+
+const CHAPTER2_STEIN24_DROP_SPECS = buildChapter2Stein24DropSpecs();
+
+function isChapter2Subscene24SteinDropId(propId: Chapter2PropId) {
+  return (CHAPTER2_SUBSCENE_24_STEIN_DROP_IDS as readonly string[]).includes(propId);
+}
+
+/** stein1–3 — slight drop while volcano rises (seeded stagger). */
+export function getChapter2SteinSubscene24Drop(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince24Sec: number,
+): Chapter2Subscene24CharacterShrink | null {
+  if (phase !== "2-4-playing" || !isChapter2Subscene24SteinDropId(propId)) return null;
+
+  const motionElapsed = elapsedSince24Sec - CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC;
+  if (motionElapsed <= 0) return null;
+
+  const spec = CHAPTER2_STEIN24_DROP_SPECS[propId];
+  if (motionElapsed <= spec.delaySec) return null;
+
+  const t = easeInOutSine(
+    clamp01((motionElapsed - spec.delaySec) / Math.max(0.12, spec.spanSec)),
+  );
+  if (t <= 0) return null;
+
+  return {
+    scaleMul: 1,
     yOffsetPx: t * spec.dropPx,
   };
 }
@@ -258,7 +331,11 @@ export function getChapter2BergSubscene24YOffset(
   if (bergId === "berg3") {
     return progress * CHAPTER2_BERG3_SUBSCENE_24_Y;
   }
-  return progress * CHAPTER2_BERG2_SUBSCENE_24_Y;
+  return Math.max(
+    0,
+    progress *
+      (CHAPTER2_BERG2_SUBSCENE_24_Y - CHAPTER2_SUBSCENE_24_BERG2_GRUN_DESCENT_LIFT_PX),
+  );
 }
 
 /** Rise distance (px) — bottom of viewport → rest anchor. */
@@ -309,6 +386,134 @@ export function getChapter2RVulkanSubscene24Reveal(
     opacity: 1,
     riseYOffsetPx: (1 - surge) * risePx,
     scaleMul: 0.86 + 0.14 * surge,
+  };
+}
+
+/** Gap after volcano rise before celem1 enters. */
+export const CHAPTER2_R_CELEMEN1_AFTER_VULKAN_DELAY_SEC = 0.28;
+export const CHAPTER2_R_CELEMEN1_ENTER_SPAN_SEC = 1.5;
+
+/** When celem1 slide-in beat starts (celem2 overlaps this window). */
+export function getChapter2RCelemen1Subscene24BeatStartSec() {
+  return (
+    CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC +
+    getChapter2RVulkanSubscene24MotionSpanSec() +
+    CHAPTER2_R_CELEMEN1_AFTER_VULKAN_DELAY_SEC
+  );
+}
+
+/** Stagger within celem1 enter — celem2 starts rising while celem1 is on screen. */
+export const CHAPTER2_R_CELEMEN2_ENTER_OFFSET_IN_CCELEM1_BEAT_SEC = 0.32;
+export const CHAPTER2_R_CELEMEN2_ENTER_SPAN_SEC = 1.45;
+
+export type Chapter2RCelemenSubscene24Enter = {
+  opacity: number;
+  slideXOffsetPx: number;
+  slideYOffsetPx: number;
+};
+
+/** r_celemen1 — slide in from outside bottom-left after volcano appears. */
+export function getChapter2RCelemenSubscene24Enter(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince24Sec: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): Chapter2RCelemenSubscene24Enter | null {
+  if (propId !== "r_celemen1") return null;
+
+  const slideFromLeftPx = viewportWidth * 0.28 + 140;
+  const slideFromBottomPx = viewportHeight * 0.22 + 90;
+
+  if (phase !== "2-4-playing") {
+    return {
+      opacity: 0,
+      slideXOffsetPx: -slideFromLeftPx,
+      slideYOffsetPx: slideFromBottomPx,
+    };
+  }
+
+  const beatStartSec = getChapter2RCelemen1Subscene24BeatStartSec();
+  const enterElapsed = elapsedSince24Sec - beatStartSec;
+  if (enterElapsed <= 0) {
+    return {
+      opacity: 0,
+      slideXOffsetPx: -slideFromLeftPx,
+      slideYOffsetPx: slideFromBottomPx,
+    };
+  }
+
+  const t = easeInOutSine(
+    clamp01(enterElapsed / Math.max(0.15, CHAPTER2_R_CELEMEN1_ENTER_SPAN_SEC)),
+  );
+  if (t <= 0) {
+    return {
+      opacity: 0,
+      slideXOffsetPx: -slideFromLeftPx,
+      slideYOffsetPx: slideFromBottomPx,
+    };
+  }
+
+  const surge = 1 - (1 - t) ** 3;
+  return {
+    opacity: 1,
+    slideXOffsetPx: -(1 - surge) * slideFromLeftPx,
+    slideYOffsetPx: (1 - surge) * slideFromBottomPx,
+  };
+}
+
+export type Chapter2RCelemen2Subscene24Enter = {
+  opacity: number;
+  slideXOffsetPx: number;
+  slideYOffsetPx: number;
+  scaleMul: number;
+};
+
+/** r_celemen2 — slide in from outside bottom-right while celem1 is entering. */
+export function getChapter2RCelemen2Subscene24Enter(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince24Sec: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): Chapter2RCelemen2Subscene24Enter | null {
+  if (propId !== "r_celemen2") return null;
+
+  const slideFromRightPx = viewportWidth * 0.28 + 140;
+  const slideFromBottomPx = viewportHeight * 0.22 + 90;
+
+  const offScreen = {
+    opacity: 0 as number,
+    slideXOffsetPx: slideFromRightPx,
+    slideYOffsetPx: slideFromBottomPx,
+    scaleMul: 0.88,
+  };
+
+  if (phase !== "2-4-playing") {
+    return offScreen;
+  }
+
+  const beatStartSec =
+    getChapter2RCelemen1Subscene24BeatStartSec() +
+    CHAPTER2_R_CELEMEN2_ENTER_OFFSET_IN_CCELEM1_BEAT_SEC;
+  const enterElapsed = elapsedSince24Sec - beatStartSec;
+  if (enterElapsed <= 0) {
+    return offScreen;
+  }
+
+  const t = easeInOutSine(
+    clamp01(enterElapsed / Math.max(0.15, CHAPTER2_R_CELEMEN2_ENTER_SPAN_SEC)),
+  );
+  if (t <= 0) {
+    return offScreen;
+  }
+
+  const surge = 1 - (1 - t) ** 3;
+  return {
+    opacity: 1,
+    slideXOffsetPx: (1 - surge) * slideFromRightPx,
+    slideYOffsetPx: (1 - surge) * slideFromBottomPx,
+    scaleMul: 0.88 + 0.12 * surge,
   };
 }
 
@@ -441,12 +646,191 @@ export function getChapter2SporeSubscene24Exit(
   };
 }
 
+type Chapter2Bubble24ExitSpec = {
+  delaySec: number;
+  spanSec: number;
+  dirX: number;
+  dirY: number;
+  travelNorm: number;
+};
+
+function buildChapter2Bubble24ExitSpecs(): Chapter2Bubble24ExitSpec[] {
+  const specs: Chapter2Bubble24ExitSpec[] = [];
+  for (let i = 0; i < CHAPTER2_BUBBLE_COUNT; i++) {
+    const inst = CHAPTER2_BUBBLE_INSTANCES[i];
+    const rand = seededRandom(0x240babb0 + i * 677);
+    const cx = inst.xNorm - 0.5;
+    const cy = inst.yNorm - 0.5;
+    const len = Math.hypot(cx, cy) || 1;
+    specs.push({
+      delaySec: rand() * 1.15,
+      spanSec: 2.6 + rand() * 2.4,
+      dirX: cx / len,
+      dirY: cy / len,
+      travelNorm: 0.52 + rand() * 0.38,
+    });
+  }
+  return specs;
+}
+
+const CHAPTER2_BUBBLE24_EXIT_SPECS = buildChapter2Bubble24ExitSpecs();
+
+export type Chapter2BubbleSubscene24Exit = {
+  opacityMul: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+/** During volcano beat — bubbles drift off-screen (seeded stagger). */
+export function getChapter2BubbleSubscene24Exit(
+  bubbleIndex: number,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince24Sec: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): Chapter2BubbleSubscene24Exit {
+  if (phase !== "2-4-playing") {
+    return { opacityMul: 1, offsetX: 0, offsetY: 0 };
+  }
+
+  const motionElapsed = elapsedSince24Sec - CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC;
+  if (motionElapsed <= 0) {
+    return { opacityMul: 1, offsetX: 0, offsetY: 0 };
+  }
+
+  const spec = CHAPTER2_BUBBLE24_EXIT_SPECS[bubbleIndex];
+  if (!spec || motionElapsed <= spec.delaySec) {
+    return { opacityMul: 1, offsetX: 0, offsetY: 0 };
+  }
+
+  const t = easeInOutSine(
+    clamp01((motionElapsed - spec.delaySec) / Math.max(0.2, spec.spanSec)),
+  );
+  const fade = easeOutCubic(t);
+  const travelX = spec.dirX * viewportWidth * spec.travelNorm;
+  const travelY = spec.dirY * viewportHeight * spec.travelNorm;
+
+  return {
+    opacityMul: 1 - fade,
+    offsetX: t * travelX,
+    offsetY: t * travelY,
+  };
+}
+
+type Chapter2Nabi24ExitSpec = {
+  delaySec: number;
+  spanSec: number;
+  dirX: number;
+  dirY: number;
+  travelNorm: number;
+};
+
+function buildChapter2Nabi24ExitSpecs(): Record<string, Chapter2Nabi24ExitSpec> {
+  const specs: Record<string, Chapter2Nabi24ExitSpec> = {};
+  for (const inst of CHAPTER2_NABI_INSTANCES) {
+    if (!inst.exitAtSubscene24) continue;
+    const seed = inst.id === "nabi2" ? 0x24002002 : 0x24003003;
+    const rand = seededRandom(seed);
+    const cx = inst.patrol.x - 0.5;
+    const cy = inst.patrol.y - 0.5;
+    const len = Math.hypot(cx, cy) || 1;
+    specs[inst.id] = {
+      delaySec: 0.08 + rand() * 1.12,
+      spanSec: 2.7 + rand() * 2.5,
+      dirX: cx / len,
+      dirY: cy / len,
+      travelNorm: 0.5 + rand() * 0.4,
+    };
+  }
+  return specs;
+}
+
+const CHAPTER2_NABI24_EXIT_SPECS = buildChapter2Nabi24ExitSpecs();
+
+/** nabi2 / nabi3 — drift off with the 2-4 bubble beat (seeded stagger). */
+export function getChapter2NabiSubscene24Exit(
+  spec: Chapter2NabiInstance,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince24Sec: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): Chapter2BubbleSubscene24Exit {
+  if (!spec.exitAtSubscene24 || phase !== "2-4-playing") {
+    return { opacityMul: 1, offsetX: 0, offsetY: 0 };
+  }
+
+  const motionElapsed = elapsedSince24Sec - CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC;
+  if (motionElapsed <= 0) {
+    return { opacityMul: 1, offsetX: 0, offsetY: 0 };
+  }
+
+  const exitSpec = CHAPTER2_NABI24_EXIT_SPECS[spec.id];
+  if (!exitSpec || motionElapsed <= exitSpec.delaySec) {
+    return { opacityMul: 1, offsetX: 0, offsetY: 0 };
+  }
+
+  const t = easeInOutSine(
+    clamp01((motionElapsed - exitSpec.delaySec) / Math.max(0.2, exitSpec.spanSec)),
+  );
+  const fade = easeOutCubic(t);
+  const travelX = exitSpec.dirX * viewportWidth * exitSpec.travelNorm;
+  const travelY = exitSpec.dirY * viewportHeight * exitSpec.travelNorm;
+
+  return {
+    opacityMul: 1 - fade,
+    offsetX: t * travelX,
+    offsetY: t * travelY,
+  };
+}
+
+function chapter2Subscene24VolcanoBeatEndSec(
+  startSec: number,
+  delaySec: number,
+  spanSec: number,
+) {
+  return startSec + delaySec + spanSec;
+}
+
 export function getChapter2Subscene24MotionCompleteSec() {
   let maxEnd = getChapter2Subscene24BergDropCompleteSec();
   for (const spec of Object.values(CHAPTER2_SPORE24_EXIT_SPECS)) {
     maxEnd = Math.max(
       maxEnd,
-      CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC + spec.delaySec + spec.spanSec,
+      chapter2Subscene24VolcanoBeatEndSec(
+        CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC,
+        spec.delaySec,
+        spec.spanSec,
+      ),
+    );
+  }
+  for (const spec of Object.values(CHAPTER2_STEIN24_DROP_SPECS)) {
+    maxEnd = Math.max(
+      maxEnd,
+      chapter2Subscene24VolcanoBeatEndSec(
+        CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC,
+        spec.delaySec,
+        spec.spanSec,
+      ),
+    );
+  }
+  for (const spec of CHAPTER2_BUBBLE24_EXIT_SPECS) {
+    maxEnd = Math.max(
+      maxEnd,
+      chapter2Subscene24VolcanoBeatEndSec(
+        CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC,
+        spec.delaySec,
+        spec.spanSec,
+      ),
+    );
+  }
+  for (const spec of Object.values(CHAPTER2_NABI24_EXIT_SPECS)) {
+    maxEnd = Math.max(
+      maxEnd,
+      chapter2Subscene24VolcanoBeatEndSec(
+        CHAPTER2_BERG4_SUBSCENE_24_SYNC_START_SEC,
+        spec.delaySec,
+        spec.spanSec,
+      ),
     );
   }
   return maxEnd + 0.08;

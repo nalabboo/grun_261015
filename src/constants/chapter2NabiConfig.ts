@@ -21,6 +21,8 @@ export type Chapter2NabiInstance = {
   keepAfterLaubl?: boolean;
   /** Drift off when scene 2-3 starts (visible through full 2-2). */
   exitAtSubscene23?: boolean;
+  /** Drift off during 2-4 volcano / bubble exit beat. */
+  exitAtSubscene24?: boolean;
 };
 
 export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
@@ -52,7 +54,7 @@ export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
     patrol: { x: 0.72, y: 0.3 },
     flutterPhase: 1.7,
     driftRadiusVw: 2.4,
-    exitAtSubscene23: true,
+    exitAtSubscene24: true,
   },
   {
     id: "nabi3",
@@ -68,6 +70,7 @@ export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
     flutterPhase: 3.1,
     driftRadiusVw: 3,
     keepAfterLaubl: true,
+    exitAtSubscene24: true,
   },
 ] as const;
 

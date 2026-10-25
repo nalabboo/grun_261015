@@ -54,6 +54,10 @@ export type Chapter2PropConfig = {
   revealOnSubscene24?: boolean;
   /** Scene 2-4 — rise from below while bergs drop (`getChapter2RVulkanSubscene24Reveal`). */
   revealWithBerg24Drop?: boolean;
+  /** Scene 2-4 — after volcano, enter from bottom-left (`getChapter2RCelemenSubscene24Enter`). */
+  revealFromBottomLeftAfterVulkan?: boolean;
+  /** Scene 2-4 — slide from bottom-right during celem1 enter (`getChapter2RCelemen2Subscene24Enter`). */
+  revealRiseDuringCelem1Enter?: boolean;
 };
 
 /** Hidden until scene 2-3 starts (Laubl beat and blau reveals). */
@@ -68,7 +72,12 @@ export function chapter2PropIsSubscene23Exclusive(prop: Chapter2PropConfig): boo
 }
 
 export function chapter2PropIsSubscene24Exclusive(prop: Chapter2PropConfig): boolean {
-  return Boolean(prop.revealOnSubscene24 || prop.revealWithBerg24Drop);
+  return Boolean(
+    prop.revealOnSubscene24 ||
+      prop.revealWithBerg24Drop ||
+      prop.revealFromBottomLeftAfterVulkan ||
+      prop.revealRiseDuringCelem1Enter,
+  );
 }
 
 export const CHAPTER2_PROP_IDS = [
@@ -96,6 +105,8 @@ export const CHAPTER2_PROP_IDS = [
   "ikki3",
   "koki",
   "r_vulkan",
+  "r_celemen1",
+  "r_celemen2",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -145,11 +156,13 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   /** 이끼2 (b_moss2) — berg3 (initial layout). */
   ikki2: { x: -320, y: -500, scale: 2.1, scaleY: 2.1, rotate: -15 },
   /** 이끼3 (b_moss3) — berg2 (initial layout). */
-  ikki3: { x: 530, y: -220, scale: 1.2, scaleY: 2.4, rotate: -23 },
+  ikki3: { x: 470, y: -340, scale: 1.2, scaleY: 2.4, rotate: -23 },
   /** 코키 — scene 2-4 lead (initial layout). */
   koki: { x: -500, y: -400, scale: 1.65, scaleY: 1.65, rotate: 0 },
   /** 불칸 — center-bottom, rises during 2-4 berg drop. */
-  r_vulkan: { x: -60, y: 180, scale: 2.50, scaleY: 2.50, rotate: 5 },
+  r_vulkan: { x: -60, y: 50, scale: 2.50, scaleY: 2.50, rotate: 5 },
+  r_celemen1: { x: -540, y: 130, scale: 1.20, scaleY: 1.30, rotate: -15 },
+  r_celemen2: { x: 200, y: -500, scale: 0.50, scaleY: 0.50, rotate: 28 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -233,8 +246,11 @@ const CORAL3_DEPTH_PX = -228;
 const CORAL4_DEPTH_PX = -110;
 /** Between berg3 and berg2 planes (with stein3). */
 const CORAL5_DEPTH_PX = 12;
-/** Mid-plane — volcano between berg3 / berg2 during 2-4 drop. */
-const R_VULKAN_DEPTH_PX = 6;
+/** Behind grun_v — volcano under characters during 2-4. */
+const R_VULKAN_DEPTH_PX = 42;
+const R_CELEMEN1_DEPTH_PX = 66;
+/** Just in front of r_vulkan (42). */
+const R_CELEMEN2_DEPTH_PX = 48;
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -507,8 +523,9 @@ export const CHAPTER2_R_VULKAN: Chapter2PropConfig = {
   file: "rot objekt/r_vulkan.png",
   width: 1000,
   height: 677,
-  zIndex: CHAPTER2_PROP_Z_BETWEEN_BERG3_AND_BERG2,
-  stack: "betweenBerg3AndBerg2",
+  /** Below grun_v (z 2) and nari (z 3); above stein3/coral5 back stack. */
+  zIndex: 1,
+  stack: "midBerg2",
   revealWithBerg24Drop: true,
   parallax: 18,
   heightVh: 0.38,
@@ -516,6 +533,40 @@ export const CHAPTER2_R_VULKAN: Chapter2PropConfig = {
   blurRatio: 0,
   brightness: getDepthBrightness(R_VULKAN_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_vulkan,
+};
+
+/** celem1 — enters from bottom-left after volcano (rot objekt/r_celemen1.png). */
+export const CHAPTER2_R_CELEMEN1: Chapter2PropConfig = {
+  id: "r_celemen1",
+  file: "rot objekt/r_celemen1.png",
+  width: 1435,
+  height: 962,
+  zIndex: 5,
+  stack: "midBerg2",
+  revealFromBottomLeftAfterVulkan: true,
+  parallax: 17,
+  heightVh: 0.32,
+  depthPx: R_CELEMEN1_DEPTH_PX,
+  blurRatio: 0,
+  brightness: getDepthBrightness(R_CELEMEN1_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_celemen1,
+};
+
+/** 셀레맨2 — directly in front of 불칸; enters from bottom-right during 셀레맨1 enter. */
+export const CHAPTER2_R_CELEMEN2: Chapter2PropConfig = {
+  id: "r_celemen2",
+  file: "rot objekt/r_celemen2.png",
+  width: 1305,
+  height: 857,
+  zIndex: 2,
+  stack: "midBerg2",
+  revealRiseDuringCelem1Enter: true,
+  parallax: 16,
+  heightVh: 0.34,
+  depthPx: R_CELEMEN2_DEPTH_PX,
+  blurRatio: 0,
+  brightness: getDepthBrightness(R_CELEMEN2_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_celemen2,
 };
 
 /** 코키 — scene 2-4 first beat (charactor/koki.png). */
@@ -660,6 +711,8 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_CORAL5,
   CHAPTER2_CORAL6,
   CHAPTER2_R_VULKAN,
+  CHAPTER2_R_CELEMEN1,
+  CHAPTER2_R_CELEMEN2,
   CHAPTER2_IKKI1,
   CHAPTER2_IKKI2,
   CHAPTER2_IKKI3,

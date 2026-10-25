@@ -57,6 +57,9 @@ import {
   getChapter2CoralSubscene24Shrink,
   getChapter2Subscene24CharacterShrink,
   getChapter2SporeSubscene24Exit,
+  getChapter2SteinSubscene24Drop,
+  getChapter2RCelemen2Subscene24Enter,
+  getChapter2RCelemenSubscene24Enter,
   getChapter2RVulkanSubscene24Reveal,
   getChapter2Subscene24EarthquakeShake,
   isChapter2Subscene24ScrollAccumReady,
@@ -442,6 +445,9 @@ export default function Chapter2Scene({
   const scroll22Progress = getChapter2Scroll22Progress(scrollSegments.raw);
   void frame;
 
+  const viewportWidth =
+    typeof window !== "undefined" ? window.innerWidth : SCENE_REFERENCE_HEIGHT;
+
   const playbackPhase = playbackPhaseRef.current;
   const subscene23MotionPhase: Chapter2SubscenePlaybackPhase =
     playbackPhase === "2-3-complete" || playbackPhase === "2-4-playing"
@@ -519,8 +525,15 @@ export default function Chapter2Scene({
   const betweenBerg3AndBerg2Props = CHAPTER2_PROPS.filter(
     (prop) => prop.stack === "betweenBerg3AndBerg2",
   ).sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id));
+  const rVulkanProp = CHAPTER2_PROPS.find((prop) => prop.id === "r_vulkan");
+  const rCelemen2Prop = CHAPTER2_PROPS.find((prop) => prop.id === "r_celemen2");
   const behindBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "behindBerg2");
-  const midBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "midBerg2");
+  const midBerg2Props = CHAPTER2_PROPS.filter(
+    (prop) =>
+      prop.stack === "midBerg2" &&
+      prop.id !== "r_vulkan" &&
+      prop.id !== "r_celemen2",
+  ).sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id));
   const aboveBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "aboveBerg2").sort(
     (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
   );
@@ -618,6 +631,35 @@ export default function Chapter2Scene({
         scrollScaleMul *= vulkanReveal.scaleMul;
       }
     }
+    if (prop.revealFromBottomLeftAfterVulkan) {
+      const celemEnter = getChapter2RCelemenSubscene24Enter(
+        prop.id,
+        playbackPhase,
+        subscene24ElapsedSec,
+        viewportWidth,
+        viewportHeight,
+      );
+      if (celemEnter) {
+        scrollOpacity *= celemEnter.opacity;
+        layoutXOffset += celemEnter.slideXOffsetPx;
+        layoutYOffset += celemEnter.slideYOffsetPx;
+      }
+    }
+    if (prop.revealRiseDuringCelem1Enter) {
+      const celem2Enter = getChapter2RCelemen2Subscene24Enter(
+        prop.id,
+        playbackPhase,
+        subscene24ElapsedSec,
+        viewportWidth,
+        viewportHeight,
+      );
+      if (celem2Enter) {
+        scrollOpacity *= celem2Enter.opacity;
+        layoutXOffset += celem2Enter.slideXOffsetPx;
+        layoutYOffset += celem2Enter.slideYOffsetPx;
+        scrollScaleMul *= celem2Enter.scaleMul;
+      }
+    }
     if (prop.revealFromBottomAfterLaubl) {
       const steinReveal = getChapter2BlauSteinReveal(
         prop.id,
@@ -690,6 +732,14 @@ export default function Chapter2Scene({
     if (coral24Shrink) {
       scrollScaleMul *= coral24Shrink.scaleMul;
       layoutYOffset += coral24Shrink.yOffsetPx;
+    }
+    const stein24Drop = getChapter2SteinSubscene24Drop(
+      prop.id,
+      playbackPhase,
+      subscene24ElapsedSec,
+    );
+    if (stein24Drop) {
+      layoutYOffset += stein24Drop.yOffsetPx;
     }
     if (!kokiCharacterShrink && prop.id === "grun_v") {
       scrollScaleMul *= getChapter2GrunSubscene23ScaleMul(playbackPhase, subscene23ElapsedSec);
@@ -821,7 +871,10 @@ export default function Chapter2Scene({
               />
             )}
             {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
-            {layer.id === "berg2" && midBerg2Props.map((prop) => renderPropLayer(prop))}
+            {layer.id === "berg2" && rVulkanProp && renderPropLayer(rVulkanProp)}
+            {layer.id === "berg2" && rCelemen2Prop && renderPropLayer(rCelemen2Prop)}
+            {layer.id === "berg2" &&
+              midBerg2Props.map((prop) => renderPropLayer(prop))}
             {layer.id === "berg3" &&
               behindBerg3Props.map((prop) =>
                 renderPropLayer(prop, undefined, undefined, berg3PropMotion),
@@ -867,6 +920,7 @@ export default function Chapter2Scene({
       <Chapter2FloatingBubbles
         playbackPhase={playbackPhase}
         subscene23ElapsedSec={subscene23ElapsedSec}
+        subscene24ElapsedSec={subscene24ElapsedSec}
       />
 
       <Chapter2FloatingMarimos
@@ -881,6 +935,7 @@ export default function Chapter2Scene({
         scroll22Progress={scroll22Progress}
         subscene23Phase={playbackPhase}
         subscene23ElapsedSec={subscene23ElapsedSec}
+        subscene24ElapsedSec={subscene24ElapsedSec}
         yellowExitVisibility={getChapter2YellowGelbExitVisibility(
           subscene23MotionPhase,
           subscene23ElapsedSec,

@@ -234,6 +234,8 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("charactor/laubl.png"),
     chapter2AssetUrl("charactor/koki.png"),
     chapter2AssetUrl("rot objekt/r_vulkan.png"),
+    chapter2AssetUrl("rot objekt/r_celemen1.png"),
+    chapter2AssetUrl("rot objekt/r_celemen2.png"),
     chapter2AssetUrl("blau objekt/b_stein1.png"),
     chapter2AssetUrl("blau objekt/b_stein2.png"),
     chapter2AssetUrl("blau objekt/b_coral1.png"),

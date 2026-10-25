@@ -8,6 +8,7 @@ import {
 } from "@/constants/chapter2NabiConfig";
 import { getChapter2NabiScroll22ExitOpacity } from "@/constants/chapter2Scroll22Motion";
 import { getChapter2NabiSubscene23ExitOpacity } from "@/constants/chapter2Subscene23Motion";
+import { getChapter2NabiSubscene24Exit } from "@/constants/chapter2Subscene24Motion";
 import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
   scroll22Progress: number;
   subscene23Phase?: Chapter2SubscenePlaybackPhase;
   subscene23ElapsedSec?: number;
+  subscene24ElapsedSec?: number;
   /** Scene 2-3 yellow gelb exit (1 = visible, 0 = gone). */
   yellowExitVisibility?: number;
 };
@@ -24,6 +26,7 @@ export default function Chapter2FloatingNabis({
   scroll22Progress,
   subscene23Phase = "2-1",
   subscene23ElapsedSec = 0,
+  subscene24ElapsedSec = 0,
   yellowExitVisibility = 1,
 }: Props) {
   const anchorRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -31,6 +34,7 @@ export default function Chapter2FloatingNabis({
   const scroll22Ref = useRef(scroll22Progress);
   const sub23PhaseRef = useRef(subscene23Phase);
   const sub23ElapsedRef = useRef(subscene23ElapsedSec);
+  const sub24ElapsedRef = useRef(subscene24ElapsedSec);
   const yellowVisRef = useRef(yellowExitVisibility);
   const sizeRef = useRef({ width: 0, height: 0 });
 
@@ -38,6 +42,7 @@ export default function Chapter2FloatingNabis({
   scroll22Ref.current = scroll22Progress;
   sub23PhaseRef.current = subscene23Phase;
   sub23ElapsedRef.current = subscene23ElapsedSec;
+  sub24ElapsedRef.current = subscene24ElapsedSec;
   yellowVisRef.current = yellowExitVisibility;
 
   useEffect(() => {
@@ -78,14 +83,26 @@ export default function Chapter2FloatingNabis({
             spec.patrol.y - 0.5,
             spec.patrol.x - 0.5,
           );
+          const sub24Exit = getChapter2NabiSubscene24Exit(
+            spec,
+            sub23PhaseRef.current,
+            sub24ElapsedRef.current,
+            width,
+            height,
+          );
           const opacity =
             getChapter2NabiOpacity(spec, spore) *
             yellowVisRef.current *
-            stayMul;
+            stayMul *
+            sub24Exit.opacityMul;
           const baseX =
-            base.x + Math.cos(exitAngle) * exitPush;
+            base.x +
+            Math.cos(exitAngle) * exitPush +
+            sub24Exit.offsetX;
           const baseY =
-            base.y + Math.sin(exitAngle) * exitPush;
+            base.y +
+            Math.sin(exitAngle) * exitPush +
+            sub24Exit.offsetY;
           const phase = spec.flutterPhase;
 
           const driftPx = (spec.driftRadiusVw / 100) * width;
