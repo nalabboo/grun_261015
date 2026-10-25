@@ -62,6 +62,7 @@ import {
   getChapter2RCelemenSubscene24Enter,
   getChapter2RVulkanSubscene24Reveal,
   getChapter2RBlumeSubscene24Bloom,
+  getChapter2RObstSubscene24GrowDuringBlume,
   getChapter2Subscene24EarthquakeShake,
   isChapter2Subscene24ScrollAccumReady,
 } from "@/constants/chapter2Subscene24Motion";
@@ -526,6 +527,7 @@ export default function Chapter2Scene({
   const betweenBerg3AndBerg2Props = CHAPTER2_PROPS.filter(
     (prop) => prop.stack === "betweenBerg3AndBerg2",
   ).sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id));
+  const rObst4Prop = CHAPTER2_PROPS.find((prop) => prop.id === "r_obst4");
   const rVulkanProp = CHAPTER2_PROPS.find((prop) => prop.id === "r_vulkan");
   const rCelemen2Prop = CHAPTER2_PROPS.find((prop) => prop.id === "r_celemen2");
   const behindBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "behindBerg2");
@@ -533,7 +535,8 @@ export default function Chapter2Scene({
     (prop) =>
       prop.stack === "midBerg2" &&
       prop.id !== "r_vulkan" &&
-      prop.id !== "r_celemen2",
+      prop.id !== "r_celemen2" &&
+      prop.id !== "r_obst4",
   ).sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id));
   const aboveBerg2Props = CHAPTER2_PROPS.filter((prop) => prop.stack === "aboveBerg2").sort(
     (a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id),
@@ -610,6 +613,7 @@ export default function Chapter2Scene({
       bergScale,
       scrollSegments,
     );
+    let scrollScaleYMul: number | undefined;
     let scrollOpacity = getChapter2PropScrollOpacity(prop, scrollSegments);
     let layoutYOffset = 0;
     let layoutXOffset = 0;
@@ -671,6 +675,20 @@ export default function Chapter2Scene({
         scrollOpacity *= blumeBloom.opacity;
         layoutYOffset += blumeBloom.riseYOffsetPx;
         scrollScaleMul *= blumeBloom.scaleMul;
+      }
+    }
+    if (prop.revealGrowFromTopDuringBlumeBloom) {
+      const obstGrow = getChapter2RObstSubscene24GrowDuringBlume(
+        prop.id,
+        playbackPhase,
+        subscene24ElapsedSec,
+        viewportHeight,
+      );
+      if (obstGrow) {
+        scrollOpacity *= obstGrow.opacity;
+        layoutYOffset += obstGrow.dropYOffsetPx;
+        scrollScaleMul *= obstGrow.scaleMul;
+        scrollScaleYMul = (scrollScaleYMul ?? scrollScaleMul) * obstGrow.scaleYMul;
       }
     }
     if (prop.revealFromBottomAfterLaubl) {
@@ -780,6 +798,7 @@ export default function Chapter2Scene({
         shiftY={shiftY}
         bergScale={bergScale}
         scrollScaleMul={scrollScaleMul}
+        scrollScaleYMul={scrollScaleYMul}
         scrollOpacity={scrollOpacity}
         layoutYOffset={layoutYOffset}
         layoutXOffset={layoutXOffset}
@@ -884,6 +903,7 @@ export default function Chapter2Scene({
               />
             )}
             {layer.id === "berg2" && behindBerg2Props.map((prop) => renderPropLayer(prop))}
+            {layer.id === "berg2" && rObst4Prop && renderPropLayer(rObst4Prop)}
             {layer.id === "berg2" && rVulkanProp && renderPropLayer(rVulkanProp)}
             {layer.id === "berg2" && rCelemen2Prop && renderPropLayer(rCelemen2Prop)}
             {layer.id === "berg2" &&

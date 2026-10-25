@@ -19,6 +19,8 @@ type Props = {
   bergScale?: number;
   /** Scroll-driven scale (grun / spore segments). */
   scrollScaleMul?: number;
+  /** Optional Y-only scale multiplier (defaults to scrollScaleMul). */
+  scrollScaleYMul?: number;
   /** Scroll-driven opacity (nari reveal). */
   scrollOpacity?: number;
   /** Scene 2-3 extra Y (px, downward). */
@@ -40,6 +42,7 @@ export default function Chapter2PropLayer({
   shiftY,
   bergScale = 1,
   scrollScaleMul = 1,
+  scrollScaleYMul,
   scrollOpacity = 1,
   layoutYOffset = 0,
   layoutXOffset = 0,
@@ -73,6 +76,12 @@ export default function Chapter2PropLayer({
     return null;
   }
 
+  const layoutAnchorY = prop.layoutAnchor === "top" ? "0%" : "-100%";
+  const transformOrigin = prop.transformOrigin ?? "50% 100%";
+  const scaleYMul = scrollScaleYMul ?? scrollScaleMul;
+  const scaleX = layout.scale * bergScale * scrollScaleMul;
+  const scaleY = layout.scaleY * bergScale * scaleYMul;
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -94,8 +103,8 @@ export default function Chapter2PropLayer({
             : "ns-resize"
           : undefined,
         filter: filterParts.join(" "),
-        transformOrigin: "50% 100%",
-        transform: `translate(calc(-50% + ${shiftX + layout.x + layoutXOffset}px), calc(-100% + ${shiftY + layout.y + layoutYOffset}px)) scale(${layout.scale * bergScale * scrollScaleMul}, ${layout.scaleY * bergScale * scrollScaleMul}) rotate(${layout.rotate}deg)`,
+        transformOrigin,
+        transform: `translate(calc(-50% + ${shiftX + layout.x + layoutXOffset}px), calc(${layoutAnchorY} + ${shiftY + layout.y + layoutYOffset}px)) scale(${scaleX}, ${scaleY}) rotate(${layout.rotate}deg)`,
       }}
       onPointerDown={(event) => {
         if (!editorActive) return;

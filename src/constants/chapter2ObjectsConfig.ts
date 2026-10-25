@@ -60,6 +60,12 @@ export type Chapter2PropConfig = {
   revealRiseDuringCelem1Enter?: boolean;
   /** Scene 2-4 — bloom on coral1 after volcano (`getChapter2RBlumeSubscene24Bloom`). */
   revealBloomAfterVulkan?: boolean;
+  /** Scene 2-4 — grow downward from top while blumes bloom (`getChapter2RObstSubscene24GrowDuringBlume`). */
+  revealGrowFromTopDuringBlumeBloom?: boolean;
+  /** Prop layer translate Y anchor — default foot (`-100%`). */
+  layoutAnchor?: "foot" | "top";
+  /** CSS transform-origin override. */
+  transformOrigin?: string;
 };
 
 /** Hidden until scene 2-3 starts (Laubl beat and blau reveals). */
@@ -79,7 +85,8 @@ export function chapter2PropIsSubscene24Exclusive(prop: Chapter2PropConfig): boo
       prop.revealWithBerg24Drop ||
       prop.revealFromBottomLeftAfterVulkan ||
       prop.revealRiseDuringCelem1Enter ||
-      prop.revealBloomAfterVulkan,
+      prop.revealBloomAfterVulkan ||
+      prop.revealGrowFromTopDuringBlumeBloom,
   );
 }
 
@@ -113,6 +120,11 @@ export const CHAPTER2_PROP_IDS = [
   "r_blume1",
   "r_blume2",
   "r_blume3",
+  "r_obst1",
+  "r_obst2",
+  "r_obst3",
+  "r_obst4",
+  "r_obst5",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -174,6 +186,12 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   r_blume2: { x: -680, y: -520, scale: 1.00, scaleY: 1.00, rotate: 15 },
   /** On coral5 — bloom after volcano (2-4). */
   r_blume3: { x: 650, y: -400, scale: 1.50, scaleY: 1.50, rotate: 6 },
+  /** Hanging grass — grows from top during blume beat (2-4). */
+  r_obst1: { x: -850, y: -1100, scale: 1.30, scaleY: 1.30, rotate: 0 },
+  r_obst2: { x: -410, y: -1150, scale: 1.60, scaleY: 1.60, rotate: -15 },
+  r_obst3: { x: -450, y: -1100, scale: 1.45, scaleY: 1.45, rotate: 4 },
+  r_obst4: { x: 300, y: -1200, scale: 1.00, scaleY: 1.00, rotate: -8 },
+  r_obst5: { x: -200, y: -800, scale: 1.40, scaleY: 1.40, rotate: 6 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -267,6 +285,13 @@ const R_BLUME1_DEPTH_PX = 84;
 const R_BLUME2_DEPTH_PX = 86;
 /** Slightly in front of coral5. */
 const R_BLUME3_DEPTH_PX = 20;
+/** Obst grass — staggered depth (left/back → right/near) for DOF separation. */
+const R_OBST1_DEPTH_PX = 46;
+const R_OBST2_DEPTH_PX = 76;
+const R_OBST3_DEPTH_PX = 60;
+/** Behind r_vulkan (42). */
+const R_OBST4_DEPTH_PX = 36;
+const R_OBST5_DEPTH_PX = 54;
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -638,6 +663,105 @@ export const CHAPTER2_R_BLUME3: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_blume3,
 };
 
+/** 장애물1 (풀) — grows from top of frame during blume bloom. */
+export const CHAPTER2_R_OBST1: Chapter2PropConfig = {
+  id: "r_obst1",
+  file: "rot objekt/r_obst1.png",
+  width: 263,
+  height: 653,
+  zIndex: 3,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealGrowFromTopDuringBlumeBloom: true,
+  layoutAnchor: "top",
+  transformOrigin: "50% 0%",
+  parallax: 9,
+  heightVh: 0.38,
+  depthPx: R_OBST1_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(R_OBST1_DEPTH_PX),
+  brightness: getDepthBrightness(R_OBST1_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst1,
+};
+
+/** 장애물2 (풀) — same grow beat as obst1, staggered start. */
+export const CHAPTER2_R_OBST2: Chapter2PropConfig = {
+  id: "r_obst2",
+  file: "rot objekt/r_obst2.png",
+  width: 263,
+  height: 653,
+  zIndex: 3,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealGrowFromTopDuringBlumeBloom: true,
+  layoutAnchor: "top",
+  transformOrigin: "50% 0%",
+  parallax: 15,
+  heightVh: 0.38,
+  depthPx: R_OBST2_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(R_OBST2_DEPTH_PX),
+  brightness: getDepthBrightness(R_OBST2_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst2,
+};
+
+/** 장애물3 (풀) — same grow beat, third stagger. */
+export const CHAPTER2_R_OBST3: Chapter2PropConfig = {
+  id: "r_obst3",
+  file: "rot objekt/r_obst3.png",
+  width: 263,
+  height: 653,
+  zIndex: 3,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealGrowFromTopDuringBlumeBloom: true,
+  layoutAnchor: "top",
+  transformOrigin: "50% 0%",
+  parallax: 11,
+  heightVh: 0.38,
+  depthPx: R_OBST3_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(R_OBST3_DEPTH_PX),
+  brightness: getDepthBrightness(R_OBST3_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst3,
+};
+
+/** 장애물4 (풀) — same blume grow timing; paints behind volcano. */
+export const CHAPTER2_R_OBST4: Chapter2PropConfig = {
+  id: "r_obst4",
+  file: "rot objekt/r_obst4.png",
+  width: 263,
+  height: 653,
+  zIndex: 0,
+  stack: "midBerg2",
+  revealGrowFromTopDuringBlumeBloom: true,
+  layoutAnchor: "top",
+  transformOrigin: "50% 0%",
+  parallax: 16,
+  heightVh: 0.38,
+  depthPx: R_OBST4_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(R_OBST4_DEPTH_PX),
+  brightness: getDepthBrightness(R_OBST4_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst4,
+};
+
+/** 장애물5 (풀) — blume grow with obst1 beat. */
+export const CHAPTER2_R_OBST5: Chapter2PropConfig = {
+  id: "r_obst5",
+  file: "rot objekt/r_obst5.png",
+  width: 263,
+  height: 653,
+  zIndex: 3,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealGrowFromTopDuringBlumeBloom: true,
+  layoutAnchor: "top",
+  transformOrigin: "50% 0%",
+  parallax: 10,
+  heightVh: 0.38,
+  depthPx: R_OBST5_DEPTH_PX,
+  blurRatio: getDepthBlurRatio(R_OBST5_DEPTH_PX),
+  brightness: getDepthBrightness(R_OBST5_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst5,
+};
+
 /** 코키 — scene 2-4 first beat (charactor/koki.png). */
 export const CHAPTER2_KOKI: Chapter2PropConfig = {
   id: "koki",
@@ -776,6 +900,11 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_CORAL1,
   CHAPTER2_R_BLUME1,
   CHAPTER2_R_BLUME2,
+  CHAPTER2_R_OBST1,
+  CHAPTER2_R_OBST2,
+  CHAPTER2_R_OBST3,
+  CHAPTER2_R_OBST4,
+  CHAPTER2_R_OBST5,
   CHAPTER2_CORAL2,
   CHAPTER2_CORAL3,
   CHAPTER2_CORAL4,

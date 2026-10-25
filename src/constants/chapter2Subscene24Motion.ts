@@ -466,6 +466,104 @@ export function getChapter2RBlumeSubscene24Bloom(
   };
 }
 
+/** First blume bloom beat (shared timing for r_obst1). */
+export function getChapter2RBlumeSubscene24BeatStartSec() {
+  return (
+    getChapter2RVulkanSubscene24CompleteSec() + CHAPTER2_R_BLUME1_AFTER_VULKAN_DELAY_SEC
+  );
+}
+
+export const CHAPTER2_R_OBST1_DURING_BLUME_START_OFFSET_SEC = 0.1;
+export const CHAPTER2_R_OBST1_GROW_SPAN_SEC = 2.35;
+export const CHAPTER2_R_OBST2_DURING_BLUME_START_OFFSET_SEC = 0.38;
+export const CHAPTER2_R_OBST2_GROW_SPAN_SEC = 2.35;
+export const CHAPTER2_R_OBST3_DURING_BLUME_START_OFFSET_SEC = 0.66;
+export const CHAPTER2_R_OBST3_GROW_SPAN_SEC = 2.35;
+export const CHAPTER2_R_OBST4_DURING_BLUME_START_OFFSET_SEC =
+  CHAPTER2_R_OBST1_DURING_BLUME_START_OFFSET_SEC;
+export const CHAPTER2_R_OBST4_GROW_SPAN_SEC = CHAPTER2_R_OBST1_GROW_SPAN_SEC;
+export const CHAPTER2_R_OBST5_DURING_BLUME_START_OFFSET_SEC =
+  CHAPTER2_R_OBST1_DURING_BLUME_START_OFFSET_SEC;
+export const CHAPTER2_R_OBST5_GROW_SPAN_SEC = CHAPTER2_R_OBST1_GROW_SPAN_SEC;
+
+type RObstGrowSpec = {
+  startOffsetSec: number;
+  spanSec: number;
+};
+
+const CHAPTER2_R_OBST_SUBSCENE_24_GROW: Partial<Record<Chapter2PropId, RObstGrowSpec>> = {
+  r_obst1: {
+    startOffsetSec: CHAPTER2_R_OBST1_DURING_BLUME_START_OFFSET_SEC,
+    spanSec: CHAPTER2_R_OBST1_GROW_SPAN_SEC,
+  },
+  r_obst2: {
+    startOffsetSec: CHAPTER2_R_OBST2_DURING_BLUME_START_OFFSET_SEC,
+    spanSec: CHAPTER2_R_OBST2_GROW_SPAN_SEC,
+  },
+  r_obst3: {
+    startOffsetSec: CHAPTER2_R_OBST3_DURING_BLUME_START_OFFSET_SEC,
+    spanSec: CHAPTER2_R_OBST3_GROW_SPAN_SEC,
+  },
+  r_obst4: {
+    startOffsetSec: CHAPTER2_R_OBST4_DURING_BLUME_START_OFFSET_SEC,
+    spanSec: CHAPTER2_R_OBST4_GROW_SPAN_SEC,
+  },
+  r_obst5: {
+    startOffsetSec: CHAPTER2_R_OBST5_DURING_BLUME_START_OFFSET_SEC,
+    spanSec: CHAPTER2_R_OBST5_GROW_SPAN_SEC,
+  },
+};
+
+export type Chapter2RObstSubscene24Grow = {
+  opacity: number;
+  scaleMul: number;
+  scaleYMul: number;
+  dropYOffsetPx: number;
+};
+
+/** r_obst* — grass grows downward from above while blumes are blooming. */
+export function getChapter2RObstSubscene24GrowDuringBlume(
+  propId: Chapter2PropId,
+  phase: Chapter2SubscenePlaybackPhase,
+  elapsedSince24Sec: number,
+  viewportHeight: number,
+): Chapter2RObstSubscene24Grow | null {
+  const spec = CHAPTER2_R_OBST_SUBSCENE_24_GROW[propId];
+  if (!spec) return null;
+
+  const tuckAbovePx = viewportHeight * 0.14;
+  const hidden = {
+    opacity: 0,
+    scaleMul: 0.78,
+    scaleYMul: 0.025,
+    dropYOffsetPx: -tuckAbovePx,
+  };
+
+  if (phase !== "2-4-playing") {
+    return hidden;
+  }
+
+  const beatStartSec =
+    getChapter2RBlumeSubscene24BeatStartSec() + spec.startOffsetSec;
+  const growElapsed = elapsedSince24Sec - beatStartSec;
+  if (growElapsed <= 0) {
+    return hidden;
+  }
+
+  const t = easeOutCubic(clamp01(growElapsed / Math.max(0.2, spec.spanSec)));
+  if (t <= 0) {
+    return hidden;
+  }
+
+  const surge = 1 - (1 - t) ** 2.4;
+  return {
+    opacity: Math.min(1, t * 1.06),
+    scaleMul: 0.78 + 0.22 * surge,
+    scaleYMul: 0.025 + 0.975 * surge,
+    dropYOffsetPx: -(1 - surge) * tuckAbovePx,
+  };
+}
+
 /** Gap after volcano rise before celem1 enters. */
 export const CHAPTER2_R_CELEMEN1_AFTER_VULKAN_DELAY_SEC = 0.28;
 export const CHAPTER2_R_CELEMEN1_ENTER_SPAN_SEC = 1.5;
