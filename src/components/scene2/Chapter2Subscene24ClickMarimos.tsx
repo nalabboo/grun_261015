@@ -42,7 +42,7 @@ export default function Chapter2Subscene24ClickMarimos({
     lastBurstSeqRef.current = burstSeq;
     particlesRef.current = [
       ...particlesRef.current,
-      ...createChapter2ClickMarimoBurst(burstX, burstY, performance.now()),
+      ...createChapter2ClickMarimoBurst(burstX, burstY, burstSeq, performance.now()),
     ];
   }, [enabled, burstSeq, burstX, burstY]);
 
@@ -73,7 +73,10 @@ export default function Chapter2Subscene24ClickMarimos({
   const { now, particles: renderParticles } = renderTick;
 
   return (
-    <div className="chapter2-click-marimo-layer" aria-hidden>
+    <div
+      className="chapter2-click-marimo-layer"
+      aria-hidden
+    >
       {renderParticles.map((particle) => {
         const motion = getChapter2ClickMarimoBurstMotion(particle, now);
         if (motion.opacity <= 0.02) return null;

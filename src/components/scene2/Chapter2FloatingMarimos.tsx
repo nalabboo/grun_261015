@@ -266,7 +266,10 @@ export default function Chapter2FloatingMarimos({
   }, []);
 
   return (
-    <div className="chapter2-marimo-layer" aria-hidden>
+    <div
+      className="chapter2-marimo-layer"
+      aria-hidden
+    >
       {CHAPTER2_MARIMO_INSTANCES.map((marimo, index) => {
         const aspect = marimo.width / marimo.height;
         const blurPx = getChapter2BergViewportBlurPx(viewportHeight, marimo.blurRatio);

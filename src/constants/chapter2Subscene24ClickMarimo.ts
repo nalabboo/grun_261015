@@ -1,14 +1,39 @@
 import { chapter2AssetUrl } from "@/constants/chapter2Config";
+import { isChapter2Subscene24MotionComplete } from "@/constants/chapter2Subscene24Motion";
 import type { Chapter2SubscenePlaybackPhase } from "@/constants/chapter2SubscenePlayback";
+import type { Chapter2PropId } from "@/constants/chapter2ObjectsConfig";
 
 export const CHAPTER2_CLICK_MARIMO_BURST_MIN = 2;
 export const CHAPTER2_CLICK_MARIMO_BURST_MAX = 5;
-/** Total visible life (pop + spread + fade). */
+/** Total visible life (pop + spread + fade) at click #1. */
 export const CHAPTER2_CLICK_MARIMO_BURST_SPAN_SEC = 2.9;
 /** Base time to reach full scatter distance. */
 export const CHAPTER2_CLICK_MARIMO_SPREAD_SEC = 2.35;
 export const CHAPTER2_CLICK_MARIMO_HEIGHT_VH = 0.058;
 export const CHAPTER2_CLICK_MARIMO_Z_INDEX = 9;
+
+export const CHAPTER2_CLICK_MARIMO_GREEN_SPOTLIGHT_CLICKS = 15;
+/** Fade-in duration for the dim overlay (ms). */
+export const CHAPTER2_GREEN_SPOTLIGHT_FADE_MS = 2000;
+export const CHAPTER2_GREEN_SPOTLIGHT_DARK_ALPHA = 0.88;
+/** After dim fade finishes, wait then zoom 초록이 / koki (ms). */
+export const CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DELAY_MS = 2000;
+export const CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DURATION_MS = 2200;
+export const CHAPTER2_GREEN_SPOTLIGHT_ZOOM_SCALE = 1.4;
+
+export function getChapter2GreenSpotlightSceneScale(zoomProgress: number) {
+  const t = Math.min(1, Math.max(0, zoomProgress));
+  return 1 + (CHAPTER2_GREEN_SPOTLIGHT_ZOOM_SCALE - 1) * t;
+}
+
+/** Circular spotlight hole on 15th click. */
+export const CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID = "grun_v" as const satisfies Chapter2PropId;
+/** Zoom focus after dim hold (koki / 초록이). */
+export const CHAPTER2_GREEN_SPOTLIGHT_ZOOM_PROP_ID = "koki" as const satisfies Chapter2PropId;
+
+export const CHAPTER2_GREEN_SPOTLIGHT_PROP_IDS: ReadonlySet<Chapter2PropId> = new Set([
+  CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID,
+]);
 
 const MARIMO_FILES = [
   { file: "grun objekt/marimo1.png", width: 300, height: 299 },
@@ -22,11 +47,10 @@ export type Chapter2ClickMarimoBurstParticle = {
   height: number;
   originX: number;
   originY: number;
-  /** Scatter offset from origin (px). */
   targetDx: number;
   targetDy: number;
-  /** Per-particle spread duration multiplier. */
   spreadSecMul: number;
+  spanSec: number;
   rot: number;
   spinDegPerSec: number;
   scale: number;
@@ -40,11 +64,36 @@ function spreadEase(t: number) {
   return 1 - (1 - clamped) ** 2.35;
 }
 
+/** Shorter lifetime as click count rises (click #1 = full span). */
+export function getChapter2ClickMarimoSpanSec(clickIndex: number) {
+  const index = Math.min(24, Math.max(1, clickIndex));
+  const mul = Math.max(0.2, 1 - (index - 1) * 0.055);
+  return CHAPTER2_CLICK_MARIMO_BURST_SPAN_SEC * mul;
+}
+
+export function isChapter2ClickMarimoGreenSpotlightActive(clickCount: number) {
+  return clickCount >= CHAPTER2_CLICK_MARIMO_GREEN_SPOTLIGHT_CLICKS;
+}
+
+export function isChapter2ClickMarimoBurstEnabled(
+  playbackPhase: Chapter2SubscenePlaybackPhase,
+  subscene24ElapsedSec: number,
+) {
+  return (
+    playbackPhase === "2-4-playing" &&
+    isChapter2Subscene24MotionComplete(subscene24ElapsedSec)
+  );
+}
+
 export function createChapter2ClickMarimoBurst(
   sceneX: number,
   sceneY: number,
+  clickIndex: number,
   nowMs = performance.now(),
 ): Chapter2ClickMarimoBurstParticle[] {
+  const spanSec = getChapter2ClickMarimoSpanSec(clickIndex);
+  const spreadSecBase = CHAPTER2_CLICK_MARIMO_SPREAD_SEC * (spanSec / CHAPTER2_CLICK_MARIMO_BURST_SPAN_SEC);
+
   const count =
     CHAPTER2_CLICK_MARIMO_BURST_MIN +
     Math.floor(
@@ -73,7 +122,8 @@ export function createChapter2ClickMarimoBurst(
       originY,
       targetDx,
       targetDy,
-      spreadSecMul: 0.78 + Math.random() * 0.55,
+      spreadSecMul: (0.78 + Math.random() * 0.55) * (spreadSecBase / CHAPTER2_CLICK_MARIMO_SPREAD_SEC),
+      spanSec,
       rot: (Math.random() - 0.5) * 36,
       spinDegPerSec: (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 32),
       scale: 0.72 + Math.random() * 0.48,
@@ -98,7 +148,7 @@ export function getChapter2ClickMarimoBurstMotion(
     };
   }
 
-  const spanMs = CHAPTER2_CLICK_MARIMO_BURST_SPAN_SEC * 1000;
+  const spanMs = particle.spanSec * 1000;
   if (elapsedMs >= spanMs) {
     return {
       x: particle.originX + particle.targetDx,
@@ -117,11 +167,11 @@ export function getChapter2ClickMarimoBurstMotion(
   const rot = particle.rot + particle.spinDegPerSec * elapsedSec;
 
   const t = elapsedMs / spanMs;
-  const popT = Math.min(1, elapsedMs / 420);
+  const popT = Math.min(1, elapsedMs / Math.min(420, spanMs * 0.35));
   const pop = 1 - (1 - popT) ** 3;
-  const fadeStart = 0.55;
+  const fadeStart = 0.48;
   const fade =
-    t <= fadeStart ? 1 : 1 - (t - fadeStart) / Math.max(0.08, 1 - fadeStart);
+    t <= fadeStart ? 1 : 1 - (t - fadeStart) / Math.max(0.06, 1 - fadeStart);
   const opacity = pop * Math.max(0, fade);
   const scale =
     particle.scale * (0.12 + 0.88 * pop) * (1 + Math.min(1, spreadT) * 0.07);
@@ -133,12 +183,5 @@ export function isChapter2ClickMarimoBurstAlive(
   particle: Chapter2ClickMarimoBurstParticle,
   nowMs: number,
 ) {
-  return nowMs - particle.bornMs < CHAPTER2_CLICK_MARIMO_BURST_SPAN_SEC * 1000;
-}
-
-/** Scene 2-3 hold and full 2-4 play (incl. after 2-4 motion ends). */
-export function isChapter2ClickMarimoBurstEnabled(
-  playbackPhase: Chapter2SubscenePlaybackPhase,
-) {
-  return playbackPhase === "2-3-complete" || playbackPhase === "2-4-playing";
+  return nowMs - particle.bornMs < particle.spanSec * 1000;
 }

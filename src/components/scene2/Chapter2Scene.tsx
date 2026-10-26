@@ -68,7 +68,17 @@ import {
   isChapter2Subscene24ScrollAccumReady,
 } from "@/constants/chapter2Subscene24Motion";
 import Chapter2Subscene24ClickMarimos from "@/components/scene2/Chapter2Subscene24ClickMarimos";
-import { isChapter2ClickMarimoBurstEnabled } from "@/constants/chapter2Subscene24ClickMarimo";
+import Chapter2Subscene24GreenSpotlightOverlay from "@/components/scene2/Chapter2Subscene24GreenSpotlightOverlay";
+import {
+  CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID,
+  CHAPTER2_GREEN_SPOTLIGHT_ZOOM_PROP_ID,
+  CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DELAY_MS,
+  CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DURATION_MS,
+  CHAPTER2_GREEN_SPOTLIGHT_FADE_MS,
+  getChapter2GreenSpotlightSceneScale,
+  isChapter2ClickMarimoBurstEnabled,
+  isChapter2ClickMarimoGreenSpotlightActive,
+} from "@/constants/chapter2Subscene24ClickMarimo";
 import Chapter2BergLayer from "@/components/scene2/Chapter2BergLayer";
 import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2FloatingBubbles from "@/components/scene2/Chapter2FloatingBubbles";
@@ -194,6 +204,10 @@ export default function Chapter2Scene({
     x: 0,
     y: 0,
   });
+  const sceneRootRef = useRef<HTMLDivElement>(null);
+  const [greenSpotlightZoom, setGreenSpotlightZoom] = useState(0);
+  const greenSpotlightZoomOriginRef = useRef({ x: 0, y: 0 });
+  const greenSpotlightTimelineStartRef = useRef(0);
 
   useEffect(() => {
     setTunableEdits(loadChapter2TunableEdits());
@@ -451,7 +465,15 @@ export default function Chapter2Scene({
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
       if (editor.enabled) return;
-      if (!isChapter2ClickMarimoBurstEnabled(playbackPhaseRef.current)) return;
+      const elapsed24Sec =
+        subscene24StartMsRef.current > 0
+          ? (performance.now() - subscene24StartMsRef.current) / 1000
+          : 0;
+      if (
+        !isChapter2ClickMarimoBurstEnabled(playbackPhaseRef.current, elapsed24Sec)
+      ) {
+        return;
+      }
       const rect = event.currentTarget.getBoundingClientRect();
       setClickMarimoBurst((prev) => ({
         seq: prev.seq + 1,
@@ -461,6 +483,51 @@ export default function Chapter2Scene({
     },
     [editor.enabled],
   );
+
+  useEffect(() => {
+    const active = isChapter2ClickMarimoGreenSpotlightActive(clickMarimoBurst.seq);
+    if (!active) {
+      greenSpotlightTimelineStartRef.current = 0;
+      setGreenSpotlightZoom(0);
+      return;
+    }
+
+    if (greenSpotlightTimelineStartRef.current === 0) {
+      greenSpotlightTimelineStartRef.current = performance.now();
+    }
+
+    let raf = 0;
+    const zoomDelay =
+      CHAPTER2_GREEN_SPOTLIGHT_FADE_MS + CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DELAY_MS;
+
+    const tick = (now: number) => {
+      const root = sceneRootRef.current;
+      const hero = root?.querySelector(".chapter2-green-spotlight-zoom-target");
+      if (hero && root) {
+        const elRect = hero.getBoundingClientRect();
+        const rootRect = root.getBoundingClientRect();
+        greenSpotlightZoomOriginRef.current = {
+          x: elRect.left + elRect.width / 2 - rootRect.left,
+          y: elRect.top + elRect.height / 2 - rootRect.top,
+        };
+      }
+
+      const elapsed = now - greenSpotlightTimelineStartRef.current;
+      if (elapsed < zoomDelay) {
+        setGreenSpotlightZoom(0);
+      } else {
+        const t = Math.min(
+          1,
+          (elapsed - zoomDelay) / CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DURATION_MS,
+        );
+        setGreenSpotlightZoom(1 - (1 - t) ** 2.1);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [clickMarimoBurst.seq]);
 
   const smooth = smoothRef.current;
   const mouseX = smooth.x * CHAPTER2_MOUSE_PARALLAX_GAIN;
@@ -488,7 +555,17 @@ export default function Chapter2Scene({
     playbackPhase === "2-4-playing" && subscene24StartMsRef.current > 0
       ? (performance.now() - subscene24StartMsRef.current) / 1000
       : 0;
-  const clickMarimoBurstEnabled = isChapter2ClickMarimoBurstEnabled(playbackPhase);
+  const clickMarimoBurstEnabled = isChapter2ClickMarimoBurstEnabled(
+    playbackPhase,
+    subscene24ElapsedSec,
+  );
+  const clickMarimoGreenSpotlight = isChapter2ClickMarimoGreenSpotlightActive(
+    clickMarimoBurst.seq,
+  );
+  const greenSpotlightSceneScale = getChapter2GreenSpotlightSceneScale(greenSpotlightZoom);
+  const greenSpotlightZoomOrigin = greenSpotlightZoomOriginRef.current;
+  const greenSpotlightPanX = (1 - greenSpotlightSceneScale) * greenSpotlightZoomOrigin.x;
+  const greenSpotlightPanY = (1 - greenSpotlightSceneScale) * greenSpotlightZoomOrigin.y;
   const earthquakeShake = getChapter2Subscene24EarthquakeShake(
     playbackPhase,
     subscene24ElapsedSec,
@@ -838,16 +915,25 @@ export default function Chapter2Scene({
           if (!tunable) return;
           handlePropDragStart(prop.id as Chapter2TunablePropId, x, y);
         }}
+        greenSpotlightHoleTarget={
+          clickMarimoGreenSpotlight &&
+          prop.id === CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID
+        }
+        greenSpotlightZoomTarget={
+          clickMarimoGreenSpotlight &&
+          prop.id === CHAPTER2_GREEN_SPOTLIGHT_ZOOM_PROP_ID
+        }
       />
     );
   };
 
   return (
     <div
+      ref={sceneRootRef}
       className={`chapter2-scene chapter2-scene--visible${editor.enabled ? " chapter2-scene--editing" : ""}`}
       style={{
         ["--berg-scale" as string]: String(CHAPTER2_BERG_DISPLAY_SCALE),
-        transform: `translate3d(${earthquakeShake.x}px, ${earthquakeShake.y}px, 0)`,
+        transform: `translate3d(${earthquakeShake.x + greenSpotlightPanX}px, ${earthquakeShake.y + greenSpotlightPanY}px, 0) scale(${greenSpotlightSceneScale})`,
       }}
       onPointerDownCapture={handleScenePointerDownCapture}
     >
@@ -1005,6 +1091,11 @@ export default function Chapter2Scene({
         burstSeq={clickMarimoBurst.seq}
         burstX={clickMarimoBurst.x}
         burstY={clickMarimoBurst.y}
+      />
+
+      <Chapter2Subscene24GreenSpotlightOverlay
+        active={clickMarimoGreenSpotlight}
+        rootRef={sceneRootRef}
       />
 
     </div>
