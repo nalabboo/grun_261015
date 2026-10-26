@@ -16,24 +16,33 @@ export const CHAPTER2_CLICK_MARIMO_GREEN_SPOTLIGHT_CLICKS = 15;
 /** Fade-in duration for the dim overlay (ms). */
 export const CHAPTER2_GREEN_SPOTLIGHT_FADE_MS = 2000;
 export const CHAPTER2_GREEN_SPOTLIGHT_DARK_ALPHA = 0.88;
-/** After dim fade finishes, wait then zoom 초록이 / koki (ms). */
+/** After dim fade finishes, wait then zoom toward grun_v (초록이) (ms). */
 export const CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DELAY_MS = 2000;
 export const CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DURATION_MS = 2200;
 export const CHAPTER2_GREEN_SPOTLIGHT_ZOOM_SCALE = 1.4;
+/** After zoom finishes, wait before showing the chapter 3 page-turn control (ms). */
+export const CHAPTER2_GREEN_SPOTLIGHT_CHAPTER3_BUTTON_DELAY_MS = 3000;
 
 export function getChapter2GreenSpotlightSceneScale(zoomProgress: number) {
   const t = Math.min(1, Math.max(0, zoomProgress));
   return 1 + (CHAPTER2_GREEN_SPOTLIGHT_ZOOM_SCALE - 1) * t;
 }
 
-/** Circular spotlight hole on 15th click. */
-export const CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID = "grun_v" as const satisfies Chapter2PropId;
-/** Zoom focus after dim hold (koki / 초록이). */
-export const CHAPTER2_GREEN_SPOTLIGHT_ZOOM_PROP_ID = "koki" as const satisfies Chapter2PropId;
+/** 초록이 — circular hole + zoom target on 15th click. */
+export const CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID = "grun_v" as const satisfies Chapter2PropId;
 
-export const CHAPTER2_GREEN_SPOTLIGHT_PROP_IDS: ReadonlySet<Chapter2PropId> = new Set([
-  CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID,
-]);
+/** @deprecated Use CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID */
+export const CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID = CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID;
+
+export type Chapter2GreenSpotlightLockedCircle = {
+  cx: number;
+  cy: number;
+  r: number;
+};
+
+export function measureChapter2GreenSpotlightHoleRadius(width: number, height: number) {
+  return Math.min(155, Math.max(68, Math.hypot(width, height) * 0.48));
+}
 
 const MARIMO_FILES = [
   { file: "grun objekt/marimo1.png", width: 300, height: 299 },

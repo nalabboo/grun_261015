@@ -1,56 +1,24 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   CHAPTER2_GREEN_SPOTLIGHT_DARK_ALPHA,
   CHAPTER2_GREEN_SPOTLIGHT_FADE_MS,
+  type Chapter2GreenSpotlightLockedCircle,
 } from "@/constants/chapter2Subscene24ClickMarimo";
-
-type CircleHole = {
-  cx: number;
-  cy: number;
-  r: number;
-};
 
 type Props = {
   active: boolean;
-  rootRef: RefObject<HTMLDivElement | null>;
+  /** Fixed in scene shell coords when spotlight engages (does not follow zoom). */
+  lockedCircle: Chapter2GreenSpotlightLockedCircle | null;
 };
-
-function collectGreenSpotlightCircles(root: HTMLDivElement): CircleHole[] {
-  const rootRect = root.getBoundingClientRect();
-  const nodes = root.querySelectorAll(".chapter2-green-spotlight-target");
-  const circles: CircleHole[] = [];
-
-  nodes.forEach((node) => {
-    if (!(node instanceof HTMLElement)) return;
-    const style = window.getComputedStyle(node);
-    if (style.display === "none" || style.visibility === "hidden") return;
-    const opacity = Number.parseFloat(style.opacity);
-    if (Number.isFinite(opacity) && opacity <= 0.04) return;
-
-    const rect = node.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) return;
-
-    const cx = rect.left + rect.width / 2 - rootRect.left;
-    const cy = rect.top + rect.height / 2 - rootRect.top;
-    const isHero = node.classList.contains("chapter2-green-spotlight-target-hero");
-    const r = isHero
-      ? Math.min(155, Math.max(68, Math.hypot(rect.width, rect.height) * 0.48))
-      : Math.min(96, Math.max(20, Math.min(rect.width, rect.height) * 0.56));
-    circles.push({ cx, cy, r });
-  });
-
-  return circles;
-}
 
 export default function Chapter2Subscene24GreenSpotlightOverlay({
   active,
-  rootRef,
+  lockedCircle,
 }: Props) {
   const maskId = useId().replace(/:/g, "");
   const [overlayOpacity, setOverlayOpacity] = useState(0);
-  const [circles, setCircles] = useState<CircleHole[]>([]);
   const fadeStartRef = useRef(0);
 
   useEffect(() => {
@@ -67,24 +35,18 @@ export default function Chapter2Subscene24GreenSpotlightOverlay({
       const fadeT = Math.min(1, (now - fadeStartRef.current) / CHAPTER2_GREEN_SPOTLIGHT_FADE_MS);
       const eased = 1 - (1 - fadeT) ** 2.2;
       setOverlayOpacity(eased);
-
-      const root = rootRef.current;
-      if (root) {
-        setCircles(collectGreenSpotlightCircles(root));
-      }
-
-      if (active) {
-        raf = requestAnimationFrame(tick);
-      }
+      raf = requestAnimationFrame(tick);
     };
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [active, rootRef]);
+  }, [active]);
 
   if (!active && overlayOpacity <= 0.001) return null;
+  if (!lockedCircle) return null;
 
   const blurFilterId = `${maskId}-hole-blur`;
+  const circle = lockedCircle;
 
   return (
     <div
@@ -107,15 +69,7 @@ export default function Chapter2Subscene24GreenSpotlightOverlay({
           <mask id={`${maskId}-mask`}>
             <rect width="100%" height="100%" fill="white" />
             <g filter={`url(#${blurFilterId})`}>
-              {circles.map((circle, index) => (
-                <circle
-                  key={`hole-${index}`}
-                  cx={circle.cx}
-                  cy={circle.cy}
-                  r={circle.r}
-                  fill="black"
-                />
-              ))}
+              <circle cx={circle.cx} cy={circle.cy} r={circle.r} fill="black" />
             </g>
           </mask>
         </defs>

@@ -9,6 +9,8 @@ import MossHitTargets from "@/components/MossHitTargets";
 import SceneCanvasLoader from "@/components/canvas/SceneCanvasLoader";
 import Chapter2Intro from "@/components/scene2/Chapter2Intro";
 import Chapter2Scene from "@/components/scene2/Chapter2Scene";
+import Chapter3Intro from "@/components/scene3/Chapter3Intro";
+import Chapter3Scene from "@/components/scene3/Chapter3Scene";
 import { Chapter2LayoutRulerPortal } from "@/components/scene2/Chapter2LayoutRuler";
 import { preloadChapter2BergAssets } from "@/constants/chapter2Config";
 import NextScene from "@/components/scene2/NextScene";
@@ -54,9 +56,10 @@ type GrunSettleKind = "click" | "postReveal" | "postKind";
 
 type CameraMode = "grun" | "landmarkPaused";
 
-type Chapter = 1 | 2;
+type Chapter = 1 | 2 | 3;
 type Chapter1Phase = "scroll" | "tableau";
 type Chapter2Step = "intro" | "play";
+type Chapter3Step = "intro" | "play";
 
 /** Local dev: open chapter 2 play on load (set NEXT_PUBLIC_DEV_CHAPTER2=0 for chapter 1). */
 const DEV_START_CHAPTER2 =
@@ -119,6 +122,7 @@ export default function SceneStage() {
     DEV_START_CHAPTER2 ? "play" : null,
   );
   const [chapter2PlayReady, setChapter2PlayReady] = useState(false);
+  const [chapter3Step, setChapter3Step] = useState<Chapter3Step | null>(null);
   const chapterRef = useRef<Chapter>(DEV_START_CHAPTER2 ? 2 : 1);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
 
@@ -147,6 +151,17 @@ export default function SceneStage() {
 
   const handleChapter2IntroComplete = useCallback(() => {
     setChapter2Step("play");
+  }, []);
+
+  const handleChapter3PageTurn = useCallback(() => {
+    chapterRef.current = 3;
+    setChapter(3);
+    setChapter2Step(null);
+    setChapter3Step("intro");
+  }, []);
+
+  const handleChapter3IntroComplete = useCallback(() => {
+    setChapter3Step("play");
   }, []);
 
   const handleTableauRevealComplete = useCallback(() => {
@@ -653,6 +668,7 @@ export default function SceneStage() {
           onSubscene23ScrollStart={() => {
             /* scene 2-3 motion — wire timeline next */
           }}
+          onChapter3PageTurn={handleChapter3PageTurn}
         />
         <Chapter2LayoutRulerPortal />
       </>
@@ -660,6 +676,10 @@ export default function SceneStage() {
     {chapter === 2 && chapter2Step === "intro" && (
       <Chapter2Intro onComplete={handleChapter2IntroComplete} />
     )}
+    {chapter === 3 && chapter3Step === "intro" && (
+      <Chapter3Intro onComplete={handleChapter3IntroComplete} />
+    )}
+    {chapter === 3 && chapter3Step === "play" && <Chapter3Scene />}
     </>
   );
 }

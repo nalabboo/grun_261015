@@ -10,10 +10,7 @@ import {
   type Chapter2PropEdit,
 } from "@/constants/chapter2ObjectsConfig";
 import type { EditorMode } from "@/components/canvas/worldView";
-import {
-  CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID,
-  CHAPTER2_GREEN_SPOTLIGHT_ZOOM_PROP_ID,
-} from "@/constants/chapter2Subscene24ClickMarimo";
+import { CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID } from "@/constants/chapter2Subscene24ClickMarimo";
 type Props = {
   prop: Chapter2PropConfig;
   viewportHeight: number;
@@ -37,10 +34,8 @@ type Props = {
   editMode?: EditorMode;
   onSelect?: () => void;
   onDragStart?: (clientX: number, clientY: number) => void;
-  /** Dim overlay circular hole (grun_v). */
-  greenSpotlightHoleTarget?: boolean;
-  /** Scene zoom origin (koki). */
-  greenSpotlightZoomTarget?: boolean;
+  /** Dim overlay hole on grun_v (초록이). */
+  greenSpotlightCharacterTarget?: boolean;
 };
 
 export default function Chapter2PropLayer({
@@ -60,20 +55,16 @@ export default function Chapter2PropLayer({
   editMode = "translate",
   onSelect,
   onDragStart,
-  greenSpotlightHoleTarget = false,
-  greenSpotlightZoomTarget = false,
+  greenSpotlightCharacterTarget = false,
 }: Props) {
   const src = chapter2PropAssetUrl(prop.file);
   const aspect = prop.width / prop.height;
 
   const className = [
     "chapter2-prop",
-    greenSpotlightHoleTarget ? "chapter2-green-spotlight-target" : "",
-    greenSpotlightHoleTarget && prop.id === CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID
+    greenSpotlightCharacterTarget ? "chapter2-green-spotlight-target" : "",
+    greenSpotlightCharacterTarget && prop.id === CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID
       ? "chapter2-green-spotlight-target-hero"
-      : "",
-    greenSpotlightZoomTarget && prop.id === CHAPTER2_GREEN_SPOTLIGHT_ZOOM_PROP_ID
-      ? "chapter2-green-spotlight-zoom-target"
       : "",
     editorActive ? "chapter2-prop--editable" : "",
     isSelected && editorActive ? "chapter2-prop--selected" : "",

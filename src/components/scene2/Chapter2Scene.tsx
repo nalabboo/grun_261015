@@ -69,11 +69,14 @@ import {
 } from "@/constants/chapter2Subscene24Motion";
 import Chapter2Subscene24ClickMarimos from "@/components/scene2/Chapter2Subscene24ClickMarimos";
 import Chapter2Subscene24GreenSpotlightOverlay from "@/components/scene2/Chapter2Subscene24GreenSpotlightOverlay";
+import PageTurnButton from "@/components/scene2/PageTurnButton";
 import {
-  CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID,
-  CHAPTER2_GREEN_SPOTLIGHT_ZOOM_PROP_ID,
+  CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID,
+  measureChapter2GreenSpotlightHoleRadius,
+  type Chapter2GreenSpotlightLockedCircle,
   CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DELAY_MS,
   CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DURATION_MS,
+  CHAPTER2_GREEN_SPOTLIGHT_CHAPTER3_BUTTON_DELAY_MS,
   CHAPTER2_GREEN_SPOTLIGHT_FADE_MS,
   getChapter2GreenSpotlightSceneScale,
   isChapter2ClickMarimoBurstEnabled,
@@ -145,6 +148,8 @@ type Chapter2SceneProps = {
   onSubscene23ScrollStart?: () => void;
   /** First scroll after 2-3 hold — begin scene 2-4. */
   onSubscene24ScrollStart?: () => void;
+  /** User turned the page toward chapter 3 after the green spotlight zoom. */
+  onChapter3PageTurn?: () => void;
 };
 
 /** Chapter 2 — stacked berg layers with mouse parallax. */
@@ -152,6 +157,7 @@ export default function Chapter2Scene({
   onSequenceComplete,
   onSubscene23ScrollStart,
   onSubscene24ScrollStart,
+  onChapter3PageTurn,
 }: Chapter2SceneProps) {
   const targetRef = useRef<Point>({ x: 0, y: 0 });
   const smoothRef = useRef<Point>({ x: 0, y: 0 });
@@ -204,10 +210,15 @@ export default function Chapter2Scene({
     x: 0,
     y: 0,
   });
-  const sceneRootRef = useRef<HTMLDivElement>(null);
+  const sceneShellRef = useRef<HTMLDivElement>(null);
+  const sceneContentRef = useRef<HTMLDivElement>(null);
   const [greenSpotlightZoom, setGreenSpotlightZoom] = useState(0);
+  const [lockedSpotlightHole, setLockedSpotlightHole] =
+    useState<Chapter2GreenSpotlightLockedCircle | null>(null);
   const greenSpotlightZoomOriginRef = useRef({ x: 0, y: 0 });
   const greenSpotlightTimelineStartRef = useRef(0);
+  const greenSpotlightGeometryLockedRef = useRef(false);
+  const [chapter3PageTurnVisible, setChapter3PageTurnVisible] = useState(false);
 
   useEffect(() => {
     setTunableEdits(loadChapter2TunableEdits());
@@ -469,28 +480,83 @@ export default function Chapter2Scene({
         subscene24StartMsRef.current > 0
           ? (performance.now() - subscene24StartMsRef.current) / 1000
           : 0;
+      if (isChapter2ClickMarimoGreenSpotlightActive(clickMarimoBurst.seq)) {
+        return;
+      }
       if (
         !isChapter2ClickMarimoBurstEnabled(playbackPhaseRef.current, elapsed24Sec)
       ) {
         return;
       }
-      const rect = event.currentTarget.getBoundingClientRect();
+      const content = sceneContentRef.current;
+      const rect = content?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect();
       setClickMarimoBurst((prev) => ({
         seq: prev.seq + 1,
         x: event.clientX - rect.left,
         y: event.clientY - rect.top,
       }));
     },
-    [editor.enabled],
+    [editor.enabled, clickMarimoBurst.seq],
   );
+
+  useEffect(() => {
+    if (!isChapter2ClickMarimoGreenSpotlightActive(clickMarimoBurst.seq)) {
+      setChapter3PageTurnVisible(false);
+      return;
+    }
+    if (greenSpotlightZoom < 0.999) {
+      setChapter3PageTurnVisible(false);
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setChapter3PageTurnVisible(true),
+      CHAPTER2_GREEN_SPOTLIGHT_CHAPTER3_BUTTON_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [clickMarimoBurst.seq, greenSpotlightZoom]);
 
   useEffect(() => {
     const active = isChapter2ClickMarimoGreenSpotlightActive(clickMarimoBurst.seq);
     if (!active) {
+      greenSpotlightGeometryLockedRef.current = false;
       greenSpotlightTimelineStartRef.current = 0;
+      setLockedSpotlightHole(null);
       setGreenSpotlightZoom(0);
       return;
     }
+
+    if (!greenSpotlightGeometryLockedRef.current) {
+      let captureRaf = 0;
+      captureRaf = requestAnimationFrame(() => {
+        const shell = sceneShellRef.current;
+        const content = sceneContentRef.current;
+        const hero = content?.querySelector(".chapter2-green-spotlight-target-hero");
+        if (!(hero instanceof HTMLElement) || !shell || !content) return;
+
+        const elRect = hero.getBoundingClientRect();
+        const shellRect = shell.getBoundingClientRect();
+        const contentRect = content.getBoundingClientRect();
+        const cx = elRect.left + elRect.width / 2 - shellRect.left;
+        const cy = elRect.top + elRect.height / 2 - shellRect.top;
+
+        setLockedSpotlightHole({
+          cx,
+          cy,
+          r: measureChapter2GreenSpotlightHoleRadius(elRect.width, elRect.height),
+        });
+        greenSpotlightZoomOriginRef.current = {
+          x: elRect.left + elRect.width / 2 - contentRect.left,
+          y: elRect.top + elRect.height / 2 - contentRect.top,
+        };
+        greenSpotlightGeometryLockedRef.current = true;
+      });
+      return () => cancelAnimationFrame(captureRaf);
+    }
+  }, [clickMarimoBurst.seq]);
+
+  useEffect(() => {
+    const active = isChapter2ClickMarimoGreenSpotlightActive(clickMarimoBurst.seq);
+    if (!active) return;
 
     if (greenSpotlightTimelineStartRef.current === 0) {
       greenSpotlightTimelineStartRef.current = performance.now();
@@ -501,17 +567,6 @@ export default function Chapter2Scene({
       CHAPTER2_GREEN_SPOTLIGHT_FADE_MS + CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DELAY_MS;
 
     const tick = (now: number) => {
-      const root = sceneRootRef.current;
-      const hero = root?.querySelector(".chapter2-green-spotlight-zoom-target");
-      if (hero && root) {
-        const elRect = hero.getBoundingClientRect();
-        const rootRect = root.getBoundingClientRect();
-        greenSpotlightZoomOriginRef.current = {
-          x: elRect.left + elRect.width / 2 - rootRect.left,
-          y: elRect.top + elRect.height / 2 - rootRect.top,
-        };
-      }
-
       const elapsed = now - greenSpotlightTimelineStartRef.current;
       if (elapsed < zoomDelay) {
         setGreenSpotlightZoom(0);
@@ -915,13 +970,9 @@ export default function Chapter2Scene({
           if (!tunable) return;
           handlePropDragStart(prop.id as Chapter2TunablePropId, x, y);
         }}
-        greenSpotlightHoleTarget={
+        greenSpotlightCharacterTarget={
           clickMarimoGreenSpotlight &&
-          prop.id === CHAPTER2_GREEN_SPOTLIGHT_HOLE_PROP_ID
-        }
-        greenSpotlightZoomTarget={
-          clickMarimoGreenSpotlight &&
-          prop.id === CHAPTER2_GREEN_SPOTLIGHT_ZOOM_PROP_ID
+          prop.id === CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID
         }
       />
     );
@@ -929,14 +980,18 @@ export default function Chapter2Scene({
 
   return (
     <div
-      ref={sceneRootRef}
+      ref={sceneShellRef}
       className={`chapter2-scene chapter2-scene--visible${editor.enabled ? " chapter2-scene--editing" : ""}`}
-      style={{
-        ["--berg-scale" as string]: String(CHAPTER2_BERG_DISPLAY_SCALE),
-        transform: `translate3d(${earthquakeShake.x + greenSpotlightPanX}px, ${earthquakeShake.y + greenSpotlightPanY}px, 0) scale(${greenSpotlightSceneScale})`,
-      }}
       onPointerDownCapture={handleScenePointerDownCapture}
     >
+      <div
+        ref={sceneContentRef}
+        className="chapter2-scene-content"
+        style={{
+          ["--berg-scale" as string]: String(CHAPTER2_BERG_DISPLAY_SCALE),
+          transform: `translate3d(${earthquakeShake.x + greenSpotlightPanX}px, ${earthquakeShake.y + greenSpotlightPanY}px, 0) scale(${greenSpotlightSceneScale})`,
+        }}
+      >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={CHAPTER2_PAPIER_BG_URL}
@@ -1093,10 +1148,16 @@ export default function Chapter2Scene({
         burstY={clickMarimoBurst.y}
       />
 
+      </div>
+
       <Chapter2Subscene24GreenSpotlightOverlay
         active={clickMarimoGreenSpotlight}
-        rootRef={sceneRootRef}
+        lockedCircle={lockedSpotlightHole}
       />
+
+      {chapter3PageTurnVisible && onChapter3PageTurn && (
+        <PageTurnButton label="3장" onTurn={onChapter3PageTurn} />
+      )}
 
     </div>
   );

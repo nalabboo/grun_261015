@@ -315,6 +315,31 @@ body {
     filter 1.4s ease-in-out;
 }
 
+.chapter3-intro__title {
+  color: rgba(28, 52, 38, 0);
+  letter-spacing: 0.08em;
+}
+
+.chapter3-intro__title.chapter2-intro__title--visible {
+  color: rgba(42, 44, 52, 0.9);
+}
+
+.chapter3-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  background: #0a0b0e;
+  animation: chapter2-scene-in 0.45s ease-out forwards;
+}
+
+.chapter3-scene__veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 38%, rgba(120, 128, 148, 0.12), transparent 58%);
+  pointer-events: none;
+}
+
 .chapter2-scene {
   position: fixed;
   inset: 0;
@@ -326,6 +351,12 @@ body {
 
 .chapter2-scene--editing {
   cursor: default;
+}
+
+.chapter2-scene-content {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
 }
 
 .chapter2-green-spotlight-overlay {
