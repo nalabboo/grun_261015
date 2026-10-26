@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type { EditorMode } from "@/components/canvas/worldView";
 import { SCENE_PERSPECTIVE_RATIO, SCENE_REFERENCE_HEIGHT } from "@/constants/sceneConfig";
 import {
@@ -66,6 +67,8 @@ import {
   getChapter2Subscene24EarthquakeShake,
   isChapter2Subscene24ScrollAccumReady,
 } from "@/constants/chapter2Subscene24Motion";
+import Chapter2Subscene24ClickMarimos from "@/components/scene2/Chapter2Subscene24ClickMarimos";
+import { isChapter2ClickMarimoBurstEnabled } from "@/constants/chapter2Subscene24ClickMarimo";
 import Chapter2BergLayer from "@/components/scene2/Chapter2BergLayer";
 import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2FloatingBubbles from "@/components/scene2/Chapter2FloatingBubbles";
@@ -186,6 +189,11 @@ export default function Chapter2Scene({
   const [tunableEdits, setTunableEdits] = useState(defaultChapter2TunableEdits);
   const [viewportHeight, setViewportHeight] = useState(SCENE_REFERENCE_HEIGHT);
   const [devEditsReady, setDevEditsReady] = useState(false);
+  const [clickMarimoBurst, setClickMarimoBurst] = useState({
+    seq: 0,
+    x: 0,
+    y: 0,
+  });
 
   useEffect(() => {
     setTunableEdits(loadChapter2TunableEdits());
@@ -439,6 +447,21 @@ export default function Chapter2Scene({
     [editor.enabled, editor.mode, propEdits],
   );
 
+  const handleScenePointerDownCapture = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      if (editor.enabled) return;
+      if (!isChapter2ClickMarimoBurstEnabled(playbackPhaseRef.current)) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      setClickMarimoBurst((prev) => ({
+        seq: prev.seq + 1,
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      }));
+    },
+    [editor.enabled],
+  );
+
   const smooth = smoothRef.current;
   const mouseX = smooth.x * CHAPTER2_MOUSE_PARALLAX_GAIN;
   const mouseY = smooth.y * CHAPTER2_MOUSE_PARALLAX_GAIN;
@@ -465,6 +488,7 @@ export default function Chapter2Scene({
     playbackPhase === "2-4-playing" && subscene24StartMsRef.current > 0
       ? (performance.now() - subscene24StartMsRef.current) / 1000
       : 0;
+  const clickMarimoBurstEnabled = isChapter2ClickMarimoBurstEnabled(playbackPhase);
   const earthquakeShake = getChapter2Subscene24EarthquakeShake(
     playbackPhase,
     subscene24ElapsedSec,
@@ -825,6 +849,7 @@ export default function Chapter2Scene({
         ["--berg-scale" as string]: String(CHAPTER2_BERG_DISPLAY_SCALE),
         transform: `translate3d(${earthquakeShake.x}px, ${earthquakeShake.y}px, 0)`,
       }}
+      onPointerDownCapture={handleScenePointerDownCapture}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -973,6 +998,13 @@ export default function Chapter2Scene({
           subscene23MotionPhase,
           subscene23ElapsedSec,
         )}
+      />
+
+      <Chapter2Subscene24ClickMarimos
+        enabled={clickMarimoBurstEnabled}
+        burstSeq={clickMarimoBurst.seq}
+        burstX={clickMarimoBurst.x}
+        burstY={clickMarimoBurst.y}
       />
 
     </div>

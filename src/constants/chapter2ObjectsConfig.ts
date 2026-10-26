@@ -125,6 +125,7 @@ export const CHAPTER2_PROP_IDS = [
   "r_obst3",
   "r_obst4",
   "r_obst5",
+  "r_obst6",
 ] as const;
 export type Chapter2PropId = (typeof CHAPTER2_PROP_IDS)[number];
 
@@ -190,8 +191,10 @@ export const CHAPTER2_PROP_FIXED_LAYOUTS: Record<
   r_obst1: { x: -850, y: -1100, scale: 1.30, scaleY: 1.30, rotate: 0 },
   r_obst2: { x: -410, y: -1150, scale: 1.60, scaleY: 1.60, rotate: -15 },
   r_obst3: { x: -450, y: -1100, scale: 1.45, scaleY: 1.45, rotate: 4 },
-  r_obst4: { x: 300, y: -1200, scale: 1.00, scaleY: 1.00, rotate: -8 },
-  r_obst5: { x: -200, y: -800, scale: 1.40, scaleY: 1.40, rotate: 6 },
+  r_obst4: { x: 300, y: -1000, scale: 1.00, scaleY: 1.00, rotate: -8 },
+  r_obst5: { x: 350, y: -1120, scale: 1.80, scaleY: 1.80, rotate: 6 },
+  /** Right of r_obst5. */
+  r_obst6: { x: 380, y: -1120, scale: 1.75, scaleY: 1.75, rotate: -4 },
 };
 
 /** Production spore1 / spore4 — same as fixed layouts in this file. */
@@ -292,6 +295,27 @@ const R_OBST3_DEPTH_PX = 60;
 /** Behind r_vulkan (42). */
 const R_OBST4_DEPTH_PX = 36;
 const R_OBST5_DEPTH_PX = 54;
+const R_OBST6_DEPTH_PX = 58;
+
+/** Per-grass DOF jitter (stable “random” blur spread). */
+const CHAPTER2_R_OBST_BLUR_JITTER: Record<
+  "r_obst1" | "r_obst2" | "r_obst3" | "r_obst4" | "r_obst5" | "r_obst6",
+  number
+> = {
+  r_obst1: 1.32,
+  r_obst2: 0.76,
+  r_obst3: 1.14,
+  r_obst4: 1.42,
+  r_obst5: 0.84,
+  r_obst6: 1.08,
+};
+
+function getChapter2ObstBlurRatio(
+  id: keyof typeof CHAPTER2_R_OBST_BLUR_JITTER,
+  depthPx: number,
+) {
+  return getDepthBlurRatio(depthPx) * CHAPTER2_R_OBST_BLUR_JITTER[id];
+}
 
 const SPORE2_FILE = "grun objekt/spore2.png";
 const SPORE2_SIZE = { width: 236, height: 854 } as const;
@@ -678,7 +702,7 @@ export const CHAPTER2_R_OBST1: Chapter2PropConfig = {
   parallax: 9,
   heightVh: 0.38,
   depthPx: R_OBST1_DEPTH_PX,
-  blurRatio: getDepthBlurRatio(R_OBST1_DEPTH_PX),
+  blurRatio: getChapter2ObstBlurRatio("r_obst1", R_OBST1_DEPTH_PX),
   brightness: getDepthBrightness(R_OBST1_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst1,
 };
@@ -698,7 +722,7 @@ export const CHAPTER2_R_OBST2: Chapter2PropConfig = {
   parallax: 15,
   heightVh: 0.38,
   depthPx: R_OBST2_DEPTH_PX,
-  blurRatio: getDepthBlurRatio(R_OBST2_DEPTH_PX),
+  blurRatio: getChapter2ObstBlurRatio("r_obst2", R_OBST2_DEPTH_PX),
   brightness: getDepthBrightness(R_OBST2_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst2,
 };
@@ -718,7 +742,7 @@ export const CHAPTER2_R_OBST3: Chapter2PropConfig = {
   parallax: 11,
   heightVh: 0.38,
   depthPx: R_OBST3_DEPTH_PX,
-  blurRatio: getDepthBlurRatio(R_OBST3_DEPTH_PX),
+  blurRatio: getChapter2ObstBlurRatio("r_obst3", R_OBST3_DEPTH_PX),
   brightness: getDepthBrightness(R_OBST3_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst3,
 };
@@ -737,7 +761,7 @@ export const CHAPTER2_R_OBST4: Chapter2PropConfig = {
   parallax: 16,
   heightVh: 0.38,
   depthPx: R_OBST4_DEPTH_PX,
-  blurRatio: getDepthBlurRatio(R_OBST4_DEPTH_PX),
+  blurRatio: getChapter2ObstBlurRatio("r_obst4", R_OBST4_DEPTH_PX),
   brightness: getDepthBrightness(R_OBST4_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst4,
 };
@@ -757,9 +781,29 @@ export const CHAPTER2_R_OBST5: Chapter2PropConfig = {
   parallax: 10,
   heightVh: 0.38,
   depthPx: R_OBST5_DEPTH_PX,
-  blurRatio: getDepthBlurRatio(R_OBST5_DEPTH_PX),
+  blurRatio: getChapter2ObstBlurRatio("r_obst5", R_OBST5_DEPTH_PX),
   brightness: getDepthBrightness(R_OBST5_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst5,
+};
+
+/** 장애물6 (풀) — right of obst5, same blume grow beat. */
+export const CHAPTER2_R_OBST6: Chapter2PropConfig = {
+  id: "r_obst6",
+  file: "rot objekt/r_obst6.png",
+  width: 263,
+  height: 653,
+  zIndex: 3,
+  stack: "aboveBerg2",
+  attachToBergId: "berg2",
+  revealGrowFromTopDuringBlumeBloom: true,
+  layoutAnchor: "top",
+  transformOrigin: "50% 0%",
+  parallax: 12,
+  heightVh: 0.38,
+  depthPx: R_OBST6_DEPTH_PX,
+  blurRatio: getChapter2ObstBlurRatio("r_obst6", R_OBST6_DEPTH_PX),
+  brightness: getDepthBrightness(R_OBST6_DEPTH_PX),
+  defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst6,
 };
 
 /** 코키 — scene 2-4 first beat (charactor/koki.png). */
@@ -905,6 +949,7 @@ export const CHAPTER2_PROPS = [
   CHAPTER2_R_OBST3,
   CHAPTER2_R_OBST4,
   CHAPTER2_R_OBST5,
+  CHAPTER2_R_OBST6,
   CHAPTER2_CORAL2,
   CHAPTER2_CORAL3,
   CHAPTER2_CORAL4,

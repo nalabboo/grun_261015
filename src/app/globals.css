@@ -436,6 +436,30 @@ body {
   overflow: hidden;
 }
 
+.chapter2-click-marimo-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.chapter2-click-marimo-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.chapter2-click-marimo {
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center center;
+}
+
 .chapter2-nabi-layer {
   position: absolute;
   inset: 0;

@@ -140,6 +140,8 @@ export type Chapter2BergLayerConfig = {
   scrollAltFile?: string;
   /** Scene 2-3 PNG crossfaded from scrollAlt at intro progress 1. */
   subscene23AltFile?: string;
+  /** Pick one texture at opacity 1 (no stacked alpha crossfade). */
+  opaqueTextureBlend?: boolean;
 };
 
 export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
@@ -169,6 +171,7 @@ export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
     file: "background/2_berg3.png",
     scrollAltFile: "background/y2_berg3.png",
     subscene23AltFile: "background/b2_berg3.png",
+    opaqueTextureBlend: true,
     width: CH2_BG_BERG.width,
     height: CH2_BG_BERG.height,
     scaleY: 1.12,
@@ -244,6 +247,7 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("rot objekt/r_obst3.png"),
     chapter2AssetUrl("rot objekt/r_obst4.png"),
     chapter2AssetUrl("rot objekt/r_obst5.png"),
+    chapter2AssetUrl("rot objekt/r_obst6.png"),
     chapter2AssetUrl("blau objekt/b_stein1.png"),
     chapter2AssetUrl("blau objekt/b_stein2.png"),
     chapter2AssetUrl("blau objekt/b_coral1.png"),

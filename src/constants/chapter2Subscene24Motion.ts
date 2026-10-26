@@ -75,7 +75,7 @@ function buildChapter2KokiCharacterShrinkSpecs(): Partial<
     delayBaseSec: number;
     delayJitterSec: number;
   }[] = [
-    { id: "grun_v", scaleEnd: 0.45, dropPx: 22, seed: 0x20404b01, delayBaseSec: 0, delayJitterSec: 0.22 },
+    { id: "grun_v", scaleEnd: 0.32, dropPx: 22, seed: 0x20404b01, delayBaseSec: 0, delayJitterSec: 0.22 },
     { id: "laubl", scaleEnd: 0.8, dropPx: 44, seed: 0x20404b02, delayBaseSec: 0.05, delayJitterSec: 0.28 },
     { id: "nari", scaleEnd: 0.6, dropPx: 40, seed: 0x20404b03, delayBaseSec: 0.1, delayJitterSec: 0.32 },
   ];
@@ -485,6 +485,9 @@ export const CHAPTER2_R_OBST4_GROW_SPAN_SEC = CHAPTER2_R_OBST1_GROW_SPAN_SEC;
 export const CHAPTER2_R_OBST5_DURING_BLUME_START_OFFSET_SEC =
   CHAPTER2_R_OBST1_DURING_BLUME_START_OFFSET_SEC;
 export const CHAPTER2_R_OBST5_GROW_SPAN_SEC = CHAPTER2_R_OBST1_GROW_SPAN_SEC;
+export const CHAPTER2_R_OBST6_DURING_BLUME_START_OFFSET_SEC =
+  CHAPTER2_R_OBST1_DURING_BLUME_START_OFFSET_SEC;
+export const CHAPTER2_R_OBST6_GROW_SPAN_SEC = CHAPTER2_R_OBST1_GROW_SPAN_SEC;
 
 type RObstGrowSpec = {
   startOffsetSec: number;
@@ -511,6 +514,10 @@ const CHAPTER2_R_OBST_SUBSCENE_24_GROW: Partial<Record<Chapter2PropId, RObstGrow
   r_obst5: {
     startOffsetSec: CHAPTER2_R_OBST5_DURING_BLUME_START_OFFSET_SEC,
     spanSec: CHAPTER2_R_OBST5_GROW_SPAN_SEC,
+  },
+  r_obst6: {
+    startOffsetSec: CHAPTER2_R_OBST6_DURING_BLUME_START_OFFSET_SEC,
+    spanSec: CHAPTER2_R_OBST6_GROW_SPAN_SEC,
   },
 };
 
@@ -975,8 +982,49 @@ function chapter2Subscene24VolcanoBeatEndSec(
   return startSec + delaySec + spanSec;
 }
 
+/** Latest foreground beat (celem / blume / obst) after volcano. */
+function getChapter2Subscene24ForegroundBeatEndSec() {
+  let maxEnd = 0;
+
+  maxEnd = Math.max(
+    maxEnd,
+    getChapter2RCelemen1Subscene24BeatStartSec() + CHAPTER2_R_CELEMEN1_ENTER_SPAN_SEC,
+  );
+  maxEnd = Math.max(
+    maxEnd,
+    getChapter2RCelemen1Subscene24BeatStartSec() +
+      CHAPTER2_R_CELEMEN2_ENTER_OFFSET_IN_CCELEM1_BEAT_SEC +
+      CHAPTER2_R_CELEMEN2_ENTER_SPAN_SEC,
+  );
+
+  for (const spec of Object.values(CHAPTER2_R_BLUME_SUBSCENE_24_BLOOM)) {
+    if (!spec) continue;
+    maxEnd = Math.max(
+      maxEnd,
+      getChapter2RVulkanSubscene24CompleteSec() + spec.delayAfterVulkanSec + spec.spanSec,
+    );
+  }
+  for (const spec of Object.values(CHAPTER2_R_OBST_SUBSCENE_24_GROW)) {
+    if (!spec) continue;
+    maxEnd = Math.max(
+      maxEnd,
+      getChapter2RBlumeSubscene24BeatStartSec() + spec.startOffsetSec + spec.spanSec,
+    );
+  }
+
+  for (const spec of Object.values(CHAPTER2_KOKI_CHARACTER_SHRINK)) {
+    if (!spec) continue;
+    maxEnd = Math.max(maxEnd, spec.delaySec + spec.spanSec);
+  }
+
+  return maxEnd;
+}
+
 export function getChapter2Subscene24MotionCompleteSec() {
-  let maxEnd = getChapter2Subscene24BergDropCompleteSec();
+  let maxEnd = Math.max(
+    getChapter2Subscene24BergDropCompleteSec(),
+    getChapter2Subscene24ForegroundBeatEndSec(),
+  );
   for (const spec of Object.values(CHAPTER2_SPORE24_EXIT_SPECS)) {
     maxEnd = Math.max(
       maxEnd,

@@ -273,6 +273,16 @@ export default function Chapter2BergLayer({
 
   const pointerOnTop = s23 >= 0.5 || (s23 <= 0 && blend >= 0.5);
 
+  if (layer.opaqueTextureBlend) {
+    if (sub23File && s23 >= 0.5) {
+      return renderImage("sub23", sub23.src, sub23.layerAssetUrl, 1, true);
+    }
+    if (layer.scrollAltFile && blend >= 0.5) {
+      return renderImage("alt", alt.src, alt.layerAssetUrl, 1, true);
+    }
+    return renderImage("base", base.src, base.layerAssetUrl, 1, true);
+  }
+
   return (
     <>
       {renderImage("base", base.src, base.layerAssetUrl, baseOpacity, !pointerOnTop)}
