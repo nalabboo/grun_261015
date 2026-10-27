@@ -2,6 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import {
+  CHAPTER2_STAGE_HEIGHT,
+  CHAPTER2_STAGE_WIDTH,
+  chapter2StageVh,
+} from "@/constants/chapter2Viewport";
+import {
   CHAPTER2_BUBBLE_INSTANCES,
   type Chapter2BubbleInstance,
 } from "@/constants/chapter2BubbleConfig";
@@ -98,15 +103,10 @@ export default function Chapter2FloatingBubbles({
   elapsed24Ref.current = subscene24ElapsedSec;
 
   useEffect(() => {
-    const syncSize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      sizeRef.current = { width, height };
-      simRef.current = createSimBodies(CHAPTER2_BUBBLE_INSTANCES, width, height);
-    };
-
-    syncSize();
-    window.addEventListener("resize", syncSize);
+    const width = CHAPTER2_STAGE_WIDTH;
+    const height = CHAPTER2_STAGE_HEIGHT;
+    sizeRef.current = { width, height };
+    simRef.current = createSimBodies(CHAPTER2_BUBBLE_INSTANCES, width, height);
 
     let raf = 0;
     let last = performance.now();
@@ -168,10 +168,7 @@ export default function Chapter2FloatingBubbles({
     };
 
     raf = requestAnimationFrame(tick);
-    return () => {
-      window.removeEventListener("resize", syncSize);
-      cancelAnimationFrame(raf);
-    };
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   if (!isChapter2PlaybackSubscene23OrLater(playbackPhase)) {
@@ -199,7 +196,7 @@ export default function Chapter2FloatingBubbles({
               decoding="async"
               className="chapter2-bubble"
               style={{
-                height: `${bubble.heightVh * 100}vh`,
+                height: chapter2StageVh(bubble.heightVh),
                 width: "auto",
                 aspectRatio: String(aspect),
               }}

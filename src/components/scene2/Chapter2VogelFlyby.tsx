@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import {
+  CHAPTER2_STAGE_HEIGHT,
+  CHAPTER2_STAGE_WIDTH,
+  chapter2StageVh,
+} from "@/constants/chapter2Viewport";
 import { getChapter2BergViewportBlurPx } from "@/constants/chapter2Config";
 import {
   CHAPTER2_VOGEL,
@@ -53,8 +58,8 @@ export default function Chapter2VogelFlyby({
     const tick = (now: number) => {
       const el = anchorRef.current;
       if (el) {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        const width = CHAPTER2_STAGE_WIDTH;
+        const height = CHAPTER2_STAGE_HEIGHT;
         const { shiftX: sx, shiftY: sy } = shiftRef.current;
         const rawProgress = getChapter2SaFlyProgress(nariRef.current);
 
@@ -135,7 +140,7 @@ export default function Chapter2VogelFlyby({
         decoding="async"
         className="chapter2-vogel"
         style={{
-          height: `${CHAPTER2_VOGEL.heightVh * 100}vh`,
+          height: chapter2StageVh(CHAPTER2_VOGEL.heightVh),
           width: "auto",
           aspectRatio: String(aspect),
           filter: filterParts.join(" "),

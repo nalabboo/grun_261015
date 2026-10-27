@@ -2,6 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import {
+  CHAPTER2_STAGE_HEIGHT,
+  CHAPTER2_STAGE_WIDTH,
+  chapter2StageVh,
+} from "@/constants/chapter2Viewport";
+import {
   CHAPTER2_NABI_INSTANCES,
   getChapter2NabiBasePosition,
   getChapter2NabiOpacity,
@@ -46,11 +51,7 @@ export default function Chapter2FloatingNabis({
   yellowVisRef.current = yellowExitVisibility;
 
   useEffect(() => {
-    const syncSize = () => {
-      sizeRef.current = { width: window.innerWidth, height: window.innerHeight };
-    };
-    syncSize();
-    window.addEventListener("resize", syncSize);
+    sizeRef.current = { width: CHAPTER2_STAGE_WIDTH, height: CHAPTER2_STAGE_HEIGHT };
 
     let raf = 0;
     const start = performance.now();
@@ -140,10 +141,7 @@ export default function Chapter2FloatingNabis({
     };
 
     raf = requestAnimationFrame(tick);
-    return () => {
-      window.removeEventListener("resize", syncSize);
-      cancelAnimationFrame(raf);
-    };
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   if (sporeProgress <= 0) {
@@ -171,7 +169,7 @@ export default function Chapter2FloatingNabis({
               decoding="async"
               className="chapter2-nabi"
               style={{
-                height: `${nabi.heightVh * 100}vh`,
+                height: chapter2StageVh(nabi.heightVh),
                 width: "auto",
                 aspectRatio: String(aspect),
               }}

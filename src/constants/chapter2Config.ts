@@ -30,14 +30,13 @@ export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
 export const CHAPTER2_MOUSE_PARALLAX_GAIN = 1.45;
 
 /**
- * Dev: `2-3-complete` (2-3 motions done — scroll after 3 s → 2-4).
- * Default when chapter 2 dev load is on. Override with `NEXT_PUBLIC_DEV_CHAPTER2_START_2_1=1`.
+ * Dev: jump to `2-3-complete` (2-3 motions done — scroll after 3 s → 2-4).
+ * Default chapter 2 dev load starts at **2-1**. Enable with `NEXT_PUBLIC_DEV_CHAPTER2_START_23_HOLD=1`.
  */
 export const DEV_CHAPTER2_START_AT_SUBSCENE_23_HOLD =
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_CHAPTER2 !== "0" &&
-  process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_2_1 !== "1" &&
-  process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_23 !== "1";
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2_START_23_HOLD === "1";
 
 /** Dev: jump to `2-3-playing` (mid Laubl beat). `NEXT_PUBLIC_DEV_CHAPTER2_START_23=1`. */
 export const DEV_CHAPTER2_START_AT_SUBSCENE_23 =

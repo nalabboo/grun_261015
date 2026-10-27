@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { getChapter2BergViewportBlurPx } from "@/constants/chapter2Config";
-import { SCENE_REFERENCE_HEIGHT } from "@/constants/sceneConfig";
+import {
+  CHAPTER2_STAGE_HEIGHT,
+  CHAPTER2_STAGE_WIDTH,
+  chapter2StageVh,
+} from "@/constants/chapter2Viewport";
 import {
   CHAPTER2_MARIMO_INSTANCES,
   getChapter2MarimoSporeExitOpacity,
@@ -120,7 +124,7 @@ export default function Chapter2FloatingMarimos({
   const scroll22Ref = useRef(scroll22Progress);
   const sub23PhaseRef = useRef(subscene23Phase);
   const sub23ElapsedRef = useRef(subscene23ElapsedSec);
-  const [viewportHeight, setViewportHeight] = useState(SCENE_REFERENCE_HEIGHT);
+  const viewportHeight = CHAPTER2_STAGE_HEIGHT;
 
   sporeRef.current = sporeProgress;
   scroll22Ref.current = scroll22Progress;
@@ -128,16 +132,12 @@ export default function Chapter2FloatingMarimos({
   sub23ElapsedRef.current = subscene23ElapsedSec;
 
   useEffect(() => {
-    const syncSize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      sizeRef.current = { width, height };
-      setViewportHeight(height);
-      simRef.current = createSimBodies(CHAPTER2_MARIMO_INSTANCES, width, height);
-    };
-
-    syncSize();
-    window.addEventListener("resize", syncSize);
+    sizeRef.current = { width: CHAPTER2_STAGE_WIDTH, height: CHAPTER2_STAGE_HEIGHT };
+    simRef.current = createSimBodies(
+      CHAPTER2_MARIMO_INSTANCES,
+      CHAPTER2_STAGE_WIDTH,
+      CHAPTER2_STAGE_HEIGHT,
+    );
 
     let raf = 0;
     let last = performance.now();
@@ -259,10 +259,7 @@ export default function Chapter2FloatingMarimos({
     };
 
     raf = requestAnimationFrame(tick);
-    return () => {
-      window.removeEventListener("resize", syncSize);
-      cancelAnimationFrame(raf);
-    };
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   return (
@@ -291,7 +288,7 @@ export default function Chapter2FloatingMarimos({
               decoding="async"
               className="chapter2-marimo"
               style={{
-                height: `${marimo.heightVh * 100}vh`,
+                height: chapter2StageVh(marimo.heightVh),
                 width: "auto",
                 aspectRatio: String(aspect),
                 filter,

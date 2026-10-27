@@ -61,10 +61,10 @@ type Chapter1Phase = "scroll" | "tableau";
 type Chapter2Step = "intro" | "play";
 type Chapter3Step = "intro" | "play";
 
-/** Local dev: open chapter 2 play on load (set NEXT_PUBLIC_DEV_CHAPTER2=0 for chapter 1). */
+/** Local dev: skip to chapter 2 play on load (`NEXT_PUBLIC_DEV_CHAPTER2=1`). Default: chapter 1. */
 const DEV_START_CHAPTER2 =
   process.env.NODE_ENV === "development" &&
-  process.env.NEXT_PUBLIC_DEV_CHAPTER2 !== "0";
+  process.env.NEXT_PUBLIC_DEV_CHAPTER2 === "1";
 
 export default function SceneStage() {
   const stageRef = useRef<HTMLElement>(null);

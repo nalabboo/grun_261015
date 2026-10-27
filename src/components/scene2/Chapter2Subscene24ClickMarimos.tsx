@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getChapter2BergViewportBlurPx } from "@/constants/chapter2Config";
-import { SCENE_REFERENCE_HEIGHT } from "@/constants/sceneConfig";
+import { CHAPTER2_STAGE_HEIGHT, chapter2StageVh } from "@/constants/chapter2Viewport";
 import {
   CHAPTER2_CLICK_MARIMO_HEIGHT_VH,
   CHAPTER2_CLICK_MARIMO_Z_INDEX,
@@ -27,15 +27,7 @@ export default function Chapter2Subscene24ClickMarimos({
 }: Props) {
   const particlesRef = useRef<Chapter2ClickMarimoBurstParticle[]>([]);
   const [renderTick, setRenderTick] = useState({ now: 0, particles: [] as Chapter2ClickMarimoBurstParticle[] });
-  const [viewportHeight, setViewportHeight] = useState(SCENE_REFERENCE_HEIGHT);
   const lastBurstSeqRef = useRef(0);
-
-  useEffect(() => {
-    const onResize = () => setViewportHeight(window.innerHeight);
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   useEffect(() => {
     if (!enabled || burstSeq <= 0 || burstSeq === lastBurstSeqRef.current) return;
@@ -68,7 +60,7 @@ export default function Chapter2Subscene24ClickMarimos({
 
   if (!enabled) return null;
 
-  const blurPx = getChapter2BergViewportBlurPx(viewportHeight, 0.0028);
+  const blurPx = getChapter2BergViewportBlurPx(CHAPTER2_STAGE_HEIGHT, 0.0028);
   const filter = blurPx >= 0.35 ? `blur(${blurPx.toFixed(2)}px)` : undefined;
   const { now, particles: renderParticles } = renderTick;
 
@@ -99,7 +91,7 @@ export default function Chapter2Subscene24ClickMarimos({
               decoding="async"
               className="chapter2-click-marimo"
               style={{
-                height: `${CHAPTER2_CLICK_MARIMO_HEIGHT_VH * 100}vh`,
+                height: chapter2StageVh(CHAPTER2_CLICK_MARIMO_HEIGHT_VH),
                 width: "auto",
                 aspectRatio: String(aspect),
                 filter,

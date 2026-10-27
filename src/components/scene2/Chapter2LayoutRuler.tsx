@@ -7,6 +7,11 @@ import {
   chapter2PropXToScreenPx,
   chapter2PropYToScreenTopPx,
 } from "@/constants/chapter2PropScreenCoords";
+import {
+  CHAPTER2_STAGE_HEIGHT,
+  CHAPTER2_STAGE_WIDTH,
+  useChapter2StageFit,
+} from "@/constants/chapter2Viewport";
 
 const TICK_STEP = 100;
 
@@ -28,19 +33,12 @@ function rangeTicks(min: number, max: number, step: number) {
 }
 
 export default function Chapter2LayoutRuler() {
-  const [size, setSize] = useState({ w: 1920, h: 1080 });
+  const fit = useChapter2StageFit();
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    const sync = () => setSize({ w: window.innerWidth, h: window.innerHeight });
-    sync();
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
-  }, []);
-
-  useEffect(() => {
     const onMove = (event: MouseEvent) => {
-      setCursor(chapter2ClientToPropCoords(event.clientX, event.clientY, size.w, size.h));
+      setCursor(chapter2ClientToPropCoords(event.clientX, event.clientY, fit));
     };
     const onLeave = () => setCursor(null);
     window.addEventListener("mousemove", onMove, { passive: true });
@@ -49,16 +47,16 @@ export default function Chapter2LayoutRuler() {
       window.removeEventListener("mousemove", onMove);
       document.documentElement.removeEventListener("mouseleave", onLeave);
     };
-  }, [size.w, size.h]);
+  }, [fit]);
 
-  const halfW = size.w / 2;
+  const halfW = CHAPTER2_STAGE_WIDTH / 2;
   const xTicks = useMemo(
     () => rangeTicks(-halfW, halfW, TICK_STEP),
     [halfW],
   );
   const yTicks = useMemo(
-    () => rangeTicks(-size.h, 0, TICK_STEP),
-    [size.h],
+    () => rangeTicks(-CHAPTER2_STAGE_HEIGHT, 0, TICK_STEP),
+    [],
   );
 
   return (
@@ -68,7 +66,7 @@ export default function Chapter2LayoutRuler() {
           <div
             key={y}
             className="chapter2-layout-ruler__y-tick"
-            style={{ top: chapter2PropYToScreenTopPx(y, size.h) }}
+            style={{ top: chapter2PropYToScreenTopPx(y, fit) }}
           >
             <span className="chapter2-layout-ruler__label">{y}</span>
           </div>
@@ -80,7 +78,7 @@ export default function Chapter2LayoutRuler() {
           <div
             key={x}
             className="chapter2-layout-ruler__x-tick"
-            style={{ left: chapter2PropXToScreenPx(x, size.w) }}
+            style={{ left: chapter2PropXToScreenPx(x, fit) }}
           >
             <span className="chapter2-layout-ruler__label">{x}</span>
           </div>
@@ -91,11 +89,11 @@ export default function Chapter2LayoutRuler() {
         <>
           <div
             className="chapter2-layout-ruler__crosshair chapter2-layout-ruler__crosshair--v"
-            style={{ left: chapter2PropXToScreenPx(cursor.x, size.w) }}
+            style={{ left: chapter2PropXToScreenPx(cursor.x, fit) }}
           />
           <div
             className="chapter2-layout-ruler__crosshair chapter2-layout-ruler__crosshair--h"
-            style={{ top: chapter2PropYToScreenTopPx(cursor.y, size.h) }}
+            style={{ top: chapter2PropYToScreenTopPx(cursor.y, fit) }}
           />
           <div className="chapter2-layout-ruler__readout">
             x {cursor.x}, y {cursor.y}

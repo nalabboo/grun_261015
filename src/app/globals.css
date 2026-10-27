@@ -353,6 +353,16 @@ body {
   cursor: default;
 }
 
+/* Fixed design frame (--c2-w × --c2-h), uniformly scaled to the window. */
+.chapter2-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--c2-w);
+  height: var(--c2-h);
+  transform-origin: 0 0;
+}
+
 .chapter2-scene-content {
   position: absolute;
   inset: 0;
@@ -419,12 +429,12 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  /* Fit full PNG in viewport (both axes), then scale up for parallax headroom. */
+  /* Cover the design frame (both axes), then scale up for parallax headroom. */
   width: calc(
-    var(--berg-scale, 1.18) * max(100vw, 100vh * var(--berg-aspect, 1.7777777778))
+    var(--berg-scale, 1.18) * max(var(--c2-w), var(--c2-h) * var(--berg-aspect, 1.7777777778))
   );
   height: calc(
-    var(--berg-scale, 1.18) * max(100vh, 100vw / var(--berg-aspect, 1.7777777778))
+    var(--berg-scale, 1.18) * max(var(--c2-h), var(--c2-w) / var(--berg-aspect, 1.7777777778))
   );
   max-width: none;
   max-height: none;
@@ -458,7 +468,7 @@ body {
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chapter2-bubble-anchor {
@@ -482,7 +492,7 @@ body {
   inset: 0;
   z-index: 6;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chapter2-click-marimo-layer {
@@ -490,7 +500,7 @@ body {
   inset: 0;
   z-index: 9;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chapter2-click-marimo-anchor {
@@ -514,7 +524,7 @@ body {
   inset: 0;
   z-index: 7;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chapter2-nabi-anchor {

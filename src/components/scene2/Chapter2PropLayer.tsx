@@ -11,6 +11,7 @@ import {
 } from "@/constants/chapter2ObjectsConfig";
 import type { EditorMode } from "@/components/canvas/worldView";
 import { CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID } from "@/constants/chapter2Subscene24ClickMarimo";
+import { chapter2StageVh } from "@/constants/chapter2Viewport";
 type Props = {
   prop: Chapter2PropConfig;
   viewportHeight: number;
@@ -100,7 +101,7 @@ export default function Chapter2PropLayer({
       decoding="async"
       style={{
         zIndex: isSelected && editorActive ? 45 : prop.zIndex,
-        height: `${prop.heightVh * 100}vh`,
+        height: chapter2StageVh(prop.heightVh),
         width: "auto",
         aspectRatio: String(aspect),
         opacity: scrollOpacity,

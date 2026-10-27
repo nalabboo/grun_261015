@@ -71,6 +71,11 @@ import Chapter2Subscene24ClickMarimos from "@/components/scene2/Chapter2Subscene
 import Chapter2Subscene24GreenSpotlightOverlay from "@/components/scene2/Chapter2Subscene24GreenSpotlightOverlay";
 import PageTurnButton from "@/components/scene2/PageTurnButton";
 import {
+  CHAPTER2_STAGE_HEIGHT,
+  CHAPTER2_STAGE_WIDTH,
+  useChapter2StageFit,
+} from "@/constants/chapter2Viewport";
+import {
   CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID,
   measureChapter2GreenSpotlightHoleRadius,
   type Chapter2GreenSpotlightLockedCircle,
@@ -203,7 +208,10 @@ export default function Chapter2Scene({
   const [propEditsReady, setPropEditsReady] = useState(false);
 
   const [tunableEdits, setTunableEdits] = useState(defaultChapter2TunableEdits);
-  const [viewportHeight, setViewportHeight] = useState(SCENE_REFERENCE_HEIGHT);
+  const viewportHeight = CHAPTER2_STAGE_HEIGHT;
+  const stageFit = useChapter2StageFit();
+  const stageScaleRef = useRef(stageFit.scale);
+  stageScaleRef.current = stageFit.scale;
   const [devEditsReady, setDevEditsReady] = useState(false);
   const [clickMarimoBurst, setClickMarimoBurst] = useState({
     seq: 0,
@@ -223,7 +231,6 @@ export default function Chapter2Scene({
   useEffect(() => {
     setTunableEdits(loadChapter2TunableEdits());
     setPropEdits(loadChapter2PropEdits());
-    setViewportHeight(window.innerHeight);
     setDevEditsReady(true);
     setPropEditsReady(true);
 
@@ -430,8 +437,8 @@ export default function Chapter2Scene({
       const drag = propDragRef.current;
       if (!drag) return;
 
-      const dx = event.clientX - drag.startClientX;
-      const dy = event.clientY - drag.startClientY;
+      const dx = (event.clientX - drag.startClientX) / stageScaleRef.current;
+      const dy = (event.clientY - drag.startClientY) / stageScaleRef.current;
       const base = drag.base;
 
       if (drag.mode === "translate") {
@@ -490,10 +497,11 @@ export default function Chapter2Scene({
       }
       const content = sceneContentRef.current;
       const rect = content?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect();
+      const scale = stageScaleRef.current;
       setClickMarimoBurst((prev) => ({
         seq: prev.seq + 1,
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
+        x: (event.clientX - rect.left) / scale,
+        y: (event.clientY - rect.top) / scale,
       }));
     },
     [editor.enabled, clickMarimoBurst.seq],
@@ -544,9 +552,10 @@ export default function Chapter2Scene({
           cy,
           r: measureChapter2GreenSpotlightHoleRadius(elRect.width, elRect.height),
         });
+        const scale = stageScaleRef.current;
         greenSpotlightZoomOriginRef.current = {
-          x: elRect.left + elRect.width / 2 - contentRect.left,
-          y: elRect.top + elRect.height / 2 - contentRect.top,
+          x: (elRect.left + elRect.width / 2 - contentRect.left) / scale,
+          y: (elRect.top + elRect.height / 2 - contentRect.top) / scale,
         };
         greenSpotlightGeometryLockedRef.current = true;
       });
@@ -592,8 +601,7 @@ export default function Chapter2Scene({
   const scroll22Progress = getChapter2Scroll22Progress(scrollSegments.raw);
   void frame;
 
-  const viewportWidth =
-    typeof window !== "undefined" ? window.innerWidth : SCENE_REFERENCE_HEIGHT;
+  const viewportWidth = CHAPTER2_STAGE_WIDTH;
 
   const playbackPhase = playbackPhaseRef.current;
   const subscene23MotionPhase: Chapter2SubscenePlaybackPhase =
@@ -984,14 +992,6 @@ export default function Chapter2Scene({
       className={`chapter2-scene chapter2-scene--visible${editor.enabled ? " chapter2-scene--editing" : ""}`}
       onPointerDownCapture={handleScenePointerDownCapture}
     >
-      <div
-        ref={sceneContentRef}
-        className="chapter2-scene-content"
-        style={{
-          ["--berg-scale" as string]: String(CHAPTER2_BERG_DISPLAY_SCALE),
-          transform: `translate3d(${earthquakeShake.x + greenSpotlightPanX}px, ${earthquakeShake.y + greenSpotlightPanY}px, 0) scale(${greenSpotlightSceneScale})`,
-        }}
-      >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={CHAPTER2_PAPIER_BG_URL}
@@ -1000,6 +1000,23 @@ export default function Chapter2Scene({
         decoding="async"
         className="chapter2-papier-bg"
       />
+
+      <div
+        className="chapter2-stage"
+        style={{
+          ["--c2-w" as string]: `${CHAPTER2_STAGE_WIDTH}px`,
+          ["--c2-h" as string]: `${CHAPTER2_STAGE_HEIGHT}px`,
+          transform: `translate3d(${stageFit.left}px, ${stageFit.top}px, 0) scale(${stageFit.scale})`,
+        }}
+      >
+      <div
+        ref={sceneContentRef}
+        className="chapter2-scene-content"
+        style={{
+          ["--berg-scale" as string]: String(CHAPTER2_BERG_DISPLAY_SCALE),
+          transform: `translate3d(${earthquakeShake.x + greenSpotlightPanX}px, ${earthquakeShake.y + greenSpotlightPanY}px, 0) scale(${greenSpotlightSceneScale})`,
+        }}
+      >
 
       {berg4Layer && (() => {
         const berg4Edit = devEditsReady
@@ -1148,6 +1165,7 @@ export default function Chapter2Scene({
         burstY={clickMarimoBurst.y}
       />
 
+      </div>
       </div>
 
       <Chapter2Subscene24GreenSpotlightOverlay
