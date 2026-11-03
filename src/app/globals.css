@@ -329,7 +329,8 @@ body {
   inset: 0;
   z-index: 30;
   overflow: hidden;
-  background: radial-gradient(ellipse at 50% 40%, #10131c 0%, #07080d 55%, #030305 100%);
+  background: #030305;
+  touch-action: none;
   animation: chapter2-scene-in 0.45s ease-out forwards;
 }
 

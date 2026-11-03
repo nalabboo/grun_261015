@@ -6,6 +6,9 @@ export function chapter3AssetUrl(relativePath: string) {
   return `/scene3/${path}?v=${CHAPTER3_ASSET_VERSION}`;
 }
 
+/** Distant space backdrop behind the 3D star field. */
+export const CHAPTER3_KOSMO_URL = chapter3AssetUrl("kosmos/kosmo.png");
+
 /** Chapter 3 opening title. */
 export const CHAPTER3_TITLE = "색이 없는 소호 행성";
 
