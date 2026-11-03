@@ -10,6 +10,7 @@ import SceneCanvasLoader from "@/components/canvas/SceneCanvasLoader";
 import Chapter2Intro from "@/components/scene2/Chapter2Intro";
 import Chapter2Scene from "@/components/scene2/Chapter2Scene";
 import Chapter3Intro from "@/components/scene3/Chapter3Intro";
+import Chapter3Inside from "@/components/scene3/Chapter3Inside";
 import Chapter3Scene from "@/components/scene3/Chapter3Scene";
 import { preloadChapter2BergAssets } from "@/constants/chapter2Config";
 import NextScene from "@/components/scene2/NextScene";
@@ -58,7 +59,7 @@ type CameraMode = "grun" | "landmarkPaused";
 type Chapter = 1 | 2 | 3;
 type Chapter1Phase = "scroll" | "tableau";
 type Chapter2Step = "intro" | "play";
-type Chapter3Step = "intro" | "play";
+type Chapter3Step = "intro" | "play" | "inside";
 
 function getDevStartChapter(): Chapter {
   if (process.env.NODE_ENV !== "development") return 1;
@@ -184,6 +185,18 @@ export default function SceneStage() {
 
   const handleChapter3IntroComplete = useCallback(() => {
     setChapter3Step("play");
+  }, []);
+
+  const handleChapter3EnterPlanet = useCallback(() => {
+    setChapter3Step("inside");
+  }, []);
+
+  /** Dev shortcut: `?ch3=inside` jumps straight to the inside-the-planet screen. */
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development" || DEV_START_CHAPTER !== 3) return;
+    if (new URLSearchParams(window.location.search).get("ch3") !== "inside") return;
+    const id = window.setTimeout(() => setChapter3Step("inside"), 0);
+    return () => window.clearTimeout(id);
   }, []);
 
   const handleTableauRevealComplete = useCallback(() => {
@@ -702,7 +715,10 @@ export default function SceneStage() {
     {chapter === 3 && chapter3Step === "intro" && (
       <Chapter3Intro onComplete={handleChapter3IntroComplete} />
     )}
-    {chapter === 3 && chapter3Step === "play" && <Chapter3Scene />}
+    {chapter === 3 && chapter3Step === "play" && (
+      <Chapter3Scene onEnterPlanet={handleChapter3EnterPlanet} />
+    )}
+    {chapter === 3 && chapter3Step === "inside" && <Chapter3Inside />}
     </>
   );
 }

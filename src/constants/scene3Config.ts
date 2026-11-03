@@ -9,6 +9,9 @@ export function chapter3AssetUrl(relativePath: string) {
 /** Distant space backdrop behind the 3D star field. */
 export const CHAPTER3_KOSMO_URL = chapter3AssetUrl("kosmos/kosmo.png");
 
+/** White paper backdrop of the screen inside the planet. */
+export const CHAPTER3_INSIDE_PAPIER_URL = chapter3AssetUrl("background/papier.jpg");
+
 /** Chapter 3 opening title. */
 export const CHAPTER3_TITLE = "색이 없는 소호 행성";
 

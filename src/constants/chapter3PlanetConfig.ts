@@ -38,6 +38,15 @@ export const CHAPTER3_PLANET_RIPPLE_SCALE = 2.6;
 /** Ring tilt: X opens it from edge-on toward the viewer, Z rolls it (radians). */
 export const CHAPTER3_RING_TILT_X = 0.4;
 export const CHAPTER3_RING_TILT_Z = -0.26;
+/** A press shorter/stiller than this counts as a click (enter planet), not a drag. */
+export const CHAPTER3_PLANET_CLICK_MAX_MS = 350;
+export const CHAPTER3_PLANET_CLICK_MAX_PX = 6;
+/** Fly-in from the click to the planet surface, ms. */
+export const CHAPTER3_ENTER_FLY_MS = 1000;
+/** Paper fade starts at this share of the fly-in and lasts this long (ms). */
+export const CHAPTER3_ENTER_FADE_AT = 0.74;
+export const CHAPTER3_ENTER_FADE_MS = 520;
+
 /** Grab area around the planet center, in planet radii. */
 export const CHAPTER3_PLANET_GRAB_RADIUS = 1.35;
 /** Drag rotation, radians per screen px. */

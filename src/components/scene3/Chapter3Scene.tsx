@@ -33,8 +33,13 @@ import {
   CHAPTER2_STAGE_WIDTH,
   getChapter2StageFit,
 } from "@/constants/chapter2Viewport";
-import { CHAPTER3_KOSMO_URL } from "@/constants/scene3Config";
+import { CHAPTER3_INSIDE_PAPIER_URL, CHAPTER3_KOSMO_URL } from "@/constants/scene3Config";
 import {
+  CHAPTER3_ENTER_FADE_AT,
+  CHAPTER3_ENTER_FADE_MS,
+  CHAPTER3_ENTER_FLY_MS,
+  CHAPTER3_PLANET_CLICK_MAX_MS,
+  CHAPTER3_PLANET_CLICK_MAX_PX,
   CHAPTER3_PLANET_DISCOVER_SEC,
   CHAPTER3_PLANET_DRAG_INERTIA,
   CHAPTER3_PLANET_DRAG_SPEED,
@@ -93,17 +98,29 @@ function drawKosmoBackdrop(
  * Chapter 3 — 3D star field on a canvas. Wheel flies the camera forward and back;
  * the pointer turns and shifts the camera toward itself (parallax by depth).
  */
-export default function Chapter3Scene() {
+type Chapter3SceneProps = {
+  /** Called once the click-to-enter fly-in has fully faded to paper. */
+  onEnterPlanet?: () => void;
+};
+
+export default function Chapter3Scene({ onEnterPlanet }: Chapter3SceneProps) {
   const sceneRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const planetCanvasRef = useRef<HTMLCanvasElement>(null);
+  const veilRef = useRef<HTMLImageElement>(null);
+  const onEnterPlanetRef = useRef(onEnterPlanet);
+
+  useEffect(() => {
+    onEnterPlanetRef.current = onEnterPlanet;
+  }, [onEnterPlanet]);
 
   useEffect(() => {
     const scene = sceneRef.current;
     const canvas = canvasRef.current;
     const planetCanvas = planetCanvasRef.current;
+    const veil = veilRef.current;
     const ctx = canvas?.getContext("2d");
-    if (!scene || !canvas || !planetCanvas || !ctx) return;
+    if (!scene || !canvas || !planetCanvas || !veil || !ctx) return;
 
     const planet = createChapter3GlassPlanet(planetCanvas, canvas);
 
@@ -157,9 +174,16 @@ export default function Chapter3Scene() {
     let dragLastX = 0;
     let dragLastY = 0;
     let dragLastMoveAt = 0;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragStartAt = 0;
     /** Spin velocity in radians per 60fps frame, kept after release for inertia. */
     let spinX = 0;
     let spinY = 0;
+    /** Click-to-enter fly-in: start time, camera depth it started from, and hand-off flag. */
+    let enterStartAt: number | null = null;
+    let enterFromZ = 0;
+    let entered = false;
 
     const draw = (now: number) => {
       const dt = lastNow ? Math.min(0.25, (now - lastNow) / 1000) : 0;
@@ -177,10 +201,27 @@ export default function Chapter3Scene() {
         }
       }
 
-      if (planetZ !== null) targetZ = Math.min(targetZ, planetZ - CHAPTER3_PLANET_STOP_DIST);
       const prevCameraZ = cameraZ;
-      cameraZ += (targetZ - cameraZ) * CHAPTER3_CAMERA_EASE;
-      if (Math.abs(targetZ - cameraZ) < 0.05) cameraZ = targetZ;
+      if (enterStartAt !== null && planetZ !== null) {
+        const flyT = Math.min(1, (now - enterStartAt) / CHAPTER3_ENTER_FLY_MS);
+        const surfaceZ = planetZ - (CHAPTER3_NEAR + 12);
+        cameraZ = enterFromZ + (surfaceZ - enterFromZ) * flyT * flyT;
+        targetZ = cameraZ;
+        pointerX = 0;
+        pointerY = 0;
+
+        const fadeStart = enterStartAt + CHAPTER3_ENTER_FLY_MS * CHAPTER3_ENTER_FADE_AT;
+        const fadeT = Math.min(1, Math.max(0, (now - fadeStart) / CHAPTER3_ENTER_FADE_MS));
+        veil.style.opacity = String(fadeT * fadeT * (3 - 2 * fadeT));
+        if (fadeT >= 1 && !entered) {
+          entered = true;
+          onEnterPlanetRef.current?.();
+        }
+      } else {
+        if (planetZ !== null) targetZ = Math.min(targetZ, planetZ - CHAPTER3_PLANET_STOP_DIST);
+        cameraZ += (targetZ - cameraZ) * CHAPTER3_CAMERA_EASE;
+        if (Math.abs(targetZ - cameraZ) < 0.05) cameraZ = targetZ;
+      }
 
       const velocity = cameraZ - prevCameraZ;
       if (planetZ === null && velocity > CHAPTER3_PLANET_FORWARD_MIN_SPEED) {
@@ -290,6 +331,7 @@ export default function Chapter3Scene() {
 
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
+      if (enterStartAt !== null) return;
       const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
       targetZ += event.deltaY * unit * CHAPTER3_WHEEL_SPEED;
     };
@@ -302,10 +344,14 @@ export default function Chapter3Scene() {
     };
 
     const onPointerDown = (event: PointerEvent) => {
+      if (enterStartAt !== null) return;
       if (event.button !== 0 || !isOverPlanet(event.clientX, event.clientY)) return;
       dragPointerId = event.pointerId;
       dragLastX = event.clientX;
       dragLastY = event.clientY;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      dragStartAt = event.timeStamp;
       spinX = 0;
       spinY = 0;
       try {
@@ -329,6 +375,7 @@ export default function Chapter3Scene() {
         spinY = spinY * 0.5 + angleY * 0.5;
         return;
       }
+      if (enterStartAt !== null) return;
       pointerX = Math.max(-1, Math.min(1, (event.clientX / viewW) * 2 - 1));
       pointerY = Math.max(-1, Math.min(1, (event.clientY / viewH) * 2 - 1));
       scene.style.cursor = isOverPlanet(event.clientX, event.clientY) ? "grab" : "";
@@ -337,6 +384,19 @@ export default function Chapter3Scene() {
     const endDrag = (event: PointerEvent) => {
       if (event.pointerId !== dragPointerId) return;
       dragPointerId = null;
+      const isClick =
+        event.type === "pointerup" &&
+        event.timeStamp - dragStartAt <= CHAPTER3_PLANET_CLICK_MAX_MS &&
+        Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY) <= CHAPTER3_PLANET_CLICK_MAX_PX;
+      if (isClick) {
+        if (scene.hasPointerCapture(event.pointerId)) scene.releasePointerCapture(event.pointerId);
+        enterStartAt = performance.now();
+        enterFromZ = cameraZ;
+        spinX = 0;
+        spinY = 0;
+        scene.style.cursor = "";
+        return;
+      }
       if (event.timeStamp - dragLastMoveAt > 90) {
         spinX = 0;
         spinY = 0;
@@ -373,6 +433,14 @@ export default function Chapter3Scene() {
     <div ref={sceneRef} className="chapter3-scene chapter3-scene--visible" aria-label="3장">
       <canvas ref={canvasRef} className="chapter3-stars" />
       <canvas ref={planetCanvasRef} className="chapter3-stars" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={veilRef}
+        src={CHAPTER3_INSIDE_PAPIER_URL}
+        alt=""
+        draggable={false}
+        className="chapter3-papier chapter3-enter-veil"
+      />
     </div>
   );
 }
