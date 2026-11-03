@@ -8,6 +8,10 @@ export type Chapter3AlienPart = {
   ry: number;
   rz: number;
   blend: number;
+  /** Ellipsoid tilt in degrees (Z → Y → X). */
+  rotX?: number;
+  rotY?: number;
+  rotZ?: number;
 };
 
 export const CHAPTER3_ALIEN_SHAPE_STORAGE_KEY = "chapter3-alien-shape";
@@ -29,7 +33,12 @@ export const CHAPTER3_ALIEN_DEFAULT_PARTS: Chapter3AlienPart[] = [
 ];
 
 export function cloneAlienParts(parts: Chapter3AlienPart[]): Chapter3AlienPart[] {
-  return parts.map((p) => ({ ...p }));
+  return parts.map((p) => ({
+    ...p,
+    rotX: p.rotX ?? 0,
+    rotY: p.rotY ?? 0,
+    rotZ: p.rotZ ?? 0,
+  }));
 }
 
 export function loadAlienPartsFromStorage(): Chapter3AlienPart[] {

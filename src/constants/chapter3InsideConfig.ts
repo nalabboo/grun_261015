@@ -8,7 +8,7 @@ export const CHAPTER3_ALIEN_SETTLE_HZ = 2.6;
 export const CHAPTER3_ALIEN_SETTLE_DAMP = 3.4;
 
 /** Alien body length in world units. */
-export const CHAPTER3_ALIEN_WIDTH = 3.8;
+export const CHAPTER3_ALIEN_WIDTH = 3.05;
 /** Idle jelly wobble amplitude and breathing squash. */
 export const CHAPTER3_ALIEN_WOBBLE = 0;
 export const CHAPTER3_ALIEN_BREATH = 0.02;

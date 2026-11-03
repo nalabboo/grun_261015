@@ -7,9 +7,6 @@ export const CHAPTER3_ALIEN_PX_SCALE = 1.7 / 950;
 export const CHAPTER3_ALIEN_PX_CENTER_X = 515;
 export const CHAPTER3_ALIEN_PX_CENTER_Y = 250;
 
-export const CHAPTER3_ALIEN_FACE_CENTER_PX = [725, 165] as const;
-export const CHAPTER3_ALIEN_FACE_SIZE_PX = [140, 80] as const;
-
 const FIELD_RES = 96;
 
 export function pxToLocal(px: number, py: number, pz = 0) {
@@ -26,6 +23,34 @@ function ellipsoidSdf(px: number, py: number, pz: number, rx: number, ry: number
   return (k0 * (k0 - 1)) / k1;
 }
 
+/** Rotate local offset into the part's oriented frame (degrees, Z → Y → X). */
+function partLocalOffset(dx: number, dy: number, dz: number, rotX: number, rotY: number, rotZ: number) {
+  const toRad = THREE.MathUtils.degToRad;
+  let x = dx;
+  let y = dy;
+  let z = dz;
+  const rz = toRad(-rotZ);
+  let c = Math.cos(rz);
+  let s = Math.sin(rz);
+  let x1 = x * c - y * s;
+  let y1 = x * s + y * c;
+  x = x1;
+  y = y1;
+  const ry = toRad(-rotY);
+  c = Math.cos(ry);
+  s = Math.sin(ry);
+  x1 = x * c + z * s;
+  let z1 = -x * s + z * c;
+  x = x1;
+  z = z1;
+  const rx = toRad(-rotX);
+  c = Math.cos(rx);
+  s = Math.sin(rx);
+  y1 = y * c - z * s;
+  z1 = y * s + z * c;
+  return { x, y: y1, z: z1 };
+}
+
 function smoothMin(a: number, b: number, k: number) {
   if (k <= 0) return Math.min(a, b);
   const h = Math.max(k - Math.abs(a - b), 0) / k;
@@ -34,8 +59,10 @@ function smoothMin(a: number, b: number, k: number) {
 
 function alienSdf(parts: Chapter3AlienPart[], x: number, y: number, z: number) {
   let d = Infinity;
-  for (const { cx, cy, cz, rx, ry, rz, blend } of parts) {
-    d = smoothMin(d, ellipsoidSdf(x - cx, y - cy, z - cz, rx, ry, rz), blend);
+  for (const part of parts) {
+    const { cx, cy, cz, rx, ry, rz, blend } = part;
+    const local = partLocalOffset(x - cx, y - cy, z - cz, part.rotX ?? 0, part.rotY ?? 0, part.rotZ ?? 0);
+    d = smoothMin(d, ellipsoidSdf(local.x, local.y, local.z, rx, ry, rz), blend);
   }
   return d;
 }
@@ -49,9 +76,11 @@ export function buildAlienGeometry(parts: Chapter3AlienPart[]) {
   mc.field.fill(-1);
 
   const bounds = new THREE.Box3();
-  for (const { cx, cy, cz, rx, ry, rz } of parts) {
-    bounds.expandByPoint(pxToLocal(cx - rx, cy + ry, cz - rz));
-    bounds.expandByPoint(pxToLocal(cx + rx, cy - ry, cz + rz));
+  for (const part of parts) {
+    const { cx, cy, cz, rx, ry, rz } = part;
+    const pad = Math.max(rx, ry, rz) * 0.35;
+    bounds.expandByPoint(pxToLocal(cx - rx - pad, cy + ry + pad, cz - rz - pad));
+    bounds.expandByPoint(pxToLocal(cx + rx + pad, cy - ry - pad, cz + rz + pad));
   }
   bounds.expandByScalar(0.08);
   const toCell = (v: number) => Math.round(v * half + half);
@@ -93,112 +122,4 @@ export function buildAlienGeometry(parts: Chapter3AlienPart[]) {
   geometry.setAttribute("normal", new THREE.BufferAttribute(normal, 3));
   geometry.computeBoundingBox();
   return geometry;
-}
-
-type EtchStroke = { points: [number, number][]; closed: boolean; width: number };
-
-function mulberry32(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** `eyeOpen` 1 = open, 0 = closed (squashed etched rings). */
-export function drawEtchedFaceCanvas(eyeOpen = 1) {
-  const FACE_SIZE_PX = CHAPTER3_ALIEN_FACE_SIZE_PX;
-  const FACE_CENTER_PX = CHAPTER3_ALIEN_FACE_CENTER_PX;
-  const W = 1024;
-  const s = W / FACE_SIZE_PX[0];
-  const H = Math.round(FACE_SIZE_PX[1] * s);
-  const ox = FACE_CENTER_PX[0] - FACE_SIZE_PX[0] / 2;
-  const oy = FACE_CENTER_PX[1] - FACE_SIZE_PX[1] / 2;
-  const toCanvas = (px: number, py: number): [number, number] => [(px - ox) * s, (py - oy) * s];
-  const eyeY = 150;
-  const open = Math.max(0.04, Math.min(1, eyeOpen));
-  const rand = mulberry32(0x8a3c11);
-
-  const strokes: EtchStroke[] = [688, 762].map((ex) => ({
-    points: Array.from({ length: 160 }, (_, i) => {
-      const a = (i / 160) * Math.PI * 2;
-      return toCanvas(ex + Math.cos(a) * 10.5, eyeY + Math.sin(a) * 7 * open);
-    }),
-    closed: true,
-    width: 4.2 * s,
-  }));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  const normalAt = (st: EtchStroke, i: number) => {
-    const n = st.points.length;
-    const prev = st.points[st.closed ? (i - 1 + n) % n : Math.max(0, i - 1)];
-    const next = st.points[st.closed ? (i + 1) % n : Math.min(n - 1, i + 1)];
-    const dx = next[0] - prev[0];
-    const dy = next[1] - prev[1];
-    const len = Math.hypot(dx, dy) || 1;
-    return [-dy / len, dx / len] as const;
-  };
-  const tracePath = (st: EtchStroke, offset: number) => {
-    ctx.beginPath();
-    st.points.forEach((p, i) => {
-      const [nx, ny] = normalAt(st, i);
-      const x = p[0] + nx * offset;
-      const y = p[1] + ny * offset;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    if (st.closed) ctx.closePath();
-  };
-
-  ctx.strokeStyle = "rgba(220, 225, 228, 0.92)";
-  for (const st of strokes) {
-    ctx.lineWidth = st.width;
-    tracePath(st, 0);
-    ctx.stroke();
-  }
-
-  ctx.globalCompositeOperation = "source-atop";
-  for (const st of strokes) {
-    ctx.lineWidth = 0.32 * s;
-    for (let i = 0; i < st.points.length; i += 2) {
-      const [x, y] = st.points[i];
-      const [nx, ny] = normalAt(st, i);
-      const half = st.width * (0.5 + rand() * 0.1);
-      const jitter = (rand() - 0.5) * 0.25;
-      ctx.strokeStyle = `rgba(150, 156, 161, ${0.18 + rand() * 0.25})`;
-      ctx.beginPath();
-      ctx.moveTo(x - (nx + jitter * ny) * half, y - (ny - jitter * nx) * half);
-      ctx.lineTo(x + (nx - jitter * ny) * half, y + (ny + jitter * nx) * half);
-      ctx.stroke();
-    }
-  }
-  for (let k = 0; k < 9000; k++) {
-    const light = rand() < 0.6;
-    ctx.fillStyle = light
-      ? `rgba(255, 255, 255, ${0.6 + rand() * 0.4})`
-      : `rgba(120, 126, 131, ${0.3 + rand() * 0.3})`;
-    const r = (0.25 + rand() * 0.6) * s;
-    ctx.beginPath();
-    ctx.arc(rand() * W, rand() * H, r / 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.strokeStyle = "rgba(84, 90, 95, 0.75)";
-  ctx.lineWidth = 0.9 * s;
-  for (const st of strokes) {
-    for (const side of [-1, 1]) {
-      tracePath(st, (side * st.width) / 2);
-      ctx.stroke();
-    }
-  }
-  ctx.globalCompositeOperation = "source-over";
-  return canvas;
 }

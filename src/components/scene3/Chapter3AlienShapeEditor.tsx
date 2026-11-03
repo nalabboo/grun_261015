@@ -14,11 +14,17 @@ type Props = {
   parts: Chapter3AlienPart[];
   onChange: (parts: Chapter3AlienPart[]) => void;
   rebuilding?: boolean;
+  title?: string;
+  defaultParts?: Chapter3AlienPart[];
+  formatForSource?: (parts: Chapter3AlienPart[]) => string;
+  cyMin?: number;
+  embedded?: boolean;
+  includeRotation?: boolean;
 };
 
 type DragMode = "move" | "scaleX" | "scaleY" | null;
 
-const SLIDER_SPECS: { key: keyof Chapter3AlienPart; label: string; min: number; max: number; step: number }[] = [
+const SLIDER_SPECS_BASE: { key: keyof Chapter3AlienPart; label: string; min: number; max: number; step: number }[] = [
   { key: "cx", label: "X", min: 0, max: CHAPTER3_ALIEN_REF_WIDTH, step: 1 },
   { key: "cy", label: "Y", min: 0, max: CHAPTER3_ALIEN_REF_HEIGHT, step: 1 },
   { key: "cz", label: "Z (깊이)", min: -120, max: 120, step: 1 },
@@ -48,8 +54,28 @@ function dragModeAt(parts: Chapter3AlienPart[], index: number, px: number, py: n
   return "move";
 }
 
-/** Side-view metaball editor: drag blobs on the canvas, fine-tune with sliders. */
-export default function Chapter3AlienShapeEditor({ parts, onChange, rebuilding }: Props) {
+/** Metaball editor: drag blobs on the canvas, fine-tune with sliders. */
+export default function Chapter3AlienShapeEditor({
+  parts,
+  onChange,
+  rebuilding,
+  title = "쉐입 편집",
+  defaultParts = CHAPTER3_ALIEN_DEFAULT_PARTS,
+  formatForSource = formatAlienPartsForSource,
+  cyMin,
+  embedded = false,
+  includeRotation = false,
+}: Props) {
+  const sliderSpecs = [
+    ...SLIDER_SPECS_BASE.map((s) => (s.key === "cy" && cyMin !== undefined ? { ...s, min: cyMin } : s)),
+    ...(includeRotation
+      ? ([
+          { key: "rotX" as const, label: "회전 X", min: -90, max: 90, step: 1 },
+          { key: "rotY" as const, label: "회전 Y", min: -90, max: 90, step: 1 },
+          { key: "rotZ" as const, label: "회전 Z", min: -90, max: 90, step: 1 },
+        ] as const)
+      : []),
+  ];
   const [open, setOpen] = useState(true);
   const [selected, setSelected] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -159,13 +185,13 @@ export default function Chapter3AlienShapeEditor({ parts, onChange, rebuilding }
   };
 
   const copySource = async () => {
-    await navigator.clipboard.writeText(formatAlienPartsForSource(parts));
+    await navigator.clipboard.writeText(formatForSource(parts));
   };
 
   return (
-    <div className="chapter3-shape">
+    <div className={embedded ? "chapter3-shape chapter3-shape--embedded" : "chapter3-shape"}>
       <button type="button" className="chapter3-shape__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        쉐입 편집 {open ? "▾" : "▸"}
+        {title} {open ? "▾" : "▸"}
         {rebuilding ? " · 갱신 중…" : ""}
       </button>
       {open && (
@@ -202,18 +228,18 @@ export default function Chapter3AlienShapeEditor({ parts, onChange, rebuilding }
                   onChange={(e) => patchPart(selectedIndex, { name: e.target.value })}
                 />
               </label>
-              {SLIDER_SPECS.map((spec) => (
+              {sliderSpecs.map((spec) => (
                 <label key={spec.key} className="chapter3-shape__row">
                   <span>
                     {spec.label}
-                    <output>{Number(current[spec.key]).toFixed(spec.step < 1 ? 2 : 0)}</output>
+                    <output>{Number(current[spec.key] ?? 0).toFixed(spec.step < 1 ? 2 : 0)}</output>
                   </span>
                   <input
                     type="range"
                     min={spec.min}
                     max={spec.max}
                     step={spec.step}
-                    value={Number(current[spec.key])}
+                    value={Number(current[spec.key] ?? 0)}
                     onChange={(e) => patchPart(selectedIndex, { [spec.key]: Number(e.target.value) })}
                   />
                 </label>
@@ -235,6 +261,9 @@ export default function Chapter3AlienShapeEditor({ parts, onChange, rebuilding }
                     ry: 50,
                     rz: 50,
                     blend: 40,
+                    rotX: 0,
+                    rotY: 0,
+                    rotZ: 0,
                   },
                 ])
               }
@@ -252,7 +281,7 @@ export default function Chapter3AlienShapeEditor({ parts, onChange, rebuilding }
             >
               삭제
             </button>
-            <button type="button" onClick={() => onChange(cloneAlienParts(CHAPTER3_ALIEN_DEFAULT_PARTS))}>
+            <button type="button" onClick={() => onChange(cloneAlienParts(defaultParts))}>
               기본값
             </button>
             <button type="button" onClick={() => void copySource()}>
