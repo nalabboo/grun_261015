@@ -329,14 +329,15 @@ body {
   inset: 0;
   z-index: 30;
   overflow: hidden;
-  background: #0a0b0e;
+  background: radial-gradient(ellipse at 50% 40%, #10131c 0%, #07080d 55%, #030305 100%);
   animation: chapter2-scene-in 0.45s ease-out forwards;
 }
 
-.chapter3-scene__veil {
+.chapter3-stars {
   position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 38%, rgba(120, 128, 148, 0.12), transparent 58%);
+  left: 0;
+  top: 0;
+  display: block;
   pointer-events: none;
 }
 

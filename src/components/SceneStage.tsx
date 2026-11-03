@@ -11,7 +11,6 @@ import Chapter2Intro from "@/components/scene2/Chapter2Intro";
 import Chapter2Scene from "@/components/scene2/Chapter2Scene";
 import Chapter3Intro from "@/components/scene3/Chapter3Intro";
 import Chapter3Scene from "@/components/scene3/Chapter3Scene";
-import { Chapter2LayoutRulerPortal } from "@/components/scene2/Chapter2LayoutRuler";
 import { preloadChapter2BergAssets } from "@/constants/chapter2Config";
 import NextScene from "@/components/scene2/NextScene";
 import PageTurnButton from "@/components/scene2/PageTurnButton";
@@ -61,10 +60,31 @@ type Chapter1Phase = "scroll" | "tableau";
 type Chapter2Step = "intro" | "play";
 type Chapter3Step = "intro" | "play";
 
-/** Local dev: skip to chapter 2 play on load (`NEXT_PUBLIC_DEV_CHAPTER2=1`). Default: chapter 1. */
-const DEV_START_CHAPTER2 =
+function getDevStartChapter(): Chapter {
+  if (process.env.NODE_ENV !== "development") return 1;
+  if (process.env.NEXT_PUBLIC_DEV_CHAPTER === "1") return 1;
+  if (
+    process.env.NEXT_PUBLIC_DEV_CHAPTER === "2" ||
+    process.env.NEXT_PUBLIC_DEV_CHAPTER2 === "1"
+  ) {
+    return 2;
+  }
+  if (
+    process.env.NEXT_PUBLIC_DEV_CHAPTER === "3" ||
+    process.env.NEXT_PUBLIC_DEV_CHAPTER3 === "1"
+  ) {
+    return 3;
+  }
+  /** Chapter 3 in progress — dev opens on 3장 play. Use NEXT_PUBLIC_DEV_CHAPTER=1|2 to override. */
+  return 3;
+}
+
+const DEV_START_CHAPTER = getDevStartChapter();
+
+/** Scene 1 layer gizmo toolbar — off by default (`NEXT_PUBLIC_DEV_LAYER_EDIT=1`). */
+const DEV_LAYER_EDITOR =
   process.env.NODE_ENV === "development" &&
-  process.env.NEXT_PUBLIC_DEV_CHAPTER2 === "1";
+  process.env.NEXT_PUBLIC_DEV_LAYER_EDIT === "1";
 
 export default function SceneStage() {
   const stageRef = useRef<HTMLElement>(null);
@@ -115,15 +135,17 @@ export default function SceneStage() {
   const grunSourceRef = useRef<GrunFrameSource>(createGrunFrameSource());
   const prevHeightRef = useRef(0);
   const backgroundWhiteMaxRef = useRef(0);
-  const [chapter, setChapter] = useState<Chapter>(DEV_START_CHAPTER2 ? 2 : 1);
+  const [chapter, setChapter] = useState<Chapter>(DEV_START_CHAPTER);
   const [chapter1Phase, setChapter1Phase] = useState<Chapter1Phase>("scroll");
   const [tableauRevealed, setTableauRevealed] = useState(false);
   const [chapter2Step, setChapter2Step] = useState<Chapter2Step | null>(
-    DEV_START_CHAPTER2 ? "play" : null,
+    DEV_START_CHAPTER === 2 ? "play" : null,
   );
   const [chapter2PlayReady, setChapter2PlayReady] = useState(false);
-  const [chapter3Step, setChapter3Step] = useState<Chapter3Step | null>(null);
-  const chapterRef = useRef<Chapter>(DEV_START_CHAPTER2 ? 2 : 1);
+  const [chapter3Step, setChapter3Step] = useState<Chapter3Step | null>(
+    DEV_START_CHAPTER === 3 ? "play" : null,
+  );
+  const chapterRef = useRef<Chapter>(DEV_START_CHAPTER);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
 
   useEffect(() => {
@@ -624,12 +646,14 @@ export default function SceneStage() {
         editor={editor}
         onReady={handleGlReady}
       />
-      <LayerEditorPanel
-        editor={editor}
-        onToggle={handleEditToggle}
-        onSelect={handleEditSelect}
-        onModeChange={handleEditMode}
-      />
+      {DEV_LAYER_EDITOR && (
+        <LayerEditorPanel
+          editor={editor}
+          onToggle={handleEditToggle}
+          onSelect={handleEditSelect}
+          onModeChange={handleEditMode}
+        />
+      )}
       <GrunCharacter
         sourceRef={grunSourceRef}
         isWalking={grunIsWalking}
@@ -670,7 +694,6 @@ export default function SceneStage() {
           }}
           onChapter3PageTurn={handleChapter3PageTurn}
         />
-        <Chapter2LayoutRulerPortal />
       </>
     )}
     {chapter === 2 && chapter2Step === "intro" && (

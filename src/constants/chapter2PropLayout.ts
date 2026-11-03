@@ -324,7 +324,7 @@ export const DEV_CHAPTER2_PROP_EDITOR =
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_CHAPTER2_EDIT !== "0";
 
-/** Rulers: localhost / dev by default; force with NEXT_PUBLIC_DEV_CHAPTER2_RULER=1|0. */
+/** Layout rulers off by default; enable with NEXT_PUBLIC_DEV_CHAPTER2_RULER=1 in SceneStage. */
 export const CHAPTER2_LAYOUT_RULER_ENV = process.env.NEXT_PUBLIC_DEV_CHAPTER2_RULER;
 
 export type Chapter2PropEditorState = {

@@ -112,7 +112,7 @@ export function Chapter2LayoutRulerPortal() {
   const [mountTarget, setMountTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DEV_CHAPTER2_RULER === "0") return;
+    if (process.env.NEXT_PUBLIC_DEV_CHAPTER2_RULER !== "1") return;
     setMountTarget(document.documentElement);
   }, []);
 
