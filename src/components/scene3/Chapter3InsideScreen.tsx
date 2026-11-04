@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Chapter3Alien2Editor from "@/components/scene3/Chapter3Alien2Editor";
+import type * as THREE from "three";
+import Chapter3Alien3Editor from "@/components/scene3/Chapter3Alien3Editor";
+import { buildAlien3SketchGeometry } from "@/components/scene3/chapter3Alien3SketchGeometry";
 import { createChapter3InsideScene } from "@/components/scene3/chapter3InsideScene";
 import type { Chapter3AlienFaceParams } from "@/constants/chapter3AlienFaceConfig";
 import {
-  CHAPTER3_ALIEN2_EDITOR,
-  type Chapter3Alien2FaceParams,
-  type Chapter3Alien2GlassParams,
+  CHAPTER3_ALIEN3_EDITOR,
+  type Chapter3Alien3FaceParams,
+  type Chapter3Alien3GlassParams,
+} from "@/constants/chapter3Alien3Config";
+import type {
+  Chapter3Alien2FaceParams,
+  Chapter3Alien2GlassParams,
 } from "@/constants/chapter3Alien2Config";
 import { cloneAlienParts, type Chapter3AlienPart } from "@/constants/chapter3AlienShape";
-import { CHAPTER3_INSIDE_PAPIER_URL } from "@/constants/scene3Config";
-
-const REBUILD_MS = 420;
+import { CHAPTER3_ALIEN3_SKETCH_URL, CHAPTER3_INSIDE_PAPIER_URL } from "@/constants/scene3Config";
 
 export type Chapter3InsideScreenConfig = {
   ariaLabel: string;
@@ -26,9 +30,14 @@ export type Chapter3InsideScreenConfig = {
     loadParts: () => Chapter3AlienPart[];
     loadFace: () => Chapter3Alien2FaceParams;
     loadGlass: () => Chapter3Alien2GlassParams;
-    saveParts: (parts: Chapter3AlienPart[]) => void;
-    saveFace: (face: Chapter3Alien2FaceParams) => void;
-    saveGlass: (glass: Chapter3Alien2GlassParams) => void;
+  };
+  alien3?: {
+    face: Chapter3Alien3FaceParams;
+    glass: Chapter3Alien3GlassParams;
+    loadFace: () => Chapter3Alien3FaceParams;
+    loadGlass: () => Chapter3Alien3GlassParams;
+    saveFace: (face: Chapter3Alien3FaceParams) => void;
+    saveGlass: (glass: Chapter3Alien3GlassParams) => void;
   };
 };
 
@@ -40,82 +49,100 @@ export default function Chapter3InsideScreen({ config }: Props) {
   const paperRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<ReturnType<typeof createChapter3InsideScene> | null>(null);
-  const rebuildTimerRef = useRef<number | null>(null);
-  const latestAlien2PartsRef = useRef<Chapter3AlienPart[] | null>(null);
 
-  const [alien2Parts, setAlien2PartsState] = useState(() =>
-    cloneAlienParts(config.alien2?.loadParts() ?? config.alien2?.parts ?? []),
-  );
-  const [alien2Face, setAlien2FaceState] = useState(() => config.alien2?.loadFace() ?? config.alien2?.face);
-  const [alien2Glass, setAlien2GlassState] = useState(() => config.alien2?.loadGlass() ?? config.alien2?.glass);
-  const [rebuilding, setRebuilding] = useState(false);
-
-  const scheduleAlien2Rebuild = (next: Chapter3AlienPart[]) => {
-    if (!config.alien2) return;
-    latestAlien2PartsRef.current = next;
-    setAlien2PartsState(cloneAlienParts(next));
-    config.alien2.saveParts(next);
-    if (rebuildTimerRef.current !== null) window.clearTimeout(rebuildTimerRef.current);
-    setRebuilding(true);
-    rebuildTimerRef.current = window.setTimeout(() => {
-      const snapshot = latestAlien2PartsRef.current;
-      if (snapshot) stageRef.current?.setAlien2Parts(snapshot);
-      setRebuilding(false);
-      rebuildTimerRef.current = null;
-    }, REBUILD_MS);
-  };
+  const [alien3Face, setAlien3FaceState] = useState(() => config.alien3?.loadFace() ?? config.alien3?.face);
+  const [alien3Glass, setAlien3GlassState] = useState(() => config.alien3?.loadGlass() ?? config.alien3?.glass);
+  const [stageError, setStageError] = useState<string | null>(null);
 
   useEffect(() => {
     const paper = paperRef.current;
     const canvas = canvasRef.current;
     if (!paper || !canvas) return;
 
-    const initial = config.loadParts();
-    const initialFace = config.initialFace;
-    const a2 = config.alien2;
-    const a2Parts = a2?.loadParts() ?? a2?.parts;
-    const a2Face = a2?.loadFace() ?? a2?.face;
-    const a2Glass = a2?.loadGlass() ?? a2?.glass;
-    if (a2Parts) setAlien2PartsState(cloneAlienParts(a2Parts));
-    if (a2Face) setAlien2FaceState(a2Face);
-    if (a2Glass) setAlien2GlassState(a2Glass);
+    let cancelled = false;
+    let alien3Body: THREE.BufferGeometry | null = null;
 
-    const stage = createChapter3InsideScene(
-      canvas,
-      paper,
-      initial,
-      initialFace,
-      a2 && a2Parts && a2Face && a2Glass
-        ? { parts: a2Parts, face: a2Face, glass: a2Glass }
-        : undefined,
-    );
-    stageRef.current = stage;
-    const resize = () => {
-      stage.setSize(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, 2));
-    };
-    resize();
-    window.addEventListener("resize", resize);
+    const boot = async () => {
+      setStageError(null);
+      const initial = config.loadParts();
+      const initialFace = config.initialFace;
+      const a2 = config.alien2;
+      const a3 = config.alien3;
+      const a2Parts = a2?.loadParts() ?? a2?.parts;
+      const a2Face = a2?.loadFace() ?? a2?.face;
+      const a2Glass = a2?.loadGlass() ?? a2?.glass;
+      const a3Face = a3?.loadFace() ?? a3?.face;
+      const a3Glass = a3?.loadGlass() ?? a3?.glass;
+      if (a3Face) setAlien3FaceState(a3Face);
+      if (a3Glass) setAlien3GlassState(a3Glass);
 
-    const onPointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      stage.pokeAt(e.clientX, e.clientY);
-    };
-    canvas.addEventListener("pointerdown", onPointerDown);
+      try {
+        if (a3) {
+          alien3Body = await buildAlien3SketchGeometry(CHAPTER3_ALIEN3_SKETCH_URL);
+        }
+      } catch (e) {
+        if (!cancelled) setStageError(e instanceof Error ? e.message : "외계인3 스케치 로드 실패");
+        return;
+      }
 
-    let raf = 0;
-    const tick = (now: number) => {
-      stage.render(now);
+      if (cancelled) {
+        alien3Body?.dispose();
+        return;
+      }
+
+      const extras: Parameters<typeof createChapter3InsideScene>[4] = {};
+      if (a2 && a2Parts && a2Face && a2Glass) {
+        extras.alien2 = { parts: a2Parts, face: a2Face, glass: a2Glass };
+      }
+      if (a3 && a3Face && a3Glass && alien3Body) {
+        extras.alien3 = { bodyGeometry: alien3Body, face: a3Face, glass: a3Glass };
+      }
+
+      const stage = createChapter3InsideScene(
+        canvas,
+        paper,
+        initial,
+        initialFace,
+        extras.alien2 || extras.alien3 ? extras : undefined,
+      );
+      stageRef.current = stage;
+      const resize = () => {
+        stage.setSize(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, 2));
+      };
+      resize();
+      window.addEventListener("resize", resize);
+
+      const onPointerDown = (e: PointerEvent) => {
+        if (e.button !== 0) return;
+        stage.pokeAt(e.clientX, e.clientY);
+      };
+      canvas.addEventListener("pointerdown", onPointerDown);
+
+      let raf = 0;
+      const tick = (now: number) => {
+        stage.render(now);
+        raf = requestAnimationFrame(tick);
+      };
       raf = requestAnimationFrame(tick);
+
+      return () => {
+        cancelAnimationFrame(raf);
+        window.removeEventListener("resize", resize);
+        canvas.removeEventListener("pointerdown", onPointerDown);
+        stageRef.current = null;
+        stage.dispose();
+      };
     };
-    raf = requestAnimationFrame(tick);
+
+    let teardown: (() => void) | void;
+    void boot().then((t) => {
+      teardown = t;
+    });
 
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
-      canvas.removeEventListener("pointerdown", onPointerDown);
-      if (rebuildTimerRef.current !== null) window.clearTimeout(rebuildTimerRef.current);
-      stageRef.current = null;
-      stage.dispose();
+      cancelled = true;
+      teardown?.();
+      if (!stageRef.current) alien3Body?.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one stage per mount
   }, []);
@@ -131,23 +158,25 @@ export default function Chapter3InsideScreen({ config }: Props) {
         draggable={false}
       />
       <canvas ref={canvasRef} className="chapter3-stars" />
-      {CHAPTER3_ALIEN2_EDITOR && config.alien2 && alien2Glass && alien2Face && (
-        <Chapter3Alien2Editor
-          glass={alien2Glass}
-          face={alien2Face}
-          parts={alien2Parts}
-          rebuilding={rebuilding}
+      {stageError && (
+        <p className="chapter3-shape__hint" style={{ position: "absolute", left: 16, bottom: 16, zIndex: 4 }}>
+          {stageError}
+        </p>
+      )}
+      {CHAPTER3_ALIEN3_EDITOR && config.alien3 && alien3Glass && alien3Face && (
+        <Chapter3Alien3Editor
+          glass={alien3Glass}
+          face={alien3Face}
           onGlassChange={(next) => {
-            setAlien2GlassState(next);
-            config.alien2!.saveGlass(next);
-            stageRef.current?.setAlien2GlassParams(next);
+            setAlien3GlassState(next);
+            config.alien3!.saveGlass(next);
+            stageRef.current?.setAlien3GlassParams(next);
           }}
           onFaceChange={(next) => {
-            setAlien2FaceState(next);
-            config.alien2!.saveFace(next);
-            stageRef.current?.setAlien2FaceParams(next);
+            setAlien3FaceState(next);
+            config.alien3!.saveFace(next);
+            stageRef.current?.setAlien3FaceParams(next);
           }}
-          onPartsChange={scheduleAlien2Rebuild}
         />
       )}
     </div>

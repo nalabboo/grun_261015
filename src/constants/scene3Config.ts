@@ -1,5 +1,5 @@
 /** Bump when `public/scene3/` assets change. */
-export const CHAPTER3_ASSET_VERSION = "20261103-kosmos";
+export const CHAPTER3_ASSET_VERSION = "20261104-alien3sketch";
 
 export function chapter3AssetUrl(relativePath: string) {
   const path = relativePath.split("/").map(encodeURIComponent).join("/");
@@ -11,6 +11,9 @@ export const CHAPTER3_KOSMO_URL = chapter3AssetUrl("kosmos/kosmo.png");
 
 /** White paper backdrop of the screen inside the planet. */
 export const CHAPTER3_INSIDE_PAPIER_URL = chapter3AssetUrl("background/papier.jpg");
+
+/** Hand-drawn 외계인3 outline (silhouette source). */
+export const CHAPTER3_ALIEN3_SKETCH_URL = chapter3AssetUrl("characters/alien3-sketch.png");
 
 /** Chapter 3 opening title. */
 export const CHAPTER3_TITLE = "색이 없는 소호 행성";

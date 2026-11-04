@@ -35,14 +35,34 @@ import {
   type Chapter3Alien2FaceParams,
   type Chapter3Alien2GlassParams,
 } from "@/constants/chapter3Alien2Config";
+import {
+  CHAPTER3_ALIEN3_DELAY_MS,
+  CHAPTER3_ALIEN3_POSITION_X,
+  CHAPTER3_ALIEN3_SWAY,
+  CHAPTER3_ALIEN3_TURN,
+  CHAPTER3_ALIEN3_WIDTH,
+  type Chapter3Alien3FaceParams,
+  type Chapter3Alien3GlassParams,
+} from "@/constants/chapter3Alien3Config";
 import { buildAlien2FaceRig, setAlien2EyeOpen } from "@/components/scene3/chapter3Alien2Face";
+import { buildAlien3FaceRig, setAlien3EyeOpen } from "@/components/scene3/chapter3Alien3Face";
 import { buildAlienGeometry } from "@/components/scene3/chapter3AlienGeometry";
 
-/** Second alien standing next to the hero (외계인2). */
-export type Chapter3InsideSecondaryAlien = {
+export type Chapter3InsideAlien2Bundle = {
   parts: Chapter3AlienPart[];
   face: Chapter3Alien2FaceParams;
   glass: Chapter3Alien2GlassParams;
+};
+
+export type Chapter3InsideAlien3Bundle = {
+  bodyGeometry: THREE.BufferGeometry;
+  face: Chapter3Alien3FaceParams;
+  glass: Chapter3Alien3GlassParams;
+};
+
+export type Chapter3InsideExtras = {
+  alien2?: Chapter3InsideAlien2Bundle;
+  alien3?: Chapter3InsideAlien3Bundle;
 };
 
 type AlienMotion = {
@@ -53,7 +73,7 @@ type AlienMotion = {
   sway: number;
 };
 
-type AlienFaceKind = "alien1" | "alien2";
+type AlienFaceKind = "alien1" | "alien2" | "alien3";
 
 type AlienSlot = {
   root: THREE.Group;
@@ -64,7 +84,7 @@ type AlienSlot = {
   faceBeadGeometry?: THREE.SphereGeometry;
   bodyOffset: THREE.Vector3;
   faceKind: AlienFaceKind;
-  faceParams: Chapter3AlienFaceParams | Chapter3Alien2FaceParams;
+  faceParams: Chapter3AlienFaceParams | Chapter3Alien2FaceParams | Chapter3Alien3FaceParams;
   motion: AlienMotion;
   poke: number;
   nextBlinkAt: number;
@@ -153,7 +173,14 @@ function remountFaceRig(slot: AlienSlot, eyeMaterial: THREE.Material) {
   slot.faceRig.mouthMesh?.geometry.dispose();
   slot.faceBeadGeometry?.dispose();
 
-  if (slot.faceKind === "alien2") {
+  if (slot.faceKind === "alien3") {
+    slot.faceRig = buildAlien3FaceRig(
+      slot.geometry,
+      eyeMaterial,
+      eyeMaterial,
+      slot.faceParams as Chapter3Alien3FaceParams,
+    );
+  } else if (slot.faceKind === "alien2") {
     slot.faceRig = buildAlien2FaceRig(
       slot.geometry,
       eyeMaterial,
@@ -260,6 +287,45 @@ function createAlien2Slot(
   return slot;
 }
 
+function createAlien3Slot(
+  geometry: THREE.BufferGeometry,
+  face: Chapter3Alien3FaceParams,
+  motion: AlienMotion,
+  bodyMaterial: THREE.MeshPhysicalMaterial,
+  eyeMaterial: THREE.MeshPhysicalMaterial,
+): AlienSlot {
+  const body = new THREE.Mesh(geometry, bodyMaterial);
+  const faceRig = buildAlien3FaceRig(geometry, eyeMaterial, eyeMaterial, face);
+  const faceBeadGeometry = faceRig.eyeMeshes[0]?.geometry as THREE.SphereGeometry | undefined;
+  const inner = new THREE.Group();
+  inner.add(body, faceRig.group);
+  const root = new THREE.Group();
+  root.add(inner);
+  root.position.x = motion.positionX;
+  root.visible = false;
+  const slot: AlienSlot = {
+    root,
+    inner,
+    body,
+    geometry,
+    faceRig,
+    faceBeadGeometry,
+    bodyOffset: new THREE.Vector3(),
+    faceKind: "alien3",
+    faceParams: face,
+    motion,
+    poke: 0,
+    nextBlinkAt: 0,
+    blinkStartAt: 0,
+    blinkActive: false,
+    rebuildToken: 0,
+    shadowBaseW: motion.width,
+    shadowBaseD: 1,
+  };
+  fitSlotToGeometry(slot);
+  return slot;
+}
+
 function disposeSlot(slot: AlienSlot) {
   slot.geometry.dispose();
   slot.faceRig.disposeProbe();
@@ -308,7 +374,7 @@ export function createChapter3InsideScene(
   paper: HTMLImageElement,
   initialParts: Chapter3AlienPart[],
   initialFace: Chapter3AlienFaceParams,
-  secondary?: Chapter3InsideSecondaryAlien,
+  extras?: Chapter3InsideExtras,
 ) {
   const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, alpha: true, antialias: true });
   renderer.setClearColor(0xffffff, 0);
@@ -368,7 +434,9 @@ export function createChapter3InsideScene(
   const shadowGeometry = new THREE.PlaneGeometry(1, 1);
 
   /** Same clear glass for every alien; own uniforms so a poke only jiggles the one touched. */
-  const createGlass = (glassOpts?: Chapter3Alien2GlassParams) => {
+  type GlassKnobs = Chapter3Alien2GlassParams | Chapter3Alien3GlassParams;
+
+  const createGlass = (glassOpts?: GlassKnobs) => {
     const ior = glassOpts?.ior ?? CHAPTER3_ALIEN_IOR;
     const dispersion = glassOpts?.dispersion ?? CHAPTER3_ALIEN_DISPERSION;
     const baseWobble = glassOpts?.wobble ?? CHAPTER3_ALIEN_WOBBLE;
@@ -440,7 +508,7 @@ export function createChapter3InsideScene(
     shadow: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   };
 
-  const applyGlassParams = (actor: Actor, params: Chapter3Alien2GlassParams) => {
+  const applyGlassParams = (actor: Actor, params: GlassKnobs) => {
     actor.glass.baseWobble = params.wobble;
     actor.glass.body.ior = params.ior;
     actor.glass.body.dispersion = params.dispersion;
@@ -452,7 +520,7 @@ export function createChapter3InsideScene(
     parts: Chapter3AlienPart[],
     face: Chapter3AlienFaceParams,
     motion: AlienMotion,
-    glassOpts?: Chapter3Alien2GlassParams,
+    glassOpts?: GlassKnobs,
   ): Actor => {
     const glass = createGlass(glassOpts);
     const slot = createAlienSlot(parts, face, motion, glass.body, glass.eye);
@@ -471,7 +539,20 @@ export function createChapter3InsideScene(
     turn: CHAPTER3_ALIEN_TURN,
     sway: CHAPTER3_ALIEN_SWAY,
   });
-  const secondaryActor = secondary
+  const mountExtraActor = (
+    slot: AlienSlot,
+    glass: ReturnType<typeof createGlass>,
+    positionX: number,
+  ): Actor => {
+    scene.add(slot.root);
+    const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial.clone());
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.set(positionX, 0.002, 0);
+    scene.add(shadow);
+    return { slot, glass, shadow };
+  };
+
+  const alien2Actor = extras?.alien2
     ? (() => {
         const motion = {
           width: CHAPTER3_ALIEN2_WIDTH,
@@ -480,23 +561,44 @@ export function createChapter3InsideScene(
           turn: CHAPTER3_ALIEN2_TURN,
           sway: CHAPTER3_ALIEN2_SWAY,
         };
-        const glass = createGlass(secondary.glass);
+        const glass = createGlass(extras.alien2.glass);
         const slot = createAlien2Slot(
-          secondary.parts,
-          secondary.face,
+          extras.alien2.parts,
+          extras.alien2.face,
           motion,
           glass.body,
           glass.eye,
         );
-        scene.add(slot.root);
-        const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial.clone());
-        shadow.rotation.x = -Math.PI / 2;
-        shadow.position.set(motion.positionX, 0.002, 0);
-        scene.add(shadow);
-        return { slot, glass, shadow } satisfies Actor;
+        return mountExtraActor(slot, glass, motion.positionX);
       })()
     : null;
-  const actors = secondaryActor ? [primaryActor, secondaryActor] : [primaryActor];
+
+  const alien3Actor = extras?.alien3
+    ? (() => {
+        const motion = {
+          width: CHAPTER3_ALIEN3_WIDTH,
+          positionX: CHAPTER3_ALIEN3_POSITION_X,
+          delayMs: CHAPTER3_ALIEN3_DELAY_MS,
+          turn: CHAPTER3_ALIEN3_TURN,
+          sway: CHAPTER3_ALIEN3_SWAY,
+        };
+        const glass = createGlass(extras.alien3.glass);
+        const slot = createAlien3Slot(
+          extras.alien3.bodyGeometry,
+          extras.alien3.face,
+          motion,
+          glass.body,
+          glass.eye,
+        );
+        return mountExtraActor(slot, glass, motion.positionX);
+      })()
+    : null;
+
+  const actors = [
+    primaryActor,
+    ...(alien2Actor ? [alien2Actor] : []),
+    ...(alien3Actor ? [alien3Actor] : []),
+  ];
 
   let startAt: number | null = null;
   let lastFrameMs: number | null = null;
@@ -541,20 +643,32 @@ export function createChapter3InsideScene(
       remountFaceRig(primaryActor.slot, primaryActor.glass.eye);
     },
     setAlien2FaceParams(params: Chapter3Alien2FaceParams) {
-      if (!secondaryActor) return;
-      secondaryActor.slot.faceParams = params;
-      remountFaceRig(secondaryActor.slot, secondaryActor.glass.eye);
+      if (!alien2Actor) return;
+      alien2Actor.slot.faceParams = params;
+      remountFaceRig(alien2Actor.slot, alien2Actor.glass.eye);
+    },
+    setAlien3FaceParams(params: Chapter3Alien3FaceParams) {
+      if (!alien3Actor) return;
+      alien3Actor.slot.faceParams = params;
+      remountFaceRig(alien3Actor.slot, alien3Actor.glass.eye);
     },
     setAlienParts(parts: Chapter3AlienPart[]) {
       rebuildParts(primaryActor, parts);
     },
     setAlien2Parts(parts: Chapter3AlienPart[]) {
-      if (!secondaryActor) return;
-      rebuildParts(secondaryActor, parts);
+      if (!alien2Actor) return;
+      rebuildParts(alien2Actor, parts);
+    },
+    setAlien3Parts(_parts: Chapter3AlienPart[]) {
+      /* 외계인3 body comes from the pen sketch silhouette, not metaballs. */
     },
     setAlien2GlassParams(params: Chapter3Alien2GlassParams) {
-      if (!secondaryActor) return;
-      applyGlassParams(secondaryActor, params);
+      if (!alien2Actor) return;
+      applyGlassParams(alien2Actor, params);
+    },
+    setAlien3GlassParams(params: Chapter3Alien3GlassParams) {
+      if (!alien3Actor) return;
+      applyGlassParams(alien3Actor, params);
     },
     setSize(w: number, h: number, dpr: number) {
       viewW = w;
@@ -599,14 +713,18 @@ export function createChapter3InsideScene(
             const blinkT = Math.min(1, (now - slot.blinkStartAt) / CHAPTER3_ALIEN_BLINK_MS);
             const shut = Math.sin(blinkT * Math.PI);
             const open = 1 - shut * 0.96;
-            if (slot.faceKind === "alien2") {
+            if (slot.faceKind === "alien3") {
+              setAlien3EyeOpen(slot.faceRig, open);
+            } else if (slot.faceKind === "alien2") {
               setAlien2EyeOpen(slot.faceRig, open);
             } else {
               setAlienEyeOpen(slot.faceRig.eyeMeshes, slot.faceRig.eyeBeadRadius, open);
             }
             if (blinkT >= 1) {
               slot.blinkActive = false;
-              if (slot.faceKind === "alien2") {
+              if (slot.faceKind === "alien3") {
+                setAlien3EyeOpen(slot.faceRig, 1);
+              } else if (slot.faceKind === "alien2") {
                 setAlien2EyeOpen(slot.faceRig, 1);
               } else {
                 setAlienEyeOpen(slot.faceRig.eyeMeshes, slot.faceRig.eyeBeadRadius, 1);

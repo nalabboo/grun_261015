@@ -18,7 +18,7 @@ export type Chapter3Alien2GlassParams = {
   dispersion: number;
 };
 
-export const CHAPTER3_ALIEN2_EDITOR = true;
+export const CHAPTER3_ALIEN2_EDITOR = false;
 export const CHAPTER3_ALIEN2_GLASS_STORAGE_KEY = "chapter3-alien2-glass";
 export const CHAPTER3_ALIEN2_SHAPE_STORAGE_KEY = "chapter3-alien2-shape";
 
