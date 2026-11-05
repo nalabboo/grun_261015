@@ -1,4 +1,4 @@
-/** Glass bead eyes + stick mouth (reference photo pixels, y down). */
+/** Glass bead eyes + horizontal elliptical mouth (reference photo pixels, y down). */
 export type Chapter3AlienFaceParams = {
   eyeLeftX: number;
   eyeLeftY: number;
@@ -7,9 +7,9 @@ export type Chapter3AlienFaceParams = {
   eyeRadius: number;
   mouthCenterX: number;
   mouthCenterY: number;
-  mouthWidth: number;
-  mouthStick: number;
-  mouthSmile: number;
+  mouthRadius: number;
+  mouthScaleX: number;
+  mouthScaleY: number;
 };
 
 export const CHAPTER3_ALIEN_FACE_STORAGE_KEY = "chapter3-alien-face";
@@ -22,13 +22,13 @@ export const CHAPTER3_ALIEN_DEFAULT_FACE: Chapter3AlienFaceParams = {
   eyeRadius: 10.5,
   mouthCenterX: 744,
   mouthCenterY: 171,
-  mouthWidth: 28,
-  mouthStick: 3.3,
-  mouthSmile: 2.5,
+  mouthRadius: 3.8,
+  mouthScaleX: 2.85,
+  mouthScaleY: 0.58,
 };
 
 /** Face tuning panel on the inside screen. */
-export const CHAPTER3_ALIEN_FACE_EDITOR = false;
+export const CHAPTER3_ALIEN_FACE_EDITOR = true;
 
 export const CHAPTER3_ALIEN_FACE_PARAM_SPECS: {
   key: keyof Chapter3AlienFaceParams;
@@ -44,16 +44,18 @@ export const CHAPTER3_ALIEN_FACE_PARAM_SPECS: {
   { key: "eyeRadius", label: "눈 알 크기", min: 4, max: 22, step: 0.5 },
   { key: "mouthCenterX", label: "입 X", min: 640, max: 820, step: 1 },
   { key: "mouthCenterY", label: "입 Y", min: 120, max: 280, step: 1 },
-  { key: "mouthWidth", label: "입 너비", min: 20, max: 90, step: 1 },
-  { key: "mouthStick", label: "입 작대기 굵기", min: 1, max: 8, step: 0.1 },
-  { key: "mouthSmile", label: "입 곡선", min: 0, max: 28, step: 0.5 },
+  { key: "mouthRadius", label: "입 크기", min: 1.5, max: 12, step: 0.1 },
+  { key: "mouthScaleX", label: "입 가로", min: 1, max: 5, step: 0.05 },
+  { key: "mouthScaleY", label: "입 세로", min: 0.2, max: 1.2, step: 0.05 },
 ];
 
 export function loadAlienFaceFromStorage(): Chapter3AlienFaceParams {
   if (typeof window === "undefined") return { ...CHAPTER3_ALIEN_DEFAULT_FACE };
   try {
     const raw = JSON.parse(window.localStorage.getItem(CHAPTER3_ALIEN_FACE_STORAGE_KEY) ?? "null");
-    return { ...CHAPTER3_ALIEN_DEFAULT_FACE, ...raw };
+    if (!raw || typeof raw !== "object") return { ...CHAPTER3_ALIEN_DEFAULT_FACE };
+    const merged = { ...CHAPTER3_ALIEN_DEFAULT_FACE, ...raw };
+    return merged;
   } catch {
     return { ...CHAPTER3_ALIEN_DEFAULT_FACE };
   }
@@ -73,8 +75,8 @@ export function formatAlienFaceForSource(params: Chapter3AlienFaceParams): strin
     e("eyeRadius"),
     e("mouthCenterX"),
     e("mouthCenterY"),
-    e("mouthWidth"),
-    e("mouthStick"),
-    e("mouthSmile"),
+    e("mouthRadius"),
+    e("mouthScaleX"),
+    e("mouthScaleY"),
   ].join(",\n  ")},\n};`;
 }

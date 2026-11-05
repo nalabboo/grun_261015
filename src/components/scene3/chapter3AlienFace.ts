@@ -27,36 +27,25 @@ function surfaceHit(probe: THREE.Mesh, raycaster: THREE.Raycaster, px: number, p
   return { point, normal };
 }
 
-function smilePoints(params: Chapter3AlienFaceParams, count = 9) {
-  const pts: [number, number][] = [];
-  for (let i = 0; i < count; i++) {
-    const u = i / (count - 1);
-    const px = params.mouthCenterX + (u - 0.5) * params.mouthWidth;
-    const py = params.mouthCenterY - params.mouthSmile * Math.sin(u * Math.PI);
-    pts.push([px, py]);
-  }
-  return pts;
-}
-
-function buildMouthTube(
+function buildMouthEllipse(
   probe: THREE.Mesh,
   raycaster: THREE.Raycaster,
   material: THREE.Material,
   params: Chapter3AlienFaceParams,
 ) {
-  const stickR = params.mouthStick * CHAPTER3_ALIEN_PX_SCALE;
-  const curvePts = smilePoints(params).map(([px, py]) => {
-    const { point, normal } = surfaceHit(probe, raycaster, px, py);
-    return point.clone().addScaledVector(normal, stickR * 0.95);
-  });
-  const curve = new THREE.CatmullRomCurve3(curvePts);
-  const geometry = new THREE.TubeGeometry(curve, 40, stickR, 10, false);
-  const mesh = new THREE.Mesh(geometry, material);
+  const mouthR = params.mouthRadius * CHAPTER3_ALIEN_PX_SCALE;
+  const { point, normal } = surfaceHit(probe, raycaster, params.mouthCenterX, params.mouthCenterY);
+  const outward = new THREE.Vector3(0, 0, 1);
+  const sphere = new THREE.SphereGeometry(1, 24, 18);
+  const mesh = new THREE.Mesh(sphere, material);
+  mesh.position.copy(point).addScaledVector(normal, mouthR * 0.88);
+  mesh.quaternion.setFromUnitVectors(outward, normal);
+  mesh.scale.set(mouthR * params.mouthScaleX, mouthR * params.mouthScaleY, mouthR);
   mesh.renderOrder = 3;
   return mesh;
 }
 
-/** Glass bead eyes and a curved glass stick mouth on the head surface. */
+/** Glass bead eyes and a horizontal elliptical glass mouth on the head surface. */
 export function buildAlienFaceRig(
   geometry: THREE.BufferGeometry,
   eyeMaterial: THREE.Material,
@@ -85,7 +74,7 @@ export function buildAlienFaceRig(
     eyeMeshes.push(bead);
   }
 
-  const mouthMesh = buildMouthTube(probe, raycaster, mouthMaterial, params);
+  const mouthMesh = buildMouthEllipse(probe, raycaster, mouthMaterial, params);
   group.add(mouthMesh);
 
   return { group, eyeMeshes, mouthMesh, eyeBeadRadius, disposeProbe };

@@ -12,13 +12,10 @@ export const CHAPTER3_KOSMO_URL = chapter3AssetUrl("kosmos/kosmo.png");
 /** White paper backdrop of the screen inside the planet. */
 export const CHAPTER3_INSIDE_PAPIER_URL = chapter3AssetUrl("background/papier.jpg");
 
-/** Hand-drawn 외계인3 outline (silhouette source). */
-export const CHAPTER3_ALIEN3_SKETCH_URL = chapter3AssetUrl("characters/alien3-sketch.png");
-
 /** Chapter 3 opening title. */
 export const CHAPTER3_TITLE = "색이 없는 소호 행성";
 
-/** Dev: `SceneStage` opens 3장 play by default; `NEXT_PUBLIC_DEV_CHAPTER=1|2` for other chapters. */
+/** Dev (`yarn dev`): 3장 행성 안(외계인) 기본. 씬1=`?chapter=1` 또는 NEXT_PUBLIC_DEV_CHAPTER=1. */
 
 export const CHAPTER3_INTRO_TITLE_MS = 2400;
 export const CHAPTER3_TITLE_HOLD_MS = 5000;

@@ -371,7 +371,12 @@ body {
 
 .chapter3-inside .chapter3-stars {
   pointer-events: auto;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+}
+
+.chapter3-inside .chapter3-stars.chapter3-stars--dragging {
+  cursor: grabbing;
 }
 
 /** Stacked face panels (외계인1 + 외계인2). */

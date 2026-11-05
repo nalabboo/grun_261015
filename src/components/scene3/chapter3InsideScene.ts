@@ -55,7 +55,7 @@ export type Chapter3InsideAlien2Bundle = {
 };
 
 export type Chapter3InsideAlien3Bundle = {
-  bodyGeometry: THREE.BufferGeometry;
+  parts: Chapter3AlienPart[];
   face: Chapter3Alien3FaceParams;
   glass: Chapter3Alien3GlassParams;
 };
@@ -174,12 +174,7 @@ function remountFaceRig(slot: AlienSlot, eyeMaterial: THREE.Material) {
   slot.faceBeadGeometry?.dispose();
 
   if (slot.faceKind === "alien3") {
-    slot.faceRig = buildAlien3FaceRig(
-      slot.geometry,
-      eyeMaterial,
-      eyeMaterial,
-      slot.faceParams as Chapter3Alien3FaceParams,
-    );
+    slot.faceRig = buildAlien3FaceRig(slot.geometry, eyeMaterial, slot.faceParams as Chapter3Alien3FaceParams);
   } else if (slot.faceKind === "alien2") {
     slot.faceRig = buildAlien2FaceRig(
       slot.geometry,
@@ -288,14 +283,15 @@ function createAlien2Slot(
 }
 
 function createAlien3Slot(
-  geometry: THREE.BufferGeometry,
+  parts: Chapter3AlienPart[],
   face: Chapter3Alien3FaceParams,
   motion: AlienMotion,
   bodyMaterial: THREE.MeshPhysicalMaterial,
   eyeMaterial: THREE.MeshPhysicalMaterial,
 ): AlienSlot {
+  const geometry = buildAlienGeometry(parts);
   const body = new THREE.Mesh(geometry, bodyMaterial);
-  const faceRig = buildAlien3FaceRig(geometry, eyeMaterial, eyeMaterial, face);
+  const faceRig = buildAlien3FaceRig(geometry, eyeMaterial, face);
   const faceBeadGeometry = faceRig.eyeMeshes[0]?.geometry as THREE.SphereGeometry | undefined;
   const inner = new THREE.Group();
   inner.add(body, faceRig.group);
@@ -584,7 +580,7 @@ export function createChapter3InsideScene(
         };
         const glass = createGlass(extras.alien3.glass);
         const slot = createAlien3Slot(
-          extras.alien3.bodyGeometry,
+          extras.alien3.parts,
           extras.alien3.face,
           motion,
           glass.body,
@@ -607,6 +603,42 @@ export function createChapter3InsideScene(
 
   const raycaster = new THREE.Raycaster();
   const pointerNdc = new THREE.Vector2();
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const groundHit = new THREE.Vector3();
+
+  const pickActorAt = (clientX: number, clientY: number): Actor | null => {
+    pointerNdc.set((clientX / viewW) * 2 - 1, -(clientY / viewH) * 2 + 1);
+    raycaster.setFromCamera(pointerNdc, camera);
+    let nearest: Actor | null = null;
+    let nearestDist = Infinity;
+    for (const actor of actors) {
+      if (!actor.slot.root.visible) continue;
+      const hit = raycaster.intersectObject(actor.slot.root, true)[0];
+      if (hit && hit.distance < nearestDist) {
+        nearestDist = hit.distance;
+        nearest = actor;
+      }
+    }
+    return nearest;
+  };
+
+  const clientToGroundX = (clientX: number, clientY: number) => {
+    pointerNdc.set((clientX / viewW) * 2 - 1, -(clientY / viewH) * 2 + 1);
+    raycaster.setFromCamera(pointerNdc, camera);
+    return raycaster.ray.intersectPlane(groundPlane, groundHit) ? groundHit.x : null;
+  };
+
+  type DragSession = {
+    actor: Actor;
+    pointerId: number;
+    startRootX: number;
+    startGroundX: number;
+    moved: boolean;
+    startClientX: number;
+    startClientY: number;
+  };
+  let drag: DragSession | null = null;
+  const DRAG_PX = 5;
 
   const rebuildParts = (actor: Actor, parts: Chapter3AlienPart[]) => {
     const { slot } = actor;
@@ -620,22 +652,48 @@ export function createChapter3InsideScene(
   };
 
   return {
-    /** Screen click — only the nearest alien under the pointer gulps. */
-    pokeAt(clientX: number, clientY: number) {
-      pointerNdc.set((clientX / viewW) * 2 - 1, -(clientY / viewH) * 2 + 1);
-      raycaster.setFromCamera(pointerNdc, camera);
-      let nearest: Actor | null = null;
-      let nearestDist = Infinity;
-      for (const actor of actors) {
-        if (!actor.slot.root.visible) continue;
-        const hit = raycaster.intersectObject(actor.slot.root, true)[0];
-        if (hit && hit.distance < nearestDist) {
-          nearestDist = hit.distance;
-          nearest = actor;
-        }
+    isDraggingAlien() {
+      return drag?.moved ?? false;
+    },
+    pointerDown(clientX: number, clientY: number, pointerId: number) {
+      const actor = pickActorAt(clientX, clientY);
+      if (!actor) return false;
+      const gx = clientToGroundX(clientX, clientY);
+      if (gx === null) return false;
+      drag = {
+        actor,
+        pointerId,
+        startRootX: actor.slot.root.position.x,
+        startGroundX: gx,
+        moved: false,
+        startClientX: clientX,
+        startClientY: clientY,
+      };
+      return true;
+    },
+    pointerMove(clientX: number, clientY: number, pointerId: number) {
+      if (!drag || drag.pointerId !== pointerId) return;
+      if (!drag.moved) {
+        const d = Math.hypot(clientX - drag.startClientX, clientY - drag.startClientY);
+        if (d < DRAG_PX) return;
+        drag.moved = true;
       }
-      if (!nearest) return false;
-      nearest.slot.poke = 1;
+      const gx = clientToGroundX(clientX, clientY);
+      if (gx === null) return;
+      const nextX = drag.startRootX + (gx - drag.startGroundX);
+      drag.actor.slot.root.position.x = nextX;
+      drag.actor.shadow.position.x = nextX;
+    },
+    pointerUp(clientX: number, clientY: number, pointerId: number) {
+      if (!drag || drag.pointerId !== pointerId) return;
+      if (!drag.moved) drag.actor.slot.poke = 1;
+      drag = null;
+    },
+    /** @deprecated use pointerDown/Up — tap without drag still pokes. */
+    pokeAt(clientX: number, clientY: number) {
+      const actor = pickActorAt(clientX, clientY);
+      if (!actor) return false;
+      actor.slot.poke = 1;
       return true;
     },
     setFaceParams(params: Chapter3AlienFaceParams) {
@@ -659,8 +717,9 @@ export function createChapter3InsideScene(
       if (!alien2Actor) return;
       rebuildParts(alien2Actor, parts);
     },
-    setAlien3Parts(_parts: Chapter3AlienPart[]) {
-      /* 외계인3 body comes from the pen sketch silhouette, not metaballs. */
+    setAlien3Parts(parts: Chapter3AlienPart[]) {
+      if (!alien3Actor) return;
+      rebuildParts(alien3Actor, parts);
     },
     setAlien2GlassParams(params: Chapter3Alien2GlassParams) {
       if (!alien2Actor) return;
@@ -737,6 +796,7 @@ export function createChapter3InsideScene(
         const near = localMs > 0 ? 1 - Math.min(1, lift / CHAPTER3_ALIEN_DROP_HEIGHT) : 0;
         shadow.material.uniforms.uOpacity.value = near * near;
         const spread = sxz * (0.6 + 0.4 * near);
+        shadow.position.x = slot.root.position.x;
         shadow.scale.set(slot.shadowBaseW * spread, slot.shadowBaseD * spread, 1);
         shadow.rotation.z = slot.root.rotation.y;
       }

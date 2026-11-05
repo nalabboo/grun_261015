@@ -57,7 +57,8 @@ function smoothMin(a: number, b: number, k: number) {
   return Math.min(a, b) - h * h * k * 0.25;
 }
 
-function alienSdf(parts: Chapter3AlienPart[], x: number, y: number, z: number) {
+/** Metaball field (negative inside), same as 외계인1·2. */
+export function evaluateAlienPartsSdf(parts: Chapter3AlienPart[], x: number, y: number, z: number) {
   let d = Infinity;
   for (const part of parts) {
     const { cx, cy, cz, rx, ry, rz, blend } = part;
@@ -98,7 +99,7 @@ export function buildAlienGeometry(parts: Chapter3AlienPart[]) {
       const py = CHAPTER3_ALIEN_PX_CENTER_Y - ((y - half) / half) / CHAPTER3_ALIEN_PX_SCALE;
       for (let x = x0; x <= x1; x++) {
         const px = ((x - half) / half) / CHAPTER3_ALIEN_PX_SCALE + CHAPTER3_ALIEN_PX_CENTER_X;
-        mc.field[x + y * size + z * size * size] = -alienSdf(parts, px, py, pz);
+        mc.field[x + y * size + z * size * size] = -evaluateAlienPartsSdf(parts, px, py, pz);
       }
     }
   }

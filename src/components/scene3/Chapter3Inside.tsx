@@ -7,12 +7,14 @@ import {
   loadAlien2PartsFromStorage,
 } from "@/constants/chapter3Alien2Config";
 import {
-  loadAlien3FaceFromStorage,
-  loadAlien3GlassFromStorage,
-  saveAlien3FaceToStorage,
-  saveAlien3GlassToStorage,
+  CHAPTER3_ALIEN3_DEFAULT_FACE,
+  CHAPTER3_ALIEN3_DEFAULT_GLASS,
+  CHAPTER3_ALIEN3_PARTS,
 } from "@/constants/chapter3Alien3Config";
-import { loadAlienFaceFromStorage } from "@/constants/chapter3AlienFaceConfig";
+import {
+  loadAlienFaceFromStorage,
+  saveAlienFaceToStorage,
+} from "@/constants/chapter3AlienFaceConfig";
 import { CHAPTER3_ALIEN_SHAPE_EDITOR } from "@/constants/chapter3InsideConfig";
 import {
   CHAPTER3_ALIEN_DEFAULT_PARTS,
@@ -20,7 +22,7 @@ import {
   loadAlienPartsFromStorage,
 } from "@/constants/chapter3AlienShape";
 
-/** Planet inside — 외계인1 · 외계인2 (left) · 외계인3 sketch (right). Panel: 외계인3 only. */
+/** Planet inside — 외계인1 · 외계인2 (left) · 외계인3 metaball (right). */
 export default function Chapter3Inside() {
   const initialParts = CHAPTER3_ALIEN_SHAPE_EDITOR
     ? cloneAlienParts(loadAlienPartsFromStorage())
@@ -36,6 +38,8 @@ export default function Chapter3Inside() {
           CHAPTER3_ALIEN_SHAPE_EDITOR
             ? cloneAlienParts(loadAlienPartsFromStorage())
             : cloneAlienParts(CHAPTER3_ALIEN_DEFAULT_PARTS),
+        loadFace: loadAlienFaceFromStorage,
+        saveFace: saveAlienFaceToStorage,
         alien2: {
           parts: loadAlien2PartsFromStorage(),
           face: loadAlien2FaceFromStorage(),
@@ -45,12 +49,11 @@ export default function Chapter3Inside() {
           loadGlass: loadAlien2GlassFromStorage,
         },
         alien3: {
-          face: loadAlien3FaceFromStorage(),
-          glass: loadAlien3GlassFromStorage(),
-          loadFace: loadAlien3FaceFromStorage,
-          loadGlass: loadAlien3GlassFromStorage,
-          saveFace: saveAlien3FaceToStorage,
-          saveGlass: saveAlien3GlassToStorage,
+          parts: cloneAlienParts(CHAPTER3_ALIEN3_PARTS),
+          face: { ...CHAPTER3_ALIEN3_DEFAULT_FACE },
+          glass: CHAPTER3_ALIEN3_DEFAULT_GLASS,
+          loadParts: () => cloneAlienParts(CHAPTER3_ALIEN3_PARTS),
+          loadFace: () => ({ ...CHAPTER3_ALIEN3_DEFAULT_FACE }),
         },
       }}
     />

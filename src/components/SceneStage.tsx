@@ -76,11 +76,18 @@ function getDevStartChapter(): Chapter {
   ) {
     return 3;
   }
-  /** Chapter 3 in progress — dev opens on 3장 play. Use NEXT_PUBLIC_DEV_CHAPTER=1|2 to override. */
+  /** Dev default: 3장 행성 안 (외계인). 씬1은 `?chapter=1` 또는 NEXT_PUBLIC_DEV_CHAPTER=1. */
   return 3;
 }
 
 const DEV_START_CHAPTER = getDevStartChapter();
+
+function resolveDevChapter3Step(params: URLSearchParams): Chapter3Step {
+  const step = params.get("ch3");
+  if (step === "intro" || step === "play" || step === "inside") return step;
+  /** Dev default for 3장: 행성 안 (외계인 등장). */
+  return "inside";
+}
 
 /** Scene 1 layer gizmo toolbar — off by default (`NEXT_PUBLIC_DEV_LAYER_EDIT=1`). */
 const DEV_LAYER_EDITOR =
@@ -144,7 +151,7 @@ export default function SceneStage() {
   );
   const [chapter2PlayReady, setChapter2PlayReady] = useState(false);
   const [chapter3Step, setChapter3Step] = useState<Chapter3Step | null>(
-    DEV_START_CHAPTER === 3 ? "play" : null,
+    DEV_START_CHAPTER === 3 ? "inside" : null,
   );
   const chapterRef = useRef<Chapter>(DEV_START_CHAPTER);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
@@ -191,12 +198,51 @@ export default function SceneStage() {
     setChapter3Step("inside");
   }, []);
 
-  /** Dev shortcut: `?ch3=inside` jumps straight to the inside-the-planet screen. */
+  /** `?chapter=1|2|3` (prod preview too). Dev with no query uses DEV_START_CHAPTER. */
   useEffect(() => {
-    if (process.env.NODE_ENV !== "development" || DEV_START_CHAPTER !== 3) return;
-    if (new URLSearchParams(window.location.search).get("ch3") !== "inside") return;
-    const id = window.setTimeout(() => setChapter3Step("inside"), 0);
-    return () => window.clearTimeout(id);
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("chapter");
+    let target: Chapter | null = null;
+    if (q === "1") target = 1;
+    else if (q === "2") target = 2;
+    else if (q === "3") target = 3;
+    else if (process.env.NODE_ENV === "development") target = DEV_START_CHAPTER;
+    if (target === null) return;
+
+    chapterRef.current = target;
+    setChapter(target);
+    setChapter1Phase("scroll");
+    chapter1PhaseRef.current = "scroll";
+    setTableauRevealed(false);
+    setChapter2Step(target === 2 ? "play" : null);
+    if (target === 3) {
+      setChapter3Step(resolveDevChapter3Step(params));
+    } else {
+      setChapter3Step(null);
+    }
+
+    if (target === 1) {
+      const state = stateRef.current;
+      state.targetWorldX = null;
+      state.postLandmarkUnlocked = false;
+      state.wormPhase = "b";
+      state.kindPhase = "b";
+      state.mossPhases = { ...INITIAL_MOSS_PHASES };
+      state.walkingToKind = false;
+      state.walkingAfterKindReveal = false;
+      state.grunPostRevealArrived = false;
+      state.grunSettlingUntil = 0;
+      state.grunSettleKind = null;
+      state.cameraMode = "grun";
+      setTargetWorldX(null);
+      setWormPhase("b");
+      setKindPhase("b");
+      setMossPhases({ ...INITIAL_MOSS_PHASES });
+      setWalkingToKind(false);
+      setGrunPostRevealArrived(false);
+      setCameraMode("grun");
+      backgroundWhiteMaxRef.current = 0;
+    }
   }, []);
 
   const handleTableauRevealComplete = useCallback(() => {
