@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Chapter3AlienFaceEditor from "@/components/scene3/Chapter3AlienFaceEditor";
+import Chapter3InsideDecorEditor from "@/components/scene3/Chapter3InsideDecorEditor";
 import { createChapter3InsideScene } from "@/components/scene3/chapter3InsideScene";
-import {
-  CHAPTER3_ALIEN_DEFAULT_FACE,
-  CHAPTER3_ALIEN_FACE_EDITOR,
-  formatAlienFaceForSource,
-  type Chapter3AlienFaceParams,
-} from "@/constants/chapter3AlienFaceConfig";
+import type { Chapter3AlienFaceParams } from "@/constants/chapter3AlienFaceConfig";
 import type { Chapter3Alien3FaceParams, Chapter3Alien3GlassParams } from "@/constants/chapter3Alien3Config";
 import type {
   Chapter3Alien2FaceParams,
   Chapter3Alien2GlassParams,
 } from "@/constants/chapter3Alien2Config";
 import type { Chapter3AlienPart } from "@/constants/chapter3AlienShape";
+import {
+  CHAPTER3_DECOR_DEFAULT,
+  CHAPTER3_DECOR_EDITOR,
+  type Chapter3InsideDecorConfig,
+} from "@/constants/chapter3InsideDecorConfig";
 import { CHAPTER3_INSIDE_PAPIER_URL } from "@/constants/scene3Config";
 
 export type Chapter3InsideScreenConfig = {
@@ -22,8 +22,8 @@ export type Chapter3InsideScreenConfig = {
   initialParts: Chapter3AlienPart[];
   initialFace: Chapter3AlienFaceParams;
   loadParts: () => Chapter3AlienPart[];
-  loadFace: () => Chapter3AlienFaceParams;
-  saveFace: (face: Chapter3AlienFaceParams) => void;
+  loadDecor: () => Chapter3InsideDecorConfig;
+  saveDecor: (decor: Chapter3InsideDecorConfig) => void;
   alien2?: {
     parts: Chapter3AlienPart[];
     face: Chapter3Alien2FaceParams;
@@ -50,7 +50,7 @@ export default function Chapter3InsideScreen({ config }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<ReturnType<typeof createChapter3InsideScene> | null>(null);
   const [draggingAlien, setDraggingAlien] = useState(false);
-  const [faceParams, setFaceParams] = useState(() => config.loadFace());
+  const [decorConfig, setDecorConfig] = useState<Chapter3InsideDecorConfig>(CHAPTER3_DECOR_DEFAULT);
 
   useEffect(() => {
     const paper = paperRef.current;
@@ -82,8 +82,13 @@ export default function Chapter3InsideScreen({ config }: Props) {
       initial,
       initialFace,
       extras.alien2 || extras.alien3 ? extras : undefined,
+      undefined,
+      CHAPTER3_DECOR_DEFAULT,
     );
     stageRef.current = stage;
+    const stored = config.loadDecor();
+    setDecorConfig(stored);
+    stage.setDecorConfig(stored);
     const resize = () => {
       stage.setSize(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, 2));
     };
@@ -145,17 +150,14 @@ export default function Chapter3InsideScreen({ config }: Props) {
         ref={canvasRef}
         className={`chapter3-stars${draggingAlien ? " chapter3-stars--dragging" : ""}`}
       />
-      {CHAPTER3_ALIEN_FACE_EDITOR && (
-        <div className="chapter3-face-stack">
-          <Chapter3AlienFaceEditor
-            title="외계인1 · 얼굴"
-            params={faceParams}
-            defaultFace={CHAPTER3_ALIEN_DEFAULT_FACE}
-            formatForSource={formatAlienFaceForSource}
+      {CHAPTER3_DECOR_EDITOR && (
+        <div className="chapter3-placement-stack">
+          <Chapter3InsideDecorEditor
+            config={decorConfig}
             onChange={(next) => {
-              setFaceParams(next);
-              config.saveFace(next);
-              stageRef.current?.setFaceParams(next);
+              setDecorConfig(next);
+              config.saveDecor(next);
+              stageRef.current?.setDecorConfig(next);
             }}
           />
         </div>

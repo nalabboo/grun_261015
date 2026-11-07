@@ -11,10 +11,11 @@ import {
   CHAPTER3_ALIEN3_DEFAULT_GLASS,
   CHAPTER3_ALIEN3_PARTS,
 } from "@/constants/chapter3Alien3Config";
+import { CHAPTER3_ALIEN_DEFAULT_FACE } from "@/constants/chapter3AlienFaceConfig";
 import {
-  loadAlienFaceFromStorage,
-  saveAlienFaceToStorage,
-} from "@/constants/chapter3AlienFaceConfig";
+  loadInsideDecorFromStorage,
+  saveInsideDecorToStorage,
+} from "@/constants/chapter3InsideDecorConfig";
 import { CHAPTER3_ALIEN_SHAPE_EDITOR } from "@/constants/chapter3InsideConfig";
 import {
   CHAPTER3_ALIEN_DEFAULT_PARTS,
@@ -33,13 +34,13 @@ export default function Chapter3Inside() {
       config={{
         ariaLabel: "행성 안",
         initialParts,
-        initialFace: loadAlienFaceFromStorage(),
+        initialFace: { ...CHAPTER3_ALIEN_DEFAULT_FACE },
         loadParts: () =>
           CHAPTER3_ALIEN_SHAPE_EDITOR
             ? cloneAlienParts(loadAlienPartsFromStorage())
             : cloneAlienParts(CHAPTER3_ALIEN_DEFAULT_PARTS),
-        loadFace: loadAlienFaceFromStorage,
-        saveFace: saveAlienFaceToStorage,
+        loadDecor: loadInsideDecorFromStorage,
+        saveDecor: saveInsideDecorToStorage,
         alien2: {
           parts: loadAlien2PartsFromStorage(),
           face: loadAlien2FaceFromStorage(),

@@ -4,6 +4,7 @@ import type { Chapter3AlienFaceParams } from "@/constants/chapter3AlienFaceConfi
 import {
   buildAlienFaceRig,
   setAlienEyeOpen,
+  setAlienMouthOpen,
   type AlienFaceRig,
 } from "@/components/scene3/chapter3AlienFace";
 import {
@@ -46,7 +47,13 @@ import {
 } from "@/constants/chapter3Alien3Config";
 import { buildAlien2FaceRig, setAlien2EyeOpen } from "@/components/scene3/chapter3Alien2Face";
 import { buildAlien3FaceRig, setAlien3EyeOpen } from "@/components/scene3/chapter3Alien3Face";
-import { buildAlienGeometry } from "@/components/scene3/chapter3AlienGeometry";
+import { buildAlienGeometry, CHAPTER3_ALIEN_PX_SCALE } from "@/components/scene3/chapter3AlienGeometry";
+import { createChapter3InsideDecor } from "@/components/scene3/chapter3InsideDecor";
+import {
+  CHAPTER3_DECOR_DEFAULT,
+  type Chapter3InsideDecorConfig,
+} from "@/constants/chapter3InsideDecorConfig";
+import type { Chapter3AlienPlacements } from "@/constants/chapter3AlienPlacementConfig";
 
 export type Chapter3InsideAlien2Bundle = {
   parts: Chapter3AlienPart[];
@@ -68,6 +75,7 @@ export type Chapter3InsideExtras = {
 type AlienMotion = {
   width: number;
   positionX: number;
+  positionY: number;
   delayMs: number;
   turn: number;
   sway: number;
@@ -85,6 +93,10 @@ type AlienSlot = {
   bodyOffset: THREE.Vector3;
   faceKind: AlienFaceKind;
   faceParams: Chapter3AlienFaceParams | Chapter3Alien2FaceParams | Chapter3Alien3FaceParams;
+  /** Jelly-free glass so the thin stick mouth keeps its capsule shape. */
+  mouthMaterial?: THREE.Material;
+  /** `performance.now()` of the last tap; drives the mouth open/close envelope. */
+  mouthOpenAt: number | null;
   motion: AlienMotion;
   poke: number;
   nextBlinkAt: number;
@@ -185,7 +197,7 @@ function remountFaceRig(slot: AlienSlot, eyeMaterial: THREE.Material) {
     slot.faceRig = buildAlienFaceRig(
       slot.geometry,
       eyeMaterial,
-      eyeMaterial,
+      slot.mouthMaterial ?? eyeMaterial,
       slot.faceParams as Chapter3AlienFaceParams,
     );
   }
@@ -208,10 +220,11 @@ function createAlienSlot(
   motion: AlienMotion,
   bodyMaterial: THREE.MeshPhysicalMaterial,
   eyeMaterial: THREE.MeshPhysicalMaterial,
+  mouthMaterial: THREE.MeshPhysicalMaterial,
 ): AlienSlot {
   const geometry = buildAlienGeometry(parts);
   const body = new THREE.Mesh(geometry, bodyMaterial);
-  const faceRig = buildAlienFaceRig(geometry, eyeMaterial, eyeMaterial, face);
+  const faceRig = buildAlienFaceRig(geometry, eyeMaterial, mouthMaterial, face);
   const faceBeadGeometry = faceRig.eyeMeshes[0]?.geometry as THREE.SphereGeometry | undefined;
   const inner = new THREE.Group();
   inner.add(body, faceRig.group);
@@ -229,6 +242,8 @@ function createAlienSlot(
     bodyOffset: new THREE.Vector3(),
     faceKind: "alien1",
     faceParams: face,
+    mouthMaterial,
+    mouthOpenAt: null,
     motion,
     poke: 0,
     nextBlinkAt: 0,
@@ -268,6 +283,7 @@ function createAlien2Slot(
     faceBeadGeometry,
     bodyOffset: new THREE.Vector3(),
     faceKind: "alien2",
+    mouthOpenAt: null,
     faceParams: face,
     motion,
     poke: 0,
@@ -308,6 +324,7 @@ function createAlien3Slot(
     faceBeadGeometry,
     bodyOffset: new THREE.Vector3(),
     faceKind: "alien3",
+    mouthOpenAt: null,
     faceParams: face,
     motion,
     poke: 0,
@@ -327,6 +344,27 @@ function disposeSlot(slot: AlienSlot) {
   slot.faceRig.disposeProbe();
   slot.faceRig.mouthMesh?.geometry.dispose();
   slot.faceBeadGeometry?.dispose();
+}
+
+/** Open 'ㅇ' mouth cavity size (reference pixels). */
+const MOUTH_DENT_RX_PX = 23;
+const MOUTH_DENT_RY_PX = 15;
+const MOUTH_DENT_DEPTH_PX = 14;
+
+const MOUTH_OPEN_MS = 130;
+const MOUTH_HOLD_MS = 520;
+const MOUTH_CLOSE_MS = 320;
+
+/** 0..1 open amount: quick open, short hold, eased close. Restarts on every tap. */
+function mouthOpenEnvelope(openAt: number | null, now: number) {
+  if (openAt === null) return 0;
+  const t = now - openAt;
+  if (t < 0) return 0;
+  if (t < MOUTH_OPEN_MS) return Math.sin((t / MOUTH_OPEN_MS) * (Math.PI / 2));
+  if (t < MOUTH_OPEN_MS + MOUTH_HOLD_MS) return 1;
+  const c = (t - MOUTH_OPEN_MS - MOUTH_HOLD_MS) / MOUTH_CLOSE_MS;
+  if (c >= 1) return 0;
+  return 1 - c * c * (3 - 2 * c);
 }
 
 function updateAlienMotion(slot: AlienSlot, alienMs: number, t: number, dt: number) {
@@ -357,7 +395,7 @@ function updateAlienMotion(slot: AlienSlot, alienMs: number, t: number, dt: numb
   const breath = Math.sin(t * 1.9 + motion.positionX) * CHAPTER3_ALIEN_BREATH;
   const sy = 1 - squash + breath - slot.poke * CHAPTER3_ALIEN_POKE_SQUASH;
   const sxz = 1 / Math.sqrt(Math.max(0.2, sy));
-  slot.root.position.y = lift;
+  slot.root.position.y = lift + motion.positionY;
   slot.root.scale.set(sxz, sy, sxz);
   slot.root.rotation.y = motion.turn + Math.sin(t * 0.55 + motion.positionX) * motion.sway;
 
@@ -371,6 +409,8 @@ export function createChapter3InsideScene(
   initialParts: Chapter3AlienPart[],
   initialFace: Chapter3AlienFaceParams,
   extras?: Chapter3InsideExtras,
+  placements?: Chapter3AlienPlacements,
+  decorConfig: Chapter3InsideDecorConfig = CHAPTER3_DECOR_DEFAULT,
 ) {
   const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, alpha: true, antialias: true });
   renderer.setClearColor(0xffffff, 0);
@@ -428,6 +468,7 @@ export function createChapter3InsideScene(
     `,
   });
   const shadowGeometry = new THREE.PlaneGeometry(1, 1);
+  const decor = createChapter3InsideDecor(scene, decorConfig);
 
   /** Same clear glass for every alien; own uniforms so a poke only jiggles the one touched. */
   type GlassKnobs = Chapter3Alien2GlassParams | Chapter3Alien3GlassParams;
@@ -440,6 +481,64 @@ export function createChapter3InsideScene(
       uTime: { value: 0 },
       uWobble: { value: baseWobble },
       uPoke: { value: 0 },
+      uMouthCenter: { value: new THREE.Vector3() },
+      uMouthRadius: { value: new THREE.Vector2(MOUTH_DENT_RX_PX, MOUTH_DENT_RY_PX).multiplyScalar(CHAPTER3_ALIEN_PX_SCALE) },
+      uMouthDepth: { value: MOUTH_DENT_DEPTH_PX * CHAPTER3_ALIEN_PX_SCALE },
+      uMouthOpen: { value: 0 },
+    };
+    /** Round 'ㅇ' cavity pressed into the body: vertex dent + per-pixel normal bend + inner shade. */
+    const addMouthDent = (shader: THREE.WebGLProgramParametersWithUniforms) => {
+      const decl = `uniform vec3 uMouthCenter;
+uniform vec2 uMouthRadius;
+uniform float uMouthDepth;
+uniform float uMouthOpen;
+varying vec3 vMouthObj;
+varying vec3 vMouthAxisX;
+varying vec3 vMouthAxisY;
+float mouthFront(float z) {
+  return smoothstep(uMouthCenter.z - 0.2, uMouthCenter.z - 0.04, z);
+}
+`;
+      shader.vertexShader = shader.vertexShader
+        .replace("void main() {", `${decl}void main() {`)
+        .replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>
+          vMouthObj = position;
+          vMouthAxisX = normalize(normalMatrix * vec3(1.0, 0.0, 0.0));
+          vMouthAxisY = normalize(normalMatrix * vec3(0.0, 1.0, 0.0));
+          {
+            vec2 mq = (position.xy - uMouthCenter.xy) / uMouthRadius;
+            float mr2 = dot(mq, mq);
+            if (uMouthOpen > 0.001 && mr2 < 1.0) {
+              float mk = 1.0 - mr2;
+              transformed -= normalize(normal) * mk * mk * mouthFront(position.z) * uMouthDepth * uMouthOpen;
+            }
+          }`,
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace("void main() {", `${decl}void main() {`)
+        .replace(
+          "#include <normal_fragment_maps>",
+          `#include <normal_fragment_maps>
+          float mouthShade = 0.0;
+          {
+            vec2 mq = (vMouthObj.xy - uMouthCenter.xy) / uMouthRadius;
+            float mr2 = dot(mq, mq);
+            if (uMouthOpen > 0.001 && mr2 < 1.0) {
+              float front = mouthFront(vMouthObj.z);
+              float mk = 1.0 - mr2;
+              vec2 g = 4.0 * uMouthDepth * uMouthOpen * front * mk * mq / uMouthRadius;
+              normal = normalize(normal - g.x * vMouthAxisX - g.y * vMouthAxisY);
+              mouthShade = smoothstep(0.0, 0.7, mk) * front * uMouthOpen;
+            }
+          }`,
+        )
+        .replace(
+          "#include <opaque_fragment>",
+          `outgoingLight *= 1.0 - mouthShade * 0.42;
+          #include <opaque_fragment>`,
+        );
     };
     const addJelly = (shader: THREE.WebGLProgramParametersWithUniforms) => {
       Object.assign(shader.uniforms, uniforms);
@@ -487,6 +586,7 @@ export function createChapter3InsideScene(
     body.onBeforeCompile = (shader) => {
       addJelly(shader);
       rimGlassPatch(shader);
+      addMouthDent(shader);
     };
     const eye = body.clone();
     eye.thickness = 0.45;
@@ -495,13 +595,31 @@ export function createChapter3InsideScene(
     eye.onBeforeCompile = (shader) => {
       addJelly(shader);
     };
-    return { body, eye, uniforms, baseWobble };
+    const mouth = body.clone();
+    mouth.thickness = 0.45;
+    mouth.roughness = 0.04;
+    mouth.dispersion = dispersion * 1.15;
+    mouth.onBeforeCompile = () => {};
+    return { body, eye, mouth, uniforms, baseWobble };
   };
 
   type Actor = {
     slot: AlienSlot;
     glass: ReturnType<typeof createGlass>;
     shadow: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+  };
+
+  const applyActorPlacement = (
+    actor: Actor,
+    placement: { positionX: number; width: number; positionY: number },
+  ) => {
+    const { slot, shadow } = actor;
+    slot.motion.positionX = placement.positionX;
+    slot.motion.width = placement.width;
+    slot.motion.positionY = placement.positionY;
+    slot.root.position.x = placement.positionX;
+    shadow.position.x = placement.positionX;
+    fitSlotToGeometry(slot);
   };
 
   const applyGlassParams = (actor: Actor, params: GlassKnobs) => {
@@ -519,7 +637,7 @@ export function createChapter3InsideScene(
     glassOpts?: GlassKnobs,
   ): Actor => {
     const glass = createGlass(glassOpts);
-    const slot = createAlienSlot(parts, face, motion, glass.body, glass.eye);
+    const slot = createAlienSlot(parts, face, motion, glass.body, glass.eye, glass.mouth);
     scene.add(slot.root);
     const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial.clone());
     shadow.rotation.x = -Math.PI / 2;
@@ -529,8 +647,9 @@ export function createChapter3InsideScene(
   };
 
   const primaryActor = createActor(initialParts, initialFace, {
-    width: CHAPTER3_ALIEN_WIDTH,
-    positionX: 0,
+    width: placements?.alien1.width ?? CHAPTER3_ALIEN_WIDTH,
+    positionX: placements?.alien1.positionX ?? 0,
+    positionY: placements?.alien1.positionY ?? 0,
     delayMs: CHAPTER3_ALIEN_DELAY_MS,
     turn: CHAPTER3_ALIEN_TURN,
     sway: CHAPTER3_ALIEN_SWAY,
@@ -551,8 +670,9 @@ export function createChapter3InsideScene(
   const alien2Actor = extras?.alien2
     ? (() => {
         const motion = {
-          width: CHAPTER3_ALIEN2_WIDTH,
-          positionX: CHAPTER3_ALIEN2_POSITION_X,
+          width: placements?.alien2.width ?? CHAPTER3_ALIEN2_WIDTH,
+          positionX: placements?.alien2.positionX ?? CHAPTER3_ALIEN2_POSITION_X,
+          positionY: placements?.alien2.positionY ?? 0,
           delayMs: CHAPTER3_ALIEN2_DELAY_MS,
           turn: CHAPTER3_ALIEN2_TURN,
           sway: CHAPTER3_ALIEN2_SWAY,
@@ -572,8 +692,9 @@ export function createChapter3InsideScene(
   const alien3Actor = extras?.alien3
     ? (() => {
         const motion = {
-          width: CHAPTER3_ALIEN3_WIDTH,
-          positionX: CHAPTER3_ALIEN3_POSITION_X,
+          width: placements?.alien3.width ?? CHAPTER3_ALIEN3_WIDTH,
+          positionX: placements?.alien3.positionX ?? CHAPTER3_ALIEN3_POSITION_X,
+          positionY: placements?.alien3.positionY ?? 0,
           delayMs: CHAPTER3_ALIEN3_DELAY_MS,
           turn: CHAPTER3_ALIEN3_TURN,
           sway: CHAPTER3_ALIEN3_SWAY,
@@ -595,6 +716,12 @@ export function createChapter3InsideScene(
     ...(alien2Actor ? [alien2Actor] : []),
     ...(alien3Actor ? [alien3Actor] : []),
   ];
+
+  if (placements) {
+    applyActorPlacement(primaryActor, placements.alien1);
+    if (alien2Actor) applyActorPlacement(alien2Actor, placements.alien2);
+    if (alien3Actor) applyActorPlacement(alien3Actor, placements.alien3);
+  }
 
   let startAt: number | null = null;
   let lastFrameMs: number | null = null;
@@ -682,11 +809,15 @@ export function createChapter3InsideScene(
       if (gx === null) return;
       const nextX = drag.startRootX + (gx - drag.startGroundX);
       drag.actor.slot.root.position.x = nextX;
+      drag.actor.slot.motion.positionX = nextX;
       drag.actor.shadow.position.x = nextX;
     },
     pointerUp(clientX: number, clientY: number, pointerId: number) {
       if (!drag || drag.pointerId !== pointerId) return;
-      if (!drag.moved) drag.actor.slot.poke = 1;
+      if (!drag.moved) {
+        drag.actor.slot.poke = 1;
+        drag.actor.slot.mouthOpenAt = performance.now();
+      }
       drag = null;
     },
     /** @deprecated use pointerDown/Up — tap without drag still pokes. */
@@ -694,6 +825,7 @@ export function createChapter3InsideScene(
       const actor = pickActorAt(clientX, clientY);
       if (!actor) return false;
       actor.slot.poke = 1;
+      actor.slot.mouthOpenAt = performance.now();
       return true;
     },
     setFaceParams(params: Chapter3AlienFaceParams) {
@@ -729,6 +861,37 @@ export function createChapter3InsideScene(
       if (!alien3Actor) return;
       applyGlassParams(alien3Actor, params);
     },
+    getPlacements(): Chapter3AlienPlacements {
+      return {
+        alien1: {
+          positionX: primaryActor.slot.root.position.x,
+          width: primaryActor.slot.motion.width,
+          positionY: primaryActor.slot.motion.positionY,
+        },
+        alien2: alien2Actor
+          ? {
+              positionX: alien2Actor.slot.root.position.x,
+              width: alien2Actor.slot.motion.width,
+              positionY: alien2Actor.slot.motion.positionY,
+            }
+          : placements?.alien2 ?? { positionX: 0, width: 1, positionY: 0 },
+        alien3: alien3Actor
+          ? {
+              positionX: alien3Actor.slot.root.position.x,
+              width: alien3Actor.slot.motion.width,
+              positionY: alien3Actor.slot.motion.positionY,
+            }
+          : placements?.alien3 ?? { positionX: 0, width: 1, positionY: 0 },
+      };
+    },
+    setPlacements(next: Chapter3AlienPlacements) {
+      applyActorPlacement(primaryActor, next.alien1);
+      if (alien2Actor) applyActorPlacement(alien2Actor, next.alien2);
+      if (alien3Actor) applyActorPlacement(alien3Actor, next.alien3);
+    },
+    setDecorConfig(config: Chapter3InsideDecorConfig) {
+      decor.setConfig(config);
+    },
     setSize(w: number, h: number, dpr: number) {
       viewW = w;
       viewH = h;
@@ -760,6 +923,12 @@ export function createChapter3InsideScene(
         glass.uniforms.uTime.value = t;
         glass.uniforms.uPoke.value = slot.poke;
         glass.uniforms.uWobble.value = glass.baseWobble + slot.poke * CHAPTER3_ALIEN_POKE_WOBBLE;
+        if (slot.faceKind === "alien1") {
+          const mouthOpen = mouthOpenEnvelope(slot.mouthOpenAt, now);
+          setAlienMouthOpen(slot.faceRig, mouthOpen);
+          glass.uniforms.uMouthOpen.value = mouthOpen;
+          if (slot.faceRig.mouthAnchor) glass.uniforms.uMouthCenter.value.copy(slot.faceRig.mouthAnchor);
+        }
 
         const onGround = localMs > CHAPTER3_ALIEN_FALL_MS;
         if (onGround) {
@@ -801,6 +970,7 @@ export function createChapter3InsideScene(
         shadow.rotation.z = slot.root.rotation.y;
       }
 
+      decor.update(t);
       renderer.render(scene, camera);
     },
     dispose() {
@@ -814,8 +984,10 @@ export function createChapter3InsideScene(
         disposeSlot(slot);
         glass.body.dispose();
         glass.eye.dispose();
+        glass.mouth.dispose();
         shadow.material.dispose();
       }
+      decor.dispose();
       environment.dispose();
       renderer.dispose();
     },

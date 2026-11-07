@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Chapter3AlienFaceParams } from "@/constants/chapter3AlienFaceConfig";
 import { CHAPTER3_ALIEN_PX_SCALE, pxToLocal } from "@/components/scene3/chapter3AlienGeometry";
 
@@ -6,6 +7,8 @@ export type AlienFaceRig = {
   group: THREE.Group;
   eyeMeshes: THREE.Mesh[];
   mouthMesh: THREE.Mesh | null;
+  /** Mouth center on the body surface (body geometry space); 외계인1 only. */
+  mouthAnchor?: THREE.Vector3;
   eyeBeadRadius: number;
   /** Ellipse radii multipliers (local X/Y on the head); 외계인2 only. */
   eyeStretch?: { x: number; y: number };
@@ -27,25 +30,67 @@ function surfaceHit(probe: THREE.Mesh, raycaster: THREE.Raycaster, px: number, p
   return { point, normal };
 }
 
-function buildMouthEllipse(
+function smilePoints(params: Chapter3AlienFaceParams, count = 9) {
+  const pts: [number, number][] = [];
+  for (let i = 0; i < count; i++) {
+    const u = i / (count - 1);
+    const px = params.mouthCenterX + (u - 0.5) * params.mouthWidth;
+    const py = params.mouthCenterY - params.mouthSmile * Math.sin(u * Math.PI);
+    pts.push([px, py]);
+  }
+  return pts;
+}
+
+function buildMouthTube(
   probe: THREE.Mesh,
   raycaster: THREE.Raycaster,
   material: THREE.Material,
   params: Chapter3AlienFaceParams,
 ) {
-  const mouthR = params.mouthRadius * CHAPTER3_ALIEN_PX_SCALE;
-  const { point, normal } = surfaceHit(probe, raycaster, params.mouthCenterX, params.mouthCenterY);
-  const outward = new THREE.Vector3(0, 0, 1);
-  const sphere = new THREE.SphereGeometry(1, 24, 18);
-  const mesh = new THREE.Mesh(sphere, material);
-  mesh.position.copy(point).addScaledVector(normal, mouthR * 0.88);
-  mesh.quaternion.setFromUnitVectors(outward, normal);
-  mesh.scale.set(mouthR * params.mouthScaleX, mouthR * params.mouthScaleY, mouthR);
+  const stickR = params.mouthStick * CHAPTER3_ALIEN_PX_SCALE;
+  const curvePts = smilePoints(params).map(([px, py]) => {
+    const { point, normal } = surfaceHit(probe, raycaster, px, py);
+    return point.clone().addScaledVector(normal, stickR * 0.95);
+  });
+  const curve = new THREE.CatmullRomCurve3(curvePts);
+  const tube = new THREE.TubeGeometry(curve, 40, stickR, 12, false);
+  const capAt = (t: number) => {
+    const center = curve.getPoint(t);
+    const geo = new THREE.SphereGeometry(stickR, 14, 12);
+    geo.translate(center.x, center.y, center.z);
+    return geo;
+  };
+  const capStart = capAt(0);
+  const capEnd = capAt(1);
+  const merged = mergeGeometries([tube, capStart, capEnd]);
+  tube.dispose();
+  capStart.dispose();
+  capEnd.dispose();
+  if (!merged) {
+    const fallbackGeo = new THREE.TubeGeometry(curve, 40, stickR, 12, false);
+    const fallback = new THREE.Mesh(fallbackGeo, material);
+    fallback.renderOrder = 3;
+    return fallback;
+  }
+  merged.computeBoundingBox();
+  const center = merged.boundingBox!.getCenter(new THREE.Vector3());
+  merged.translate(-center.x, -center.y, -center.z);
+  const mesh = new THREE.Mesh(merged, material);
+  mesh.position.copy(center);
   mesh.renderOrder = 3;
   return mesh;
 }
 
-/** Glass bead eyes and a horizontal elliptical glass mouth on the head surface. */
+/** Hide the stick mouth while the body dent (see `addMouthDent`) opens (0 = closed). */
+export function setAlienMouthOpen(rig: AlienFaceRig, open: number) {
+  const stick = rig.mouthMesh;
+  if (!stick) return;
+  const s = 1 - Math.min(1, Math.max(0, open));
+  stick.visible = s > 0.02;
+  stick.scale.setScalar(Math.max(0.001, s));
+}
+
+/** Glass bead eyes and a curved glass stick mouth on the head surface. */
 export function buildAlienFaceRig(
   geometry: THREE.BufferGeometry,
   eyeMaterial: THREE.Material,
@@ -74,10 +119,11 @@ export function buildAlienFaceRig(
     eyeMeshes.push(bead);
   }
 
-  const mouthMesh = buildMouthEllipse(probe, raycaster, mouthMaterial, params);
+  const mouthMesh = buildMouthTube(probe, raycaster, mouthMaterial, params);
   group.add(mouthMesh);
+  const mouthAnchor = surfaceHit(probe, raycaster, params.mouthCenterX, params.mouthCenterY).point.clone();
 
-  return { group, eyeMeshes, mouthMesh, eyeBeadRadius, disposeProbe };
+  return { group, eyeMeshes, mouthMesh, mouthAnchor, eyeBeadRadius, disposeProbe };
 }
 
 /** Blink: squash bead eyes toward the head (1 = open). */

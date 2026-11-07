@@ -12,7 +12,7 @@ type Props = {
   specs?: typeof CHAPTER3_ALIEN_FACE_PARAM_SPECS;
 };
 
-/** Sliders for glass bead eyes and elliptical mouth (reference pixels). */
+/** Sliders for glass bead eyes and stick mouth (reference pixels). */
 export default function Chapter3AlienFaceEditor({
   params,
   onChange,
@@ -39,7 +39,7 @@ export default function Chapter3AlienFaceEditor({
       </button>
       {open && (
         <div className="chapter3-shape__panel">
-          <p className="chapter3-shape__hint">유리알 눈·타원 입 위치·크기 (픽셀 기준). 변경 즉시 3D에 반영.</p>
+          <p className="chapter3-shape__hint">유리알 눈·작대기 입 위치·크기 (픽셀 기준). 변경 즉시 3D에 반영.</p>
           {specs.map((spec) => (
             <label key={spec.key} className="chapter3-shape__row">
               <span>
