@@ -15,7 +15,7 @@ export const CHAPTER3_INSIDE_PAPIER_URL = chapter3AssetUrl("background/papier.jp
 /** Chapter 3 opening title. */
 export const CHAPTER3_TITLE = "색이 없는 소호 행성";
 
-/** Dev (`yarn dev`): 3장 행성 안(외계인) 기본. 씬1=`?chapter=1` 또는 NEXT_PUBLIC_DEV_CHAPTER=1. */
+/** Dev (`yarn dev`): 1장부터. 3장=`?chapter=3&ch3=inside` 또는 NEXT_PUBLIC_DEV_CHAPTER=3. */
 
 export const CHAPTER3_INTRO_TITLE_MS = 2400;
 export const CHAPTER3_TITLE_HOLD_MS = 5000;

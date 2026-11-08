@@ -76,8 +76,8 @@ function getDevStartChapter(): Chapter {
   ) {
     return 3;
   }
-  /** Dev default: 3장 행성 안 (외계인). 씬1은 `?chapter=1` 또는 NEXT_PUBLIC_DEV_CHAPTER=1. */
-  return 3;
+  /** Dev default: 1장(스크롤)부터. 3장=`?chapter=3` 또는 NEXT_PUBLIC_DEV_CHAPTER=3. */
+  return 1;
 }
 
 const DEV_START_CHAPTER = getDevStartChapter();
