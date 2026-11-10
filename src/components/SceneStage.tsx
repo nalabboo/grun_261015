@@ -76,17 +76,22 @@ function getDevStartChapter(): Chapter {
   ) {
     return 3;
   }
-  /** Dev default: 1장(스크롤)부터. 3장=`?chapter=3` 또는 NEXT_PUBLIC_DEV_CHAPTER=3. */
-  return 1;
+  /** Dev default: 3장 우주(play). 씬1=`?chapter=1` · 타이틀=`ch3=intro` · 행성 안=`ch3=inside`. */
+  return 3;
 }
 
 const DEV_START_CHAPTER = getDevStartChapter();
 
+function devChapter3StepFromEnv(): Chapter3Step | null {
+  const step = process.env.NEXT_PUBLIC_DEV_CH3;
+  if (step === "intro" || step === "play" || step === "inside") return step;
+  return null;
+}
+
 function resolveDevChapter3Step(params: URLSearchParams): Chapter3Step {
   const step = params.get("ch3");
   if (step === "intro" || step === "play" || step === "inside") return step;
-  /** Dev default for 3장: 행성 안 (외계인 등장). */
-  return "inside";
+  return devChapter3StepFromEnv() ?? "play";
 }
 
 /** Scene 1 layer gizmo toolbar — off by default (`NEXT_PUBLIC_DEV_LAYER_EDIT=1`). */
@@ -151,7 +156,7 @@ export default function SceneStage() {
   );
   const [chapter2PlayReady, setChapter2PlayReady] = useState(false);
   const [chapter3Step, setChapter3Step] = useState<Chapter3Step | null>(
-    DEV_START_CHAPTER === 3 ? "inside" : null,
+    DEV_START_CHAPTER === 3 ? (devChapter3StepFromEnv() ?? "play") : null,
   );
   const chapterRef = useRef<Chapter>(DEV_START_CHAPTER);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
