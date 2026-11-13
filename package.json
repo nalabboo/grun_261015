@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NEXT_PUBLIC_DEV_CHAPTER=3 NEXT_PUBLIC_DEV_CH3=play next dev",
+    "dev": "NEXT_PUBLIC_DEV_CHAPTER=1 next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
