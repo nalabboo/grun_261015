@@ -8,7 +8,7 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261017d-scene1";
+export const ASSET_VERSION = "20261114-worm-sw";
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
@@ -29,13 +29,9 @@ export const IMAGE_SIZES = {
   kind_sw: { file: "character/kind_sw.png", width: 509, height: 678 },
   kind_g: { file: "character/kind_g.png", width: 509, height: 678 },
   // landmark/
-  worm_b: { file: "landmark/worm_b.png", width: 604, height: 700 },
   worm_g: { file: "landmark/worm_g.png", width: 604, height: 700 },
   ampel_b: { file: "landmark/ampel_b.png", width: 821, height: 1000 },
   ampel_g: { file: "landmark/ampel_g.png", width: 821, height: 1000 },
-  spore1: { file: "landmark/spore1.png", width: 180, height: 693 },
-  spore2: { file: "landmark/spore2.png", width: 236, height: 854 },
-  spore3: { file: "landmark/spore3.png", width: 182, height: 645 },
   stein: { file: "landmark/stein.png", width: 700, height: 637 },
   moss1_b: { file: "landmark/moss1_b.png", width: 426, height: 242 },
   moss1_g: { file: "landmark/moss1_g.png", width: 426, height: 242 },
@@ -44,31 +40,73 @@ export const IMAGE_SIZES = {
 } as const;
 
 /**
- * Grun walk cycle: PNG frames extracted from the Kling-made grun_t.gif by
- * `scripts/extract_grun_walk.py` (every 3rd frame, watermark removed).
- * Each frame is the region `crop` of a logical `width` x `height` frame, so layout stays as before.
+ * Grun walk cycle: PNG frames extracted from source_videos/ricori_walk.mp4 (green screen removed) by
+ * `scripts/extract_ricori.py` (every 3rd frame of the 60 fps video).
+ * Each frame is drawn at (`cropX`, `cropY`) inside a logical `width` x `height` frame. The logical
+ * frame is sized so the figure's height and feet line match the previous (removed) walk frames.
  */
 export const GRUN_WALK = {
-  dir: "character/grun_walk",
-  frames: 29,
-  width: 1000,
-  height: 1080,
-  cropX: 110,
-  cropY: 20,
-  loopMs: 1720,
+  dir: "character/ricori_walk",
+  frames: 35,
+  width: 741,
+  height: 1143,
+  cropX: 34,
+  cropY: 39,
+  loopMs: 1750,
 } as const;
 
 export function grunWalkFrameUrl(index: number) {
   return assetUrl(`${GRUN_WALK.dir}/frame_${String(index).padStart(2, "0")}.png`);
 }
 
+/**
+ * Swaying spore loops cut out of source_videos/pore.mp4 (blue screen) by `scripts/extract_pore.py`
+ * (every 3rd frame of the 60 fps video). `width` / `height` = frame size, `crown` = crown width
+ * at rest (all px). Each frame is centred on the crown at rest.
+ */
+export const SPORE_CLIPS = {
+  spore1: { dir: "landmark/pore/spore1", width: 163, height: 432, crown: 109 },
+  spore2: { dir: "landmark/pore/spore2", width: 244, height: 528, crown: 143 },
+  spore3: { dir: "landmark/pore/spore3", width: 155, height: 403, crown: 104 },
+} as const;
+
+export const SPORE_CLIP_FRAMES = 45;
+export const SPORE_CLIP_LOOP_MS = 2250;
+
+export type SporeAsset = keyof typeof SPORE_CLIPS;
+
+export function sporeFrameUrls(asset: SporeAsset) {
+  const { dir } = SPORE_CLIPS[asset];
+  return Array.from({ length: SPORE_CLIP_FRAMES }, (_, index) =>
+    assetUrl(`${dir}/frame_${String(index).padStart(2, "0")}.webp`),
+  );
+}
+
+/**
+ * Grey worm idle loop cut out of source_videos/worme_sw.mp4 (magenta screen) by
+ * `scripts/extract_worm.py` (every 3rd frame of the 60 fps video). Frames use the 604x700
+ * canvas and silhouette of the former worm_b.png, so `getWormLayout` works unchanged.
+ */
+export const WORM_SW_CLIP = {
+  dir: "landmark/worm_sw",
+  frames: 59,
+  loopMs: 2950,
+  width: 604,
+  height: 700,
+} as const;
+
+/** Frame files (relative to public/scene1/) of the grey worm loop. */
+export const WORM_SW_FRAME_FILES = Array.from(
+  { length: WORM_SW_CLIP.frames },
+  (_, index) => `${WORM_SW_CLIP.dir}/frame_${String(index).padStart(2, "0")}.webp`,
+);
+
 /** Preload / runtime keys grouped by asset folder (same entries as `IMAGE_SIZES`). */
 export const SCENE_ASSET_GROUPS = {
   berg: ["berg1", "berg2", "berg3", "berg4"],
   character: ["kind_sw", "kind_g"],
   landmark: [
-    "stein", "worm_b", "worm_g", "ampel_b", "ampel_g",
-    "spore1", "spore2", "spore3",
+    "stein", "worm_g", "ampel_b", "ampel_g",
     "moss1_b", "moss1_g", "moss2_b", "moss2_g",
   ],
 } as const satisfies Record<string, readonly (keyof typeof IMAGE_SIZES)[]>;
@@ -118,14 +156,11 @@ export const GRUN_OFFSET_Y_RATIO = 10 / SCENE_REFERENCE_HEIGHT;
 /** Full playback duration of one walk cycle (ms). */
 export const GRUN_WALK_LOOP_MS = GRUN_WALK.loopMs;
 
+/** Time left in the current walk loop (ms) after `walkPlayStartMs`. */
 export function getRemainingWalkLoopMs(walkPlayStartMs: number, now = Date.now()) {
   if (walkPlayStartMs <= 0) return GRUN_WALK_LOOP_MS;
-
-  const elapsed = now - walkPlayStartMs;
-  let remaining = GRUN_WALK_LOOP_MS - (elapsed % GRUN_WALK_LOOP_MS);
-  if (remaining < 20) remaining = GRUN_WALK_LOOP_MS;
-
-  return remaining;
+  const phase = (now - walkPlayStartMs) % GRUN_WALK_LOOP_MS;
+  return GRUN_WALK_LOOP_MS - phase;
 }
 
 /** Set false to hide stein/worm while tuning the scene. */
@@ -246,16 +281,16 @@ export const GRUN_POST_REVEAL_STEIN_X_RATIO = 0.22;
 export const GRUN_POST_REVEAL_OFFSET_X_PX = 700;
 /** Extra rightward offset after kind reveal (reference px at 1080p). */
 export const GRUN_POST_KIND_REVEAL_OFFSET_X_PX = 100;
-export const WORM_HEIGHT_RATIO = IMAGE_SIZES.worm_b.height / SCENE_REFERENCE_HEIGHT;
-export const WORM_WIDTH_RATIO = IMAGE_SIZES.worm_b.width / SCENE_REFERENCE_HEIGHT;
+export const WORM_HEIGHT_RATIO = WORM_SW_CLIP.height / SCENE_REFERENCE_HEIGHT;
+export const WORM_WIDTH_RATIO = WORM_SW_CLIP.width / SCENE_REFERENCE_HEIGHT;
 export const WORM_SCALE = 0.42;
-/** Downward screen offset for worm_b (reference px at 1080p). */
+/** Downward screen offset for the worm (reference px at 1080p). */
 export const WORM_OFFSET_Y_PX = 0;
 /** Peak landing surface on stein where worm sits (source px from image bottom). */
 export const STEIN_LANDING_SURFACE_FROM_BOTTOM_PX = 268;
 /** Horizontal center of stein peak in source image (ratio of stein width). */
 export const STEIN_PEAK_CENTER_X_RATIO = 224 / IMAGE_SIZES.stein.width;
-/** worm_b feet row (source px from image bottom). */
+/** Worm feet row (source px from frame bottom). */
 export const WORM_FEET_FROM_BOTTOM_PX = 40;
 
 /** Gap after berg1 right edge before stein (viewport width ratio). */
@@ -497,16 +532,21 @@ export function getSporeLayouts(metrics: SceneMetrics) {
   const stein = getSteinLayout(metrics);
   const u = getRefUnit(metrics);
 
-  return SPORE_TREES.map((tree) => {
-    const size = IMAGE_SIZES[tree.asset];
-    const width = tree.crown * u * (size.width / (size.width * 0.96));
-    const height = width * (size.height / size.width);
+  return SPORE_TREES.map((tree, index) => {
+    const clip = SPORE_CLIPS[tree.asset];
+    // Same sizing rule as the old still images: on-screen crown width = crown / 0.96 ref px.
+    const pxScale = (tree.crown * u) / 0.96 / clip.crown;
+    const width = clip.width * pxScale;
+    const height = clip.height * pxScale;
 
     return {
       id: tree.id,
-      file: size.file,
+      asset: tree.asset,
       front: tree.front,
-      blurSrcPx: (tree.blur * size.width) / tree.crown,
+      /** Gaussian blur radius in on-screen px. */
+      blurPx: tree.blur * u,
+      /** Loop offset so neighbouring spores don't sway in lockstep. */
+      phaseMs: ((index * 0.618) % 1) * SPORE_CLIP_LOOP_MS,
       worldX: stein.worldX + (tree.xc - 365) * u - width / 2,
       width,
       height,
@@ -554,7 +594,7 @@ export function getWormLayout(metrics: SceneMetrics) {
   const width = metrics.height * WORM_WIDTH_RATIO * WORM_SCALE;
   const landingY =
     stein.height * (STEIN_LANDING_SURFACE_FROM_BOTTOM_PX / IMAGE_SIZES.stein.height);
-  const feetY = height * (WORM_FEET_FROM_BOTTOM_PX / IMAGE_SIZES.worm_b.height);
+  const feetY = height * (WORM_FEET_FROM_BOTTOM_PX / WORM_SW_CLIP.height);
   const offsetY = WORM_OFFSET_Y_PX * (metrics.height / SCENE_REFERENCE_HEIGHT);
 
   return {

@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# source videos (kept outside the repo in ../source_videos, see scripts/extract_*.py)
+*.mp4

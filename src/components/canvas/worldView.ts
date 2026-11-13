@@ -19,14 +19,19 @@ export type GrunFrameSource = {
   playStartMs: number;
   /** True while grun is walking, so the texture follows the walk frames. */
   animating: boolean;
-  /** Force a single re-draw (standing pose, or the movie just became ready). */
+  /** Force a single re-draw (idle pose, or the movie just became ready). */
   dirty: boolean;
 };
 
 export type GrunFrameSourceRef = MutableRefObject<GrunFrameSource>;
 
 export function createGrunFrameSource(): GrunFrameSource {
-  return { movie: null, playStartMs: 0, animating: false, dirty: true };
+  return {
+    movie: null,
+    playStartMs: 0,
+    animating: false,
+    dirty: true,
+  };
 }
 
 /** Scene cards that can be edited with TransformControls. */

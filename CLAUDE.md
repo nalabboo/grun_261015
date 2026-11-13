@@ -30,7 +30,7 @@
 | **Three.js** + **React Three Fiber** + **drei** | 3D/WebGL 그래픽 (1장 레이어 월드, 3장 행성·별 등) |
 | **Tailwind CSS 4** | 스타일. 대부분의 스타일은 `src/app/globals.css`에 있음 |
 | **ESLint** | 코드 검사 |
-| Python (Pillow) | 보조 스크립트 전용 (`scripts/extract_grun_walk.py`: GIF에서 걷기 프레임 추출) |
+| Python (Pillow) | 보조 스크립트 전용 (`scripts/extract_*.py`: 크로마키 영상에서 배경 제거한 프레임 추출) |
 
 패키지 관리자는 **yarn** 입니다 (`yarn.lock` 있음).
 
@@ -98,4 +98,14 @@ scripts/                보조 Python 스크립트
 - 코드에서 `@/`는 `src/` 폴더를 뜻합니다 (예: `@/components/SceneStage`).
 - 화면 기준 높이(`SCENE_REFERENCE_HEIGHT`)에 맞춰 크기가 비례 조정되므로, 픽셀 값을 바꿀 때 이 기준을 염두에 둡니다.
 - 3D/브라우저 전용 코드는 파일 맨 위에 `"use client"`가 필요합니다.
-- 커밋 메시지는 `grun_MMDD/s3 설명` 형식을 써 왔습니다 (예: `grun_1110/s3 zeigen`).
+- 커밋 메시지는 `grun_MMDD/s3 설명` 형식을 써 왔습니다 (예: `grun_1110/s3 zeigen`). 2026-11부터는 `v2_grunMMDD/...`도 사용.
+
+### 움직이는 에셋 (영상 → 프레임)
+
+- 디자이너가 크로마키(초록/파랑/분홍 배경) mp4를 주면, 스크립트로 배경을 지운 프레임(PNG/WebP)을 만들어 `public/`에 넣고 코드에서 반복 재생합니다.
+- **원본 mp4는 git에 넣지 않습니다** (`.gitignore`에 `*.mp4`). 프로젝트 바깥 `../source_videos/` (= `das_grun/source_videos/`)에 보관하고, 스크립트가 거기서 읽습니다 (`GRUN_VIDEO_DIR` 환경 변수로 위치 변경 가능).
+  - `scripts/extract_ricori.py`: `ricori_walk.mp4` → 1장 초록이 걷기 (`character/ricori_walk/`)
+  - `scripts/extract_pore.py`: `pore.mp4` → 1장 spore 3종 (`landmark/pore/`)
+  - `scripts/extract_worm.py`: `worme_sw.mp4` → 1장 회색 벌레 (`landmark/worm_sw/`)
+- 스크립트 실행에 필요: `pip install imageio-ffmpeg numpy pillow scipy` (시스템에 ffmpeg 없음, imageio-ffmpeg가 포함)
+- 영상을 바꾸면 스크립트 재실행 → 출력된 프레임 수·크기가 바뀌었으면 `sceneConfig.ts`의 해당 설정(`GRUN_WALK`, `SPORE_CLIPS`, `WORM_SW_CLIP`)도 수정 → `ASSET_VERSION` 올리기.

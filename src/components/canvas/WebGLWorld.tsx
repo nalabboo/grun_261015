@@ -24,7 +24,12 @@ import {
   MOSS_INSTANCE_IDS,
   getAmpelLayout,
   getSporeLayouts,
+  SPORE_CLIP_FRAMES,
+  SPORE_CLIP_LOOP_MS,
   SPORE_TREES,
+  WORM_SW_CLIP,
+  WORM_SW_FRAME_FILES,
+  sporeFrameUrls,
   SCENE_LAYERS,
   SCENE_PERSPECTIVE_RATIO,
   SCENE_REFERENCE_HEIGHT,
@@ -49,6 +54,7 @@ import {
 import { createBakedLayerTexture } from "@/lib/bakeLayerTexture";
 import { PAPER_GRAIN_TILE_PX } from "@/lib/paperGrain";
 import { revealFragmentShader, revealVertexShader } from "./revealShader";
+import { sporeFragmentShader, sporeVertexShader } from "./sporeShader";
 import type {
   CardId,
   EditorState,
@@ -91,6 +97,27 @@ function useSceneTexture(file: string) {
   }, [texture]);
 
   return texture;
+}
+
+/** Same as `useSceneTexture` for a list of files (e.g. the frames of a loop). */
+function useSceneTextures(files: readonly string[]) {
+  const textures = useTexture(files.map((file) => assetUrl(file)));
+
+  useMemo(() => {
+    for (const texture of textures) {
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.anisotropy = 8;
+      texture.needsUpdate = true;
+    }
+  }, [textures]);
+
+  return textures;
+}
+
+/** Index of the frame to show for a looping clip at `nowMs`. */
+function loopFrameIndex(nowMs: number, frameCount: number, loopMs: number) {
+  const t = ((nowMs % loopMs) + loopMs) % loopMs;
+  return Math.min(frameCount - 1, Math.floor((t / loopMs) * frameCount));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -409,13 +436,100 @@ function WorldSprite({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Spore (swaying frame loop from pore.mp4, blurred on the GPU by depth)      */
+/* -------------------------------------------------------------------------- */
+
+type SporeSpriteProps = {
+  tree: (typeof SPORE_TREES)[number];
+  metrics: SceneMetrics;
+  viewRef: WorldViewRef;
+  renderOrder: number;
+};
+
+function SporeSprite({ tree, metrics, viewRef, renderOrder }: SporeSpriteProps) {
+  // drei caches textures by URL, so every spore of the same kind shares one set of frames.
+  const frames = useTexture(sporeFrameUrls(tree.asset));
+  const meshRef = useRef<THREE.Mesh>(null);
+  const outerRef = useRef<THREE.Group>(null);
+  const userRef = useRef<THREE.Group>(null);
+
+  useMemo(() => {
+    for (const frame of frames) {
+      frame.colorSpace = THREE.NoColorSpace;
+      frame.anisotropy = 8;
+      frame.needsUpdate = true;
+    }
+  }, [frames]);
+
+  const uniforms = useMemo(
+    () => ({
+      map: { value: frames[0] },
+      blurUv: { value: new THREE.Vector2(0, 0) },
+      grow: { value: new THREE.Vector2(0, 0) },
+    }),
+    [frames],
+  );
+
+  useFrame(() => {
+    const mesh = meshRef.current;
+    const outer = outerRef.current;
+    if (!mesh || !outer) return;
+
+    const layout = getSporeLayouts(metrics).find((l) => l.id === tree.id);
+    if (!layout) return;
+
+    const t = (((Date.now() + layout.phaseMs) % SPORE_CLIP_LOOP_MS) + SPORE_CLIP_LOOP_MS) %
+      SPORE_CLIP_LOOP_MS;
+    const index = Math.min(
+      SPORE_CLIP_FRAMES - 1,
+      Math.floor((t / SPORE_CLIP_LOOP_MS) * SPORE_CLIP_FRAMES),
+    );
+    // R3F copies the `uniforms` prop into the material, so update the material's own copy.
+    const live = (mesh.material as THREE.ShaderMaterial).uniforms;
+    live.map.value = frames[index];
+
+    // Blur spreads ~3 sigma past the frame, so the quad grows by that much on every side.
+    const padPx = layout.blurPx * 3;
+    live.blurUv.value.set(layout.blurPx / layout.width, layout.blurPx / layout.height);
+    live.grow.value.set((2 * padPx) / layout.width, (2 * padPx) / layout.height);
+
+    outer.position.set(
+      layout.worldX - viewRef.current.worldScroll + layout.width / 2,
+      layout.bottom + layout.height / 2,
+      0,
+    );
+    mesh.scale.set(layout.width + 2 * padPx, layout.height + 2 * padPx, 1);
+  });
+
+  return (
+    <EditableCard id={tree.id} outerRef={outerRef} userRef={userRef}>
+      <mesh ref={meshRef} renderOrder={renderOrder} frustumCulled={false}>
+        <planeGeometry args={[1, 1]} />
+        <shaderMaterial
+          uniforms={uniforms}
+          vertexShader={sporeVertexShader}
+          fragmentShader={sporeFragmentShader}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </EditableCard>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Reveal sprite (b → g watercolor transition)                                */
 /* -------------------------------------------------------------------------- */
 
 type RevealSpriteProps = {
   id: CardId;
-  bFile: string;
-  gFile: string;
+  /** One image, or the frames of a loop (played over `frameLoopMs`). */
+  bFile: string | readonly string[];
+  gFile: string | readonly string[];
+  /** Duration of one loop when `bFile` / `gFile` are frame lists (ms). */
+  frameLoopMs?: number;
   phase: RevealPhase;
   onRevealComplete: () => void;
   metrics: SceneMetrics;
@@ -433,6 +547,7 @@ function RevealSprite({
   id,
   bFile,
   gFile,
+  frameLoopMs = 1000,
   phase,
   onRevealComplete,
   metrics,
@@ -440,8 +555,10 @@ function RevealSprite({
   renderOrder,
   getRect,
 }: RevealSpriteProps) {
-  const bMap = useSceneTexture(bFile);
-  const gMap = useSceneTexture(gFile);
+  const bFrames = useSceneTextures(typeof bFile === "string" ? [bFile] : bFile);
+  const gFrames = useSceneTextures(typeof gFile === "string" ? [gFile] : gFile);
+  const bMap = bFrames[0];
+  const gMap = gFrames[0];
   const meshRef = useRef<THREE.Mesh>(null);
   const outerRef = useRef<THREE.Group>(null);
   const userRef = useRef<THREE.Group>(null);
@@ -504,6 +621,13 @@ function RevealSprite({
 
     const uniforms = material.uniforms;
     (uniforms.uSize.value as THREE.Vector2).set(rect.width, rect.height);
+
+    if (bFrames.length > 1) {
+      uniforms.uB.value = bFrames[loopFrameIndex(Date.now(), bFrames.length, frameLoopMs)];
+    }
+    if (gFrames.length > 1) {
+      uniforms.uG.value = gFrames[loopFrameIndex(Date.now(), gFrames.length, frameLoopMs)];
+    }
 
     const now = performance.now();
 
@@ -584,7 +708,7 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
 
     if (ctx && movie && (source.animating || source.dirty)) {
       const time = source.animating ? Date.now() - source.playStartMs : 0;
-      if (movie.drawAt(time, ctx)) {
+      if (movie.drawAt(time, ctx, source.dirty || !source.animating)) {
         texture.needsUpdate = true;
       }
       source.dirty = false;
@@ -686,21 +810,7 @@ const wormRect = (metrics: SceneMetrics) => {
 
 const ampelRect = (metrics: SceneMetrics) => getAmpelLayout(metrics);
 
-const SPORE_RECTS = Object.fromEntries(
-  SPORE_TREES.map((tree) => [
-    tree.id,
-    (metrics: SceneMetrics) => {
-      const layout = getSporeLayouts(metrics).find((l) => l.id === tree.id)!;
-      return { worldX: layout.worldX, bottom: layout.bottom, width: layout.width, height: layout.height };
-    },
-  ]),
-) as Record<(typeof SPORE_TREES)[number]["id"], (metrics: SceneMetrics) => { worldX: number; bottom: number; width: number; height: number }>;
-
 const noop = () => {};
-
-function getSporeBlur(metrics: SceneMetrics, id: string) {
-  return getSporeLayouts(metrics).find((l) => l.id === id)?.blurSrcPx ?? 0;
-}
 
 const steinRect = (metrics: SceneMetrics) => {
   const stein = getSteinLayout(metrics);
@@ -763,15 +873,12 @@ export default function WebGLWorld({
           <BergLayer layerKey="berg3" metrics={metrics} viewRef={viewRef} renderOrder={2} />
           {SHOW_LANDMARKS &&
             SPORE_TREES.filter((tree) => tree.front === false).map((tree) => (
-              <WorldSprite
+              <SporeSprite
                 key={tree.id}
-                id={tree.id}
-                file={IMAGE_SIZES[tree.asset].file}
+                tree={tree}
                 metrics={metrics}
                 viewRef={viewRef}
                 renderOrder={2.5}
-                blurSrcPx={getSporeBlur(metrics, tree.id)}
-                getRect={SPORE_RECTS[tree.id]}
               />
             ))}
           {SHOW_LANDMARKS && (
@@ -823,8 +930,9 @@ export default function WebGLWorld({
           {SHOW_LANDMARKS && (
             <RevealSprite
               id="worm"
-              bFile={IMAGE_SIZES.worm_b.file}
-              gFile={IMAGE_SIZES.worm_b.file}
+              bFile={WORM_SW_FRAME_FILES}
+              gFile={WORM_SW_FRAME_FILES}
+              frameLoopMs={WORM_SW_CLIP.loopMs}
               phase={wormPhase}
               onRevealComplete={onWormRevealComplete}
               metrics={metrics}
@@ -848,15 +956,12 @@ export default function WebGLWorld({
           )}
           {SHOW_LANDMARKS &&
             SPORE_TREES.filter((tree) => tree.front === true).map((tree) => (
-              <WorldSprite
+              <SporeSprite
                 key={tree.id}
-                id={tree.id}
-                file={IMAGE_SIZES[tree.asset].file}
+                tree={tree}
                 metrics={metrics}
                 viewRef={viewRef}
                 renderOrder={10}
-                blurSrcPx={getSporeBlur(metrics, tree.id)}
-                getRect={SPORE_RECTS[tree.id]}
               />
             ))}
           <ReadySignal onReady={onReady} />
