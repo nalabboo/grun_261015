@@ -1,10 +1,11 @@
 import {
   GRUN_WALK,
   IMAGE_SIZES,
-  KIND_SW_FRAME_FILES,
+  KIND_CLIPS,
   SPORE_CLIPS,
-  WORM_SW_FRAME_FILES,
+  WORM_CLIPS,
   assetUrl,
+  clipSetFrameFiles,
   grunWalkFrameUrl,
   sporeFrameUrls,
   type SporeAsset,
@@ -14,8 +15,8 @@ const SCENE_IMAGE_URLS = [
   ...Object.values(IMAGE_SIZES).map(({ file }) => assetUrl(file)),
   ...Array.from({ length: GRUN_WALK.frames }, (_, index) => grunWalkFrameUrl(index)),
   ...(Object.keys(SPORE_CLIPS) as SporeAsset[]).flatMap((asset) => sporeFrameUrls(asset)),
-  ...WORM_SW_FRAME_FILES.map((file) => assetUrl(file)),
-  ...KIND_SW_FRAME_FILES.map((file) => assetUrl(file)),
+  ...clipSetFrameFiles(WORM_CLIPS).map((file) => assetUrl(file)),
+  ...clipSetFrameFiles(KIND_CLIPS).map((file) => assetUrl(file)),
 ];
 
 function loadImage(url: string): Promise<void> {

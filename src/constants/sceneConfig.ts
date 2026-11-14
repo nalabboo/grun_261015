@@ -8,7 +8,7 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261114-webp";
+export const ASSET_VERSION = "20261114-worm-transform";
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
@@ -79,42 +79,74 @@ export function sporeFrameUrls(asset: SporeAsset) {
 }
 
 /**
- * Grey worm idle loop cut out of source_videos/worme_sw.mp4 (magenta screen) by
- * `scripts/extract_worm.py` (every 3rd frame of the 60 fps video). Frames use the 604x700
- * canvas and silhouette of the former worm_b.png, so `getWormLayout` works unchanged.
+ * A character that transforms on click: grey loop (sw) → transformation once (mitte) → green
+ * loop (g). Each clip is positioned in its character's "box" px (x / y = top-left, may be
+ * negative when a clip reaches outside the box).
  */
-export const WORM_SW_CLIP = {
-  dir: "landmark/worm_sw",
-  frames: 59,
-  loopMs: 2950,
-  width: 604,
-  height: 700,
-} as const;
+export type TransformClip = {
+  dir: string;
+  frames: number;
+  durationMs: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+export type TransformClipId = "sw" | "mitte" | "g";
+export type TransformClipSet = Readonly<Record<TransformClipId, TransformClip>>;
 
-/** Frame files (relative to public/scene1/) of the grey worm loop. */
-export const WORM_SW_FRAME_FILES = Array.from(
-  { length: WORM_SW_CLIP.frames },
-  (_, index) => `${WORM_SW_CLIP.dir}/frame_${String(index).padStart(2, "0")}.webp`,
-);
+/** Frame files (relative to public/scene1/) of one clip. */
+export function clipFrameFiles(clip: TransformClip) {
+  return Array.from(
+    { length: clip.frames },
+    (_, index) => `${clip.dir}/frame_${String(index).padStart(2, "0")}.webp`,
+  );
+}
+
+/** All frame files of a clip set (for preloading). */
+export function clipSetFrameFiles(clips: TransformClipSet) {
+  return (Object.keys(clips) as TransformClipId[]).flatMap((id) => clipFrameFiles(clips[id]));
+}
 
 /**
- * Grey kid idle loop cut out of source_videos/kind1_sw.mp4 (blue screen) by
- * `scripts/extract_kind.py` (every 3rd frame of the 60 fps video). Frames use the 509x678 canvas
- * of the former kind_sw.png (same figure height / feet line), so `getKindLayout` works unchanged.
+ * The worm's "box": 604x700 px, the canvas of the former worm_b.png. `getWormLayout` places this
+ * box on screen.
  */
-export const KIND_SW_CLIP = {
-  dir: "character/kind_sw",
-  frames: 35,
-  loopMs: 1750,
-  width: 509,
-  height: 678,
-} as const;
+export const WORM_BOX = { width: 604, height: 700 } as const;
 
-/** Frame files (relative to public/scene1/) of the grey kid loop. */
-export const KIND_SW_FRAME_FILES = Array.from(
-  { length: KIND_SW_CLIP.frames },
-  (_, index) => `${KIND_SW_CLIP.dir}/frame_${String(index).padStart(2, "0")}.webp`,
-);
+/**
+ * Worm clips cut out of source_videos/worme_*.mp4 by `scripts/extract_worm.py` (every 3rd frame
+ * of the 60 fps videos, ~20 fps):
+ *  - sw:    grey idle loop (worme_sw.mp4) — before the click
+ *  - mitte: grey → green transformation, flips over (worme_mitte.mp4) — plays once after the click
+ *  - g:     green idle loop (worme_g.mp4) — after the transformation
+ */
+export const WORM_CLIPS: TransformClipSet = {
+  sw: { dir: "landmark/worm_sw", frames: 59, durationMs: 2950, x: 0, y: 0, width: 604, height: 700 },
+  mitte: { dir: "landmark/worm_mitte", frames: 37, durationMs: 1850, x: -89, y: -66, width: 751, height: 750 },
+  g: { dir: "landmark/worm_g", frames: 37, durationMs: 1850, x: -13, y: 17, width: 625, height: 670 },
+};
+
+/**
+ * The kid's "box": 509x678 px, the canvas of the former kind_sw.png. `getKindLayout` places
+ * this box on screen; every kid clip is positioned in box px (x / y = top-left, may be negative
+ * when a clip reaches outside the box, e.g. the transformation's swirls and sparkles).
+ */
+export const KIND_BOX = { width: 509, height: 678 } as const;
+
+/**
+ * Kid clips cut out of source_videos/*.mp4 by `scripts/extract_kind.py` (every 3rd frame of the
+ * 60 fps videos, ~20 fps):
+ *  - sw:    grey idle loop (kind1_sw.mp4) — before the click
+ *  - mitte: grey → green transformation (kind_mitte.mp4) — plays once after the click
+ *  - g:     green idle loop (kind_g.mp4) — after the transformation
+ */
+export const KIND_CLIPS: TransformClipSet = {
+  sw: { dir: "character/kind_sw", frames: 35, durationMs: 1750, x: 0, y: 0, width: 509, height: 678 },
+  mitte: { dir: "character/kind_mitte", frames: 60, durationMs: 3000, x: -78, y: -17, width: 656, height: 721 },
+  g: { dir: "character/kind_g", frames: 49, durationMs: 2450, x: 67, y: 13, width: 377, height: 661 },
+};
+
 
 /** Preload / runtime keys grouped by asset folder (same entries as `IMAGE_SIZES`). */
 export const SCENE_ASSET_GROUPS = {
@@ -279,8 +311,8 @@ export const STEIN_HEIGHT_RATIO = IMAGE_SIZES.stein.height / SCENE_REFERENCE_HEI
 export const STEIN_WIDTH_RATIO = IMAGE_SIZES.stein.width / SCENE_REFERENCE_HEIGHT;
 /** Display scale for the grey kid (`kind_sw`) loop relative to source frame size. */
 export const KIND_SCALE = 1.00;
-export const KIND_HEIGHT_RATIO = (KIND_SW_CLIP.height / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
-export const KIND_WIDTH_RATIO = (KIND_SW_CLIP.width / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
+export const KIND_HEIGHT_RATIO = (KIND_BOX.height / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
+export const KIND_WIDTH_RATIO = (KIND_BOX.width / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
 /** Gap between stein right edge and kind_sw left edge (reference px at 1080p). */
 export const KIND_STEIN_GAP_PX = -100;
 /** Extra rightward offset for kind_sw (reference px at 1080p). */
@@ -296,8 +328,8 @@ export const GRUN_POST_REVEAL_STEIN_X_RATIO = 0.22;
 export const GRUN_POST_REVEAL_OFFSET_X_PX = 700;
 /** Extra rightward offset after kind reveal (reference px at 1080p). */
 export const GRUN_POST_KIND_REVEAL_OFFSET_X_PX = 100;
-export const WORM_HEIGHT_RATIO = WORM_SW_CLIP.height / SCENE_REFERENCE_HEIGHT;
-export const WORM_WIDTH_RATIO = WORM_SW_CLIP.width / SCENE_REFERENCE_HEIGHT;
+export const WORM_HEIGHT_RATIO = WORM_BOX.height / SCENE_REFERENCE_HEIGHT;
+export const WORM_WIDTH_RATIO = WORM_BOX.width / SCENE_REFERENCE_HEIGHT;
 export const WORM_SCALE = 0.42;
 /** Downward screen offset for the worm (reference px at 1080p). */
 export const WORM_OFFSET_Y_PX = 0;
@@ -429,6 +461,22 @@ export function getGrunPostRevealStandX(metrics: SceneMetrics) {
     GRUN_POST_REVEAL_OFFSET_X_PX * (metrics.height / SCENE_REFERENCE_HEIGHT);
 
   return anchorX - grunWidth + offsetX;
+}
+
+/** Until the kid has transformed, grun's front may not come closer to the kid (ref px at 1080p). */
+export const KIND_BLOCK_DISTANCE_PX = 150;
+/** Front of grun's figure (facing right) as a fraction of its display width. */
+const GRUN_FRONT_RATIO = 0.9;
+/** Left edge of the kid's figure inside the kid box (box px, see KIND_CLIPS.sw). */
+const KIND_FIGURE_LEFT_PX = 83;
+
+/** Largest grun world X (left edge) allowed while the kid has not transformed yet. */
+export function getGrunKindBarrierX(metrics: SceneMetrics) {
+  const kind = getKindLayout(metrics);
+  const kidLeft = kind.worldX + kind.width * (KIND_FIGURE_LEFT_PX / KIND_BOX.width);
+  const distance = KIND_BLOCK_DISTANCE_PX * (metrics.height / SCENE_REFERENCE_HEIGHT);
+
+  return kidLeft - distance - getGrunDisplayWidth(metrics) * GRUN_FRONT_RATIO;
 }
 
 /** World X where grun stops after kind reveal. */
@@ -609,7 +657,7 @@ export function getWormLayout(metrics: SceneMetrics) {
   const width = metrics.height * WORM_WIDTH_RATIO * WORM_SCALE;
   const landingY =
     stein.height * (STEIN_LANDING_SURFACE_FROM_BOTTOM_PX / IMAGE_SIZES.stein.height);
-  const feetY = height * (WORM_FEET_FROM_BOTTOM_PX / WORM_SW_CLIP.height);
+  const feetY = height * (WORM_FEET_FROM_BOTTOM_PX / WORM_BOX.height);
   const offsetY = WORM_OFFSET_Y_PX * (metrics.height / SCENE_REFERENCE_HEIGHT);
 
   return {
@@ -657,6 +705,17 @@ export function isGrunNearWorm(metrics: SceneMetrics, grunWorldX: number) {
   const proximity = metrics.width * LANDMARK_GRUN_PROXIMITY_RATIO;
 
   return grunWorldX >= worm.worldX - proximity;
+}
+
+/**
+ * Grun (left edge) can't walk past this world X until the worm has transformed: grun stops just
+ * left of the stein (`getGrunLandmarkStandX`), always far enough in to pause at the worm.
+ */
+export function getGrunWormBarrierX(metrics: SceneMetrics) {
+  const worm = getWormLayout(metrics);
+  const pauseX = worm.worldX - metrics.width * LANDMARK_GRUN_PROXIMITY_RATIO;
+
+  return Math.max(getGrunLandmarkStandX(metrics), pauseX + 1);
 }
 
 function smoothstep(value: number) {

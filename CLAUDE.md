@@ -106,9 +106,9 @@ scripts/                보조 Python 스크립트
 - **원본 mp4는 git에 넣지 않습니다** (`.gitignore`에 `*.mp4`). 프로젝트 바깥 `../source_videos/` (= `das_grun/source_videos/`)에 보관하고, 스크립트가 거기서 읽습니다 (`GRUN_VIDEO_DIR` 환경 변수로 위치 변경 가능).
   - `scripts/extract_ricori.py`: `ricori_walk.mp4` → 1장 초록이 걷기 (`character/ricori_walk/`)
   - `scripts/extract_pore.py`: `pore.mp4` → 1장 spore 3종 (`landmark/pore/`)
-  - `scripts/extract_worm.py`: `worme_sw.mp4` → 1장 회색 벌레 (`landmark/worm_sw/`)
-  - `scripts/extract_kind.py`: `kind1_sw.mp4` → 1장 회색 아이 (`character/kind_sw/`)
+  - `scripts/extract_worm.py`: 애벌레 3개 영상 → `landmark/worm_sw/`(회색 반복, `worme_sw.mp4`), `worm_mitte/`(변신, 한 번 재생, `worme_mitte.mp4`), `worm_g/`(초록 반복, `worme_g.mp4`). 아이와 같은 방식이며 기준 좌표는 "worm box"(604x700), 위치는 `sceneConfig.ts`의 `WORM_CLIPS`. 분홍 볼이 배경색과 비슷해서, 바깥 배경과 이어진 분홍만 투명하게 만듭니다(`outside_only`). 애벌레가 변신하기 전에는 초록이가 바위 앞(`getGrunWormBarrierX`)에서 멈추고, 변신이 끝나야 다시 앞으로 갈 수 있습니다.
+  - `scripts/extract_kind.py`: 아이 3개 영상 → `character/kind_sw/`(회색 반복, `kind1_sw.mp4`), `kind_mitte/`(변신, 한 번 재생, `kind_mitte.mp4`), `kind_g/`(초록 반복, `kind_g.mp4`). 세 영상은 실루엣을 맞춰 같은 좌표("kid box", 509x678)에 배치하고 위치는 `sceneConfig.ts`의 `KIND_CLIPS`. 화면 부품은 `WebGLWorld.tsx`의 `TransformSprite` (클릭 → 변신 재생 → 끝나면 reveal 완료 알림 → 초록 반복). 아이는 회색일 때 언제든 클릭 가능(`KindHitTarget` active = kindPhase "b"). 변신 전에는 초록이가 아이 앞 `KIND_BLOCK_DISTANCE_PX`(150, 1080p 기준) 안으로 못 들어감 (`getGrunKindBarrierX`, `SceneStage.tsx`의 `getGrunLimitX`).
 - **용량 주의**: 1장은 첫 화면 전에 그림을 전부 미리 불러옵니다(`src/lib/preloadSceneAssets.ts`). 새 그림·프레임은 PNG 대신 **WebP(quality 90)**로 넣습니다 (PNG 대비 약 1/6). 2026-11-14에 1장 그림을 WebP로 바꿔 약 42MB → 10MB로 줄였습니다.
-- 벌레·아이는 원래 클릭하면 컬러로 번지는(reveal) 대상이지만, 지금은 클릭 전·후 모두 회색 영상 프레임을 씁니다 (새 캐릭터의 컬러 버전이 아직 없음).
+- 아이·애벌레는 같은 부품 `TransformSprite`(`WebGLWorld.tsx`)로 그립니다: 회색 반복(sw) → 클릭 → 변신 한 번(mitte) → 초록 반복(g). 영상마다 크로마 배경색 톤이 다를 수 있어 스크립트에서 영상별로 배경색·키 값을 따로 둡니다.
 - 스크립트 실행에 필요: `pip install imageio-ffmpeg numpy pillow scipy` (시스템에 ffmpeg 없음, imageio-ffmpeg가 포함)
-- 영상을 바꾸면 스크립트 재실행 → 출력된 프레임 수·크기가 바뀌었으면 `sceneConfig.ts`의 해당 설정(`GRUN_WALK`, `SPORE_CLIPS`, `WORM_SW_CLIP`)도 수정 → `ASSET_VERSION` 올리기.
+- 영상을 바꾸면 스크립트 재실행 → 출력된 프레임 수·크기가 바뀌었으면 `sceneConfig.ts`의 해당 설정(`GRUN_WALK`, `SPORE_CLIPS`, `WORM_CLIPS`, `KIND_CLIPS`)도 수정 → `ASSET_VERSION` 올리기.

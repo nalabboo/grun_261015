@@ -27,10 +27,11 @@ import {
   SPORE_CLIP_FRAMES,
   SPORE_CLIP_LOOP_MS,
   SPORE_TREES,
-  KIND_SW_CLIP,
-  KIND_SW_FRAME_FILES,
-  WORM_SW_CLIP,
-  WORM_SW_FRAME_FILES,
+  KIND_BOX,
+  KIND_CLIPS,
+  clipFrameFiles,
+  WORM_BOX,
+  WORM_CLIPS,
   sporeFrameUrls,
   SCENE_LAYERS,
   SCENE_PERSPECTIVE_RATIO,
@@ -42,6 +43,8 @@ import {
   getKindLayout,
   getMossOnSteinLayouts,
   getSteinLayout,
+  type TransformClipId,
+  type TransformClipSet,
   type MossInstanceId,
   type MossPhases,
   type SceneMetrics,
@@ -669,6 +672,128 @@ function RevealSprite({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Kid / worm (grey loop → click → transformation once → green loop)          */
+/* -------------------------------------------------------------------------- */
+
+type TransformSpriteProps = {
+  id: CardId;
+  /** Clips positioned in the character's box px; `boxWidth` = width of `getRect`'s rect. */
+  clips: TransformClipSet;
+  boxWidth: number;
+  phase: RevealPhase;
+  /** Called once the transformation clip has finished playing. */
+  onRevealComplete: () => void;
+  metrics: SceneMetrics;
+  viewRef: WorldViewRef;
+  renderOrder: number;
+  getRect: (metrics: SceneMetrics) => {
+    worldX: number;
+    bottom: number;
+    width: number;
+    height: number;
+  };
+};
+
+function TransformSprite({
+  id,
+  clips,
+  boxWidth,
+  phase,
+  onRevealComplete,
+  metrics,
+  viewRef,
+  renderOrder,
+  getRect,
+}: TransformSpriteProps) {
+  const swFrames = useSceneTextures(useMemo(() => clipFrameFiles(clips.sw), [clips]));
+  const mitteFrames = useSceneTextures(useMemo(() => clipFrameFiles(clips.mitte), [clips]));
+  const gFrames = useSceneTextures(useMemo(() => clipFrameFiles(clips.g), [clips]));
+  const meshRef = useRef<THREE.Mesh>(null);
+  const outerRef = useRef<THREE.Group>(null);
+  const userRef = useRef<THREE.Group>(null);
+  /** Date.now() when the transformation started (0 = not started). */
+  const mitteStartRef = useRef(0);
+  const completedRef = useRef(false);
+  const onCompleteRef = useRef(onRevealComplete);
+  onCompleteRef.current = onRevealComplete;
+
+  useEffect(() => {
+    if (phase === "b") {
+      mitteStartRef.current = 0;
+      completedRef.current = false;
+    } else if (phase === "revealing" && mitteStartRef.current === 0) {
+      mitteStartRef.current = Date.now();
+    }
+  }, [phase]);
+
+  useFrame(() => {
+    const mesh = meshRef.current;
+    const outer = outerRef.current;
+    if (!mesh || !outer) return;
+
+    const now = Date.now();
+    const mitteMs = clips.mitte.durationMs;
+    const mitteElapsed = mitteStartRef.current > 0 ? now - mitteStartRef.current : Infinity;
+
+    let clipId: TransformClipId;
+    let frames: THREE.Texture[];
+    let index: number;
+    if (phase === "b") {
+      clipId = "sw";
+      frames = swFrames;
+      index = loopFrameIndex(now, frames.length, clips.sw.durationMs);
+    } else if (mitteElapsed < mitteMs) {
+      clipId = "mitte";
+      frames = mitteFrames;
+      index = Math.min(frames.length - 1, Math.floor((mitteElapsed / mitteMs) * frames.length));
+    } else {
+      if (phase === "revealing" && !completedRef.current) {
+        completedRef.current = true;
+        onCompleteRef.current();
+      }
+      clipId = "g";
+      frames = gFrames;
+      // Start the green loop on its first frame right where the transformation ends.
+      const gElapsed = Number.isFinite(mitteElapsed) ? mitteElapsed - mitteMs : now;
+      index = loopFrameIndex(gElapsed, frames.length, clips.g.durationMs);
+    }
+
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    if (material.map !== frames[index]) material.map = frames[index];
+
+    // Place the clip's own box (in box px) relative to the character's layout rect.
+    const rect = getRect(metrics);
+    const clip = clips[clipId];
+    const unit = rect.width / boxWidth;
+    const width = clip.width * unit;
+    const height = clip.height * unit;
+    const left = rect.worldX + clip.x * unit;
+    const top = rect.bottom + rect.height - clip.y * unit;
+    outer.position.set(
+      left - viewRef.current.worldScroll + width / 2,
+      top - height / 2,
+      0,
+    );
+    mesh.scale.set(width, height, 1);
+  });
+
+  return (
+    <EditableCard id={id} outerRef={outerRef} userRef={userRef}>
+      <mesh ref={meshRef} renderOrder={renderOrder} frustumCulled={false}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial
+          map={swFrames[0]}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </EditableCard>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Grun (animated GIF → canvas texture)                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -884,11 +1009,10 @@ export default function WebGLWorld({
               />
             ))}
           {SHOW_LANDMARKS && (
-            <RevealSprite
+            <TransformSprite
               id="kind"
-              bFile={KIND_SW_FRAME_FILES}
-              gFile={KIND_SW_FRAME_FILES}
-              frameLoopMs={KIND_SW_CLIP.loopMs}
+              clips={KIND_CLIPS}
+              boxWidth={KIND_BOX.width}
               phase={kindPhase}
               onRevealComplete={onKindRevealComplete}
               metrics={metrics}
@@ -931,11 +1055,10 @@ export default function WebGLWorld({
               />
             ))}
           {SHOW_LANDMARKS && (
-            <RevealSprite
+            <TransformSprite
               id="worm"
-              bFile={WORM_SW_FRAME_FILES}
-              gFile={WORM_SW_FRAME_FILES}
-              frameLoopMs={WORM_SW_CLIP.loopMs}
+              clips={WORM_CLIPS}
+              boxWidth={WORM_BOX.width}
               phase={wormPhase}
               onRevealComplete={onWormRevealComplete}
               metrics={metrics}

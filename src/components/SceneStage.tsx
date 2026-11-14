@@ -40,6 +40,8 @@ import {
   getPostLandmarkMaxScroll,
   getBackgroundWhiteProgress,
   getRemainingWalkLoopMs,
+  getGrunKindBarrierX,
+  getGrunWormBarrierX,
   isGrunNearWorm,
   getMaxGrunWorldX,
   getMaxScroll,
@@ -99,6 +101,25 @@ const DEV_LAYER_EDITOR =
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_LAYER_EDIT === "1";
 
+/**
+ * Rightmost grun world X allowed right now: `maxX`, and — until each has transformed — the
+ * barrier in front of the worm (`getGrunWormBarrierX`) and the kid (`KIND_BLOCK_DISTANCE_PX`).
+ */
+function getGrunLimitX(
+  state: {
+    wormPhase: "b" | "revealing" | "g";
+    kindPhase: "b" | "revealing" | "g";
+    metrics: SceneMetrics;
+  },
+  maxX: number,
+) {
+  if (!SHOW_LANDMARKS || state.metrics.width <= 0) return maxX;
+  let limit = maxX;
+  if (state.wormPhase !== "g") limit = Math.min(limit, getGrunWormBarrierX(state.metrics));
+  if (state.kindPhase !== "g") limit = Math.min(limit, getGrunKindBarrierX(state.metrics));
+  return limit;
+}
+
 export default function SceneStage() {
   const stageRef = useRef<HTMLElement>(null);
   const [worldScroll, setWorldScroll] = useState(0);
@@ -119,7 +140,6 @@ export default function SceneStage() {
   const [kindPhase, setKindPhase] = useState<"b" | "revealing" | "g">("b");
   const [mossPhases, setMossPhases] = useState<MossPhases>(INITIAL_MOSS_PHASES);
   const [walkingToKind, setWalkingToKind] = useState(false);
-  const [grunPostRevealArrived, setGrunPostRevealArrived] = useState(false);
   const [grunIsWalking, setGrunIsWalking] = useState(false);
   const [grunWalkPlayStart, setGrunWalkPlayStart] = useState(0);
   const stateRef = useRef({
@@ -244,7 +264,6 @@ export default function SceneStage() {
       setKindPhase("b");
       setMossPhases({ ...INITIAL_MOSS_PHASES });
       setWalkingToKind(false);
-      setGrunPostRevealArrived(false);
       setCameraMode("grun");
       backgroundWhiteMaxRef.current = 0;
     }
@@ -365,11 +384,13 @@ export default function SceneStage() {
       const clickWorldX = Math.min(
         Math.max(0, clickScreenX + state.worldScroll),
         getPostLandmarkMaxGrunWorldX(state.metrics),
+        getGrunLimitX(state, getPostLandmarkMaxGrunWorldX(state.metrics)),
       );
 
       if (clickWorldX <= state.grunWorldX + 8) return;
 
-      unlockPostLandmarkMovement(state);
+      // Stay at the landmark (worm clickable) until the worm has transformed.
+      if (state.wormPhase === "g") unlockPostLandmarkMovement(state);
       state.grunSettlingUntil = 0;
       state.grunSettleKind = null;
       state.targetWorldX = clickWorldX;
@@ -383,7 +404,7 @@ export default function SceneStage() {
     const clickScreenX = event.clientX - rect.left;
     const clickWorldX = Math.min(
       Math.max(0, clickScreenX + state.worldScroll),
-      state.maxGrunX,
+      getGrunLimitX(state, state.maxGrunX),
     );
 
     state.targetWorldX = clickWorldX;
@@ -446,7 +467,8 @@ export default function SceneStage() {
 
   const handleKindRevealComplete = useCallback(() => {
     stateRef.current.kindPhase = "g";
-    stateRef.current.walkingAfterKindReveal = true;
+    // Auto-step after the reveal only belongs to the guided landmark sequence.
+    stateRef.current.walkingAfterKindReveal = stateRef.current.cameraMode === "landmarkPaused";
     setKindPhase("g");
   }, []);
 
@@ -511,7 +533,6 @@ export default function SceneStage() {
           state.walkingToKind = false;
           state.grunPostRevealArrived = true;
           setWalkingToKind(false);
-          setGrunPostRevealArrived(true);
           break;
         case "postKind":
           state.walkingAfterKindReveal = false;
@@ -542,7 +563,7 @@ export default function SceneStage() {
             beginWalkCycle(state);
             state.grunLastWalkDirection = (Math.sign(dx) || 1) as 1 | -1;
             state.grunWorldX += state.grunLastWalkDirection * walkSpeed * delta;
-            state.grunWorldX = Math.min(state.grunWorldX, state.maxGrunX);
+            state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
             moved = true;
           } else {
             beginSettle(state, state.grunLastWalkDirection, "click");
@@ -559,14 +580,14 @@ export default function SceneStage() {
         }
       } else if (state.cameraMode === "landmarkPaused" && width > 0) {
         if (state.targetWorldX !== null && state.grunSettlingUntil === 0) {
-          unlockPostLandmarkMovement(state);
+          if (state.wormPhase === "g") unlockPostLandmarkMovement(state);
           const dx = state.targetWorldX - state.grunWorldX;
 
           if (Math.abs(dx) > 4) {
             beginWalkCycle(state);
             state.grunLastWalkDirection = (Math.sign(dx) || 1) as 1 | -1;
             state.grunWorldX += state.grunLastWalkDirection * walkSpeed * delta;
-            state.grunWorldX = Math.min(state.grunWorldX, state.maxGrunX);
+            state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
             moved = true;
           } else {
             beginSettle(state, state.grunLastWalkDirection, "click");
@@ -576,14 +597,17 @@ export default function SceneStage() {
           areWormMossRevealsComplete(state.wormPhase, state.mossPhases) &&
           state.grunSettlingUntil === 0
         ) {
-          const targetX = getGrunPostRevealStandX(state.metrics);
+          const targetX = Math.min(
+            getGrunPostRevealStandX(state.metrics),
+            getGrunLimitX(state, state.maxGrunX),
+          );
           const dx = targetX - state.grunWorldX;
 
           if (Math.abs(dx) > 4) {
             beginWalkCycle(state);
             state.grunLastWalkDirection = (Math.sign(dx) || 1) as 1 | -1;
             state.grunWorldX += state.grunLastWalkDirection * walkSpeed * delta;
-            state.grunWorldX = Math.min(state.grunWorldX, state.maxGrunX);
+            state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
             moved = true;
           } else {
             beginSettle(state, state.grunLastWalkDirection, "postReveal");
@@ -600,7 +624,7 @@ export default function SceneStage() {
             beginWalkCycle(state);
             state.grunLastWalkDirection = (Math.sign(dx) || 1) as 1 | -1;
             state.grunWorldX += state.grunLastWalkDirection * walkSpeed * delta;
-            state.grunWorldX = Math.min(state.grunWorldX, state.maxGrunX);
+            state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
             moved = true;
           } else {
             beginSettle(state, state.grunLastWalkDirection, "postKind");
@@ -612,7 +636,7 @@ export default function SceneStage() {
         const now = Date.now();
         if (now < state.grunSettlingUntil) {
           state.grunWorldX += state.grunSettleDirection * walkSpeed * delta;
-          state.grunWorldX = Math.min(state.grunWorldX, state.maxGrunX);
+          state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
           moved = true;
         } else {
           finishSettle(state);
@@ -733,7 +757,7 @@ export default function SceneStage() {
       <KindHitTarget
         worldScroll={worldScroll}
         metrics={metrics}
-        active={cameraMode === "landmarkPaused" && kindPhase === "b" && grunPostRevealArrived}
+        active={kindPhase === "b"}
         onClick={handleKindClick}
       />
       <WormHitTarget
