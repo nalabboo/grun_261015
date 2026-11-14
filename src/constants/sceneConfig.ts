@@ -8,7 +8,7 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261114-worm-sw";
+export const ASSET_VERSION = "20261114-webp";
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
@@ -21,26 +21,22 @@ export function assetUrl(relativePath: string) {
  */
 export const IMAGE_SIZES = {
   // berg/
-  berg1: { file: "berg/berg1_3.png", width: 6568, height: 540 },
-  berg2: { file: "berg/berg2_4.png", width: 5760, height: 1080 },
-  berg3: { file: "berg/berg3_3.png", width: 5760, height: 1304 },
-  berg4: { file: "berg/berg4_3.png", width: 5760, height: 1305 },
+  berg1: { file: "berg/berg1_3.webp", width: 6568, height: 540 },
+  berg2: { file: "berg/berg2_4.webp", width: 5760, height: 1080 },
+  berg3: { file: "berg/berg3_3.webp", width: 5760, height: 1304 },
+  berg4: { file: "berg/berg4_3.webp", width: 5760, height: 1305 },
   // character/
-  kind_sw: { file: "character/kind_sw.png", width: 509, height: 678 },
-  kind_g: { file: "character/kind_g.png", width: 509, height: 678 },
   // landmark/
-  worm_g: { file: "landmark/worm_g.png", width: 604, height: 700 },
-  ampel_b: { file: "landmark/ampel_b.png", width: 821, height: 1000 },
-  ampel_g: { file: "landmark/ampel_g.png", width: 821, height: 1000 },
-  stein: { file: "landmark/stein.png", width: 700, height: 637 },
-  moss1_b: { file: "landmark/moss1_b.png", width: 426, height: 242 },
-  moss1_g: { file: "landmark/moss1_g.png", width: 426, height: 242 },
-  moss2_b: { file: "landmark/moss2_b.png", width: 278, height: 144 },
-  moss2_g: { file: "landmark/moss2_g.png", width: 278, height: 144 },
+  ampel_b: { file: "landmark/ampel_b.webp", width: 821, height: 1000 },
+  stein: { file: "landmark/stein.webp", width: 700, height: 637 },
+  moss1_b: { file: "landmark/moss1_b.webp", width: 426, height: 242 },
+  moss1_g: { file: "landmark/moss1_g.webp", width: 426, height: 242 },
+  moss2_b: { file: "landmark/moss2_b.webp", width: 278, height: 144 },
+  moss2_g: { file: "landmark/moss2_g.webp", width: 278, height: 144 },
 } as const;
 
 /**
- * Grun walk cycle: PNG frames extracted from source_videos/ricori_walk.mp4 (green screen removed) by
+ * Grun walk cycle: WebP frames extracted from source_videos/ricori_walk.mp4 (green screen removed) by
  * `scripts/extract_ricori.py` (every 3rd frame of the 60 fps video).
  * Each frame is drawn at (`cropX`, `cropY`) inside a logical `width` x `height` frame. The logical
  * frame is sized so the figure's height and feet line match the previous (removed) walk frames.
@@ -56,7 +52,7 @@ export const GRUN_WALK = {
 } as const;
 
 export function grunWalkFrameUrl(index: number) {
-  return assetUrl(`${GRUN_WALK.dir}/frame_${String(index).padStart(2, "0")}.png`);
+  return assetUrl(`${GRUN_WALK.dir}/frame_${String(index).padStart(2, "0")}.webp`);
 }
 
 /**
@@ -101,12 +97,30 @@ export const WORM_SW_FRAME_FILES = Array.from(
   (_, index) => `${WORM_SW_CLIP.dir}/frame_${String(index).padStart(2, "0")}.webp`,
 );
 
+/**
+ * Grey kid idle loop cut out of source_videos/kind1_sw.mp4 (blue screen) by
+ * `scripts/extract_kind.py` (every 3rd frame of the 60 fps video). Frames use the 509x678 canvas
+ * of the former kind_sw.png (same figure height / feet line), so `getKindLayout` works unchanged.
+ */
+export const KIND_SW_CLIP = {
+  dir: "character/kind_sw",
+  frames: 35,
+  loopMs: 1750,
+  width: 509,
+  height: 678,
+} as const;
+
+/** Frame files (relative to public/scene1/) of the grey kid loop. */
+export const KIND_SW_FRAME_FILES = Array.from(
+  { length: KIND_SW_CLIP.frames },
+  (_, index) => `${KIND_SW_CLIP.dir}/frame_${String(index).padStart(2, "0")}.webp`,
+);
+
 /** Preload / runtime keys grouped by asset folder (same entries as `IMAGE_SIZES`). */
 export const SCENE_ASSET_GROUPS = {
   berg: ["berg1", "berg2", "berg3", "berg4"],
-  character: ["kind_sw", "kind_g"],
   landmark: [
-    "stein", "worm_g", "ampel_b", "ampel_g",
+    "stein", "ampel_b",
     "moss1_b", "moss1_g", "moss2_b", "moss2_g",
   ],
 } as const satisfies Record<string, readonly (keyof typeof IMAGE_SIZES)[]>;
@@ -263,9 +277,10 @@ export const SCENE_LAYERS = {
 
 export const STEIN_HEIGHT_RATIO = IMAGE_SIZES.stein.height / SCENE_REFERENCE_HEIGHT;
 export const STEIN_WIDTH_RATIO = IMAGE_SIZES.stein.width / SCENE_REFERENCE_HEIGHT;
-const KIND_SCALE = 0.58;
-export const KIND_HEIGHT_RATIO = (IMAGE_SIZES.kind_sw.height / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
-export const KIND_WIDTH_RATIO = (IMAGE_SIZES.kind_sw.width / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
+/** Display scale for the grey kid (`kind_sw`) loop relative to source frame size. */
+export const KIND_SCALE = 1.00;
+export const KIND_HEIGHT_RATIO = (KIND_SW_CLIP.height / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
+export const KIND_WIDTH_RATIO = (KIND_SW_CLIP.width / SCENE_REFERENCE_HEIGHT) * KIND_SCALE;
 /** Gap between stein right edge and kind_sw left edge (reference px at 1080p). */
 export const KIND_STEIN_GAP_PX = -100;
 /** Extra rightward offset for kind_sw (reference px at 1080p). */
@@ -497,7 +512,7 @@ export function getAmpelLayout(metrics: SceneMetrics) {
   const stein = getSteinLayout(metrics);
   const u = getRefUnit(metrics);
   const width = 146 * u;
-  const height = width * (IMAGE_SIZES.ampel_g.height / IMAGE_SIZES.ampel_g.width);
+  const height = width * (IMAGE_SIZES.ampel_b.height / IMAGE_SIZES.ampel_b.width);
 
   return {
     worldX: stein.worldX + (775 - 365) * u,

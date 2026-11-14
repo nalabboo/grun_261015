@@ -1,6 +1,6 @@
 """Extracts Grun's walk cycle from the green-screen video and removes the background.
 
-  ../source_videos/ricori_walk.mp4 -> public/scene1/character/ricori_walk/frame_XX.png
+  ../source_videos/ricori_walk.mp4 -> public/scene1/character/ricori_walk/frame_XX.webp
 
 - Every 3rd frame of the 60 fps video is kept (~20 fps).
 - Only the strong screen green (RGB ~3,254,0) becomes transparent. Grun's own greens (hair,
@@ -75,7 +75,7 @@ def main():
         for index in range(0, len(names), STEP):
             frame = Image.open(os.path.join(tmp, names[index]))
             key_frame(frame).crop(CROP).save(
-                os.path.join(out_dir, f"frame_{count:02d}.png"), optimize=True
+                os.path.join(out_dir, f"frame_{count:02d}.webp"), quality=90, method=6
             )
             count += 1
     print(NAME, "frames", count)

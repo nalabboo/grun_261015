@@ -107,5 +107,8 @@ scripts/                보조 Python 스크립트
   - `scripts/extract_ricori.py`: `ricori_walk.mp4` → 1장 초록이 걷기 (`character/ricori_walk/`)
   - `scripts/extract_pore.py`: `pore.mp4` → 1장 spore 3종 (`landmark/pore/`)
   - `scripts/extract_worm.py`: `worme_sw.mp4` → 1장 회색 벌레 (`landmark/worm_sw/`)
+  - `scripts/extract_kind.py`: `kind1_sw.mp4` → 1장 회색 아이 (`character/kind_sw/`)
+- **용량 주의**: 1장은 첫 화면 전에 그림을 전부 미리 불러옵니다(`src/lib/preloadSceneAssets.ts`). 새 그림·프레임은 PNG 대신 **WebP(quality 90)**로 넣습니다 (PNG 대비 약 1/6). 2026-11-14에 1장 그림을 WebP로 바꿔 약 42MB → 10MB로 줄였습니다.
+- 벌레·아이는 원래 클릭하면 컬러로 번지는(reveal) 대상이지만, 지금은 클릭 전·후 모두 회색 영상 프레임을 씁니다 (새 캐릭터의 컬러 버전이 아직 없음).
 - 스크립트 실행에 필요: `pip install imageio-ffmpeg numpy pillow scipy` (시스템에 ffmpeg 없음, imageio-ffmpeg가 포함)
 - 영상을 바꾸면 스크립트 재실행 → 출력된 프레임 수·크기가 바뀌었으면 `sceneConfig.ts`의 해당 설정(`GRUN_WALK`, `SPORE_CLIPS`, `WORM_SW_CLIP`)도 수정 → `ASSET_VERSION` 올리기.

@@ -27,6 +27,8 @@ import {
   SPORE_CLIP_FRAMES,
   SPORE_CLIP_LOOP_MS,
   SPORE_TREES,
+  KIND_SW_CLIP,
+  KIND_SW_FRAME_FILES,
   WORM_SW_CLIP,
   WORM_SW_FRAME_FILES,
   sporeFrameUrls,
@@ -884,8 +886,9 @@ export default function WebGLWorld({
           {SHOW_LANDMARKS && (
             <RevealSprite
               id="kind"
-              bFile={IMAGE_SIZES.kind_sw.file}
-              gFile={IMAGE_SIZES.kind_g.file}
+              bFile={KIND_SW_FRAME_FILES}
+              gFile={KIND_SW_FRAME_FILES}
+              frameLoopMs={KIND_SW_CLIP.loopMs}
               phase={kindPhase}
               onRevealComplete={onKindRevealComplete}
               metrics={metrics}
