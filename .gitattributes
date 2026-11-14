@@ -1,0 +1,7 @@
+# Treat scene assets as binary so Git/SCM skips diff and status stays fast.
+*.webp binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.mp4 binary

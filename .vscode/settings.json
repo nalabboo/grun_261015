@@ -1,0 +1,14 @@
+{
+  "git.autofetch": false,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "git.postCommitCommand": "none",
+  "git.showProgress": true,
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.next/**": true,
+    "**/node_modules/**": true,
+    "**/public/scene1/character/**/frame_*.webp": true,
+    "**/public/scene1/character/**/frame_*.png": true
+  }
+}
