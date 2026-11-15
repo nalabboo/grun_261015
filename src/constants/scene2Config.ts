@@ -28,6 +28,35 @@ const TABLEAU_ANIM_MS = {
   hero: 1800,
 } as const;
 
+/**
+ * A looping hand-drawn clip shown instead of a still image. Frames are
+ * `${dir}/frame_XX.webp`; `holdMs[i]` = how long drawing i stays on screen (from the video).
+ */
+export type TableauClip = {
+  dir: string;
+  /** Frame size (px). */
+  width: number;
+  height: number;
+  holdMs: readonly number[];
+};
+
+/**
+ * Grun's idle loop in the closing tableau, cut out of source_videos/ricori_v.mp4 (pink screen)
+ * by `scripts/extract_ricori_v.py`: 11 drawings, 2.5 s loop. Frames keep the framing of the
+ * former grun_v.webp (a little wider for the swinging arms), so the layout is unchanged.
+ */
+export const RICORI_V_CLIP: TableauClip = {
+  dir: "character/ricori_v",
+  width: 735,
+  height: 989,
+  holdMs: [183, 250, 250, 250, 250, 250, 250, 250, 250, 250, 67],
+};
+
+/** Frame files of a tableau clip (relative to public/scene1/). */
+export function tableauClipFrameFiles(clip: TableauClip) {
+  return clip.holdMs.map((_, index) => `${clip.dir}/frame_${String(index).padStart(2, "0")}.webp`);
+}
+
 type TableauItem = {
   id: string;
   file: string;
@@ -39,9 +68,11 @@ type TableauItem = {
   delayMs: number;
   animation: keyof typeof TABLEAU_ANIM_MS;
   fit?: "fill" | "cover";
+  /** Play this clip instead of the still `file` (`file` = its first frame). */
+  clip?: TableauClip;
 };
 
-/** Appearance order: background → grass → kinder1, 2, 3 → hund → grun_v. */
+/** Appearance order: background → grass → kinder1, 2, 3 → hund → grun_v (ricori_v clip). */
 export const SCENE2_ITEMS: TableauItem[] = [
   {
     id: "hintergrund",
@@ -109,7 +140,8 @@ export const SCENE2_ITEMS: TableauItem[] = [
   },
   {
     id: "grun_v",
-    file: "character/grun_v.webp",
+    file: "character/ricori_v/frame_00.webp",
+    clip: RICORI_V_CLIP,
     left: 44.5,
     bottom: 13,
     height: 77,
@@ -135,8 +167,13 @@ export function getTableauPageButtonShowMs() {
   return getTableauRevealCompleteMs() + TABLEAU_PAGE_BUTTON_DELAY_MS;
 }
 
+/** Every image file of a tableau item (all frames for a clip). */
+export function tableauItemFiles(item: TableauItem) {
+  return item.clip ? tableauClipFrameFiles(item.clip) : [item.file];
+}
+
 export function preloadChapter1TableauAssets() {
-  for (const file of [SCENE2_PAPIER, ...SCENE2_ITEMS.map((item) => item.file)]) {
+  for (const file of [SCENE2_PAPIER, ...SCENE2_ITEMS.flatMap(tableauItemFiles)]) {
     const image = new Image();
     image.src = tableauAssetUrl(file);
   }
