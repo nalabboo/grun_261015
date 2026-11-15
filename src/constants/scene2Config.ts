@@ -42,7 +42,7 @@ export type TableauClip = {
 
 /**
  * Grun's idle loop in the closing tableau, cut out of source_videos/ricori_v.mp4 (pink screen)
- * by `scripts/extract_ricori_v.py`: 11 drawings, 2.5 s loop. Frames keep the framing of the
+ * by `scripts/extract_tableau.py`: 11 drawings, 2.5 s loop. Frames keep the framing of the
  * former grun_v.webp (a little wider for the swinging arms), so the layout is unchanged.
  */
 export const RICORI_V_CLIP: TableauClip = {
@@ -50,6 +50,49 @@ export const RICORI_V_CLIP: TableauClip = {
   width: 735,
   height: 989,
   holdMs: [183, 250, 250, 250, 250, 250, 250, 250, 250, 250, 67],
+};
+
+/**
+ * Cheering kid (replaces kinder2.webp), cut out of source_videos/ai1.mp4 by
+ * `scripts/extract_tableau.py`: 31 drawings, 1.3 s loop. Matched to kinder2's height, feet line and
+ * centre; the frames have extra room above for the raised hands, so the item's `height` is
+ * kinder2's 25 x 1.0824.
+ */
+export const AI1_CLIP: TableauClip = {
+  dir: "character/ai1",
+  width: 446,
+  height: 657,
+  holdMs: [
+    17, 50, 83, 33, 50, 33, 50, 33, 50, 33, 50, 33, 50, 33, 50, 33, 50, 33, 50, 33, 50, 33, 50, 33,
+    50, 33, 50, 33, 50, 33, 50,
+  ],
+};
+
+/**
+ * Girl whose hair swings in the wind (replaces kinder3.webp), cut out of source_videos/ai2.mp4 by
+ * `scripts/extract_tableau.py`: 10 drawings, 3 s loop. Matched to kinder3's height, feet line and
+ * centre; the frames have extra room on both sides for the hair, and the item's `height` is
+ * kinder3's 33 x 1.0049.
+ */
+export const AI2_CLIP: TableauClip = {
+  dir: "character/ai2",
+  width: 596,
+  height: 615,
+  holdMs: [550, 117, 133, 117, 133, 583, 117, 133, 117, 1000],
+};
+
+/**
+ * Kid reaching up with the dog (replaces kinder1.webp and hund.webp), cut out of
+ * source_videos/ai3.mp4 by `scripts/extract_tableau.py`: 18 drawings (wobbling lines and twinkling
+ * sparkles), 1.1 s loop. The kid is matched to kinder1's height, feet line and centre; the frames
+ * have extra room on the left for the dog and below for its feet, so the item's `height` is
+ * kinder1's 38 x 1.0739 and its `bottom` is 15 - 38 x 0.0704.
+ */
+export const AI3_CLIP: TableauClip = {
+  dir: "character/ai3",
+  width: 848,
+  height: 610,
+  holdMs: [67, 67, 67, 50, 67, 67, 67, 50, 67, 67, 67, 50, 67, 67, 67, 50, 67, 33],
 };
 
 /** Frame files of a tableau clip (relative to public/scene1/). */
@@ -72,7 +115,7 @@ type TableauItem = {
   clip?: TableauClip;
 };
 
-/** Appearance order: background → grass → kinder1, 2, 3 → hund → grun_v (ricori_v clip). */
+/** Appearance order: background → grass → kinder1 (with the dog), 2, 3 → grun_v. */
 export const SCENE2_ITEMS: TableauItem[] = [
   {
     id: "hintergrund",
@@ -100,42 +143,35 @@ export const SCENE2_ITEMS: TableauItem[] = [
   },
   {
     id: "kinder1",
-    file: "character/kinder1.webp",
+    file: "character/ai3/frame_00.webp",
+    clip: AI3_CLIP,
     left: 24,
-    bottom: 15,
-    height: 38,
+    bottom: 12.32,
+    height: 40.81,
     z: 3,
     delayMs: 2400,
     animation: "appear",
   },
   {
     id: "kinder2",
-    file: "character/kinder2.webp",
+    file: "character/ai1/frame_00.webp",
+    clip: AI1_CLIP,
     left: 64,
     bottom: 26,
-    height: 25,
+    height: 27.06,
     z: 3,
     delayMs: 3100,
     animation: "appear",
   },
   {
     id: "kinder3",
-    file: "character/kinder3.webp",
+    file: "character/ai2/frame_00.webp",
+    clip: AI2_CLIP,
     left: 72.5,
     bottom: 9,
-    height: 33,
+    height: 33.16,
     z: 4,
     delayMs: 3800,
-    animation: "appear",
-  },
-  {
-    id: "hund",
-    file: "character/hund.webp",
-    left: 15,
-    bottom: 11,
-    height: 17,
-    z: 4,
-    delayMs: 4500,
     animation: "appear",
   },
   {
