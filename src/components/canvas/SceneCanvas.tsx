@@ -7,7 +7,7 @@ import WebGLWorld, { type WebGLWorldProps } from "./WebGLWorld";
 
 export type SceneCanvasProps = WebGLWorldProps;
 
-export default function SceneCanvas(props: SceneCanvasProps) {
+export default function SceneCanvas({ onReady, ...props }: SceneCanvasProps) {
   return (
     <Canvas
       className="scene-canvas"
@@ -20,11 +20,12 @@ export default function SceneCanvas(props: SceneCanvasProps) {
         // Textures hold raw sRGB values; skip any encode so blending matches CSS.
         gl.outputColorSpace = THREE.LinearSRGBColorSpace;
         gl.setClearColor(0x000000, 0);
+        requestAnimationFrame(() => onReady?.());
       }}
       dpr={[1, 2]}
     >
       <Suspense fallback={null}>
-        <WebGLWorld {...props} />
+        <WebGLWorld onReady={onReady} {...props} />
       </Suspense>
     </Canvas>
   );

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import GrunCharacter from "@/components/GrunCharacter";
 import LayerEditorPanel from "@/components/LayerEditorPanel";
 import WormHitTarget from "@/components/WormHitTarget";
+import AmpelHitTarget from "@/components/AmpelHitTarget";
 import KindHitTarget from "@/components/KindHitTarget";
 import MossHitTargets from "@/components/MossHitTargets";
 import SceneCanvasLoader from "@/components/canvas/SceneCanvasLoader";
@@ -138,6 +139,7 @@ export default function SceneStage() {
   const [cameraMode, setCameraMode] = useState<CameraMode>("grun");
   const [wormPhase, setWormPhase] = useState<"b" | "revealing" | "g">("b");
   const [kindPhase, setKindPhase] = useState<"b" | "revealing" | "g">("b");
+  const [ampelPhase, setAmpelPhase] = useState<"b" | "g">("b");
   const [mossPhases, setMossPhases] = useState<MossPhases>(INITIAL_MOSS_PHASES);
   const [walkingToKind, setWalkingToKind] = useState(false);
   const [grunIsWalking, setGrunIsWalking] = useState(false);
@@ -262,6 +264,7 @@ export default function SceneStage() {
       setTargetWorldX(null);
       setWormPhase("b");
       setKindPhase("b");
+      setAmpelPhase("b");
       setMossPhases({ ...INITIAL_MOSS_PHASES });
       setWalkingToKind(false);
       setCameraMode("grun");
@@ -471,6 +474,8 @@ export default function SceneStage() {
     stateRef.current.walkingAfterKindReveal = stateRef.current.cameraMode === "landmarkPaused";
     setKindPhase("g");
   }, []);
+
+  const handleAmpelClick = useCallback(() => setAmpelPhase("g"), []);
 
   const handleMossClick = useCallback((id: MossInstanceId) => {
     if (stateRef.current.mossPhases[id] !== "b") return;
@@ -697,7 +702,7 @@ export default function SceneStage() {
   );
   backgroundWhiteMaxRef.current = backgroundProgress;
   const backgroundChannel = Math.round(backgroundProgress * 255);
-  const showScene = ready && assetsReady && glReady && metrics.height > 0;
+  const showScene = ready && metrics.height > 0;
   const sceneStyle = {
     "--scene-h": `${metrics.height}px`,
     "--scene-w": `${metrics.width}px`,
@@ -727,6 +732,7 @@ export default function SceneStage() {
         grunSourceRef={grunSourceRef}
         wormPhase={wormPhase}
         kindPhase={kindPhase}
+        ampelPhase={ampelPhase}
         mossPhases={mossPhases}
         onWormRevealComplete={handleWormRevealComplete}
         onKindRevealComplete={handleKindRevealComplete}
@@ -765,6 +771,12 @@ export default function SceneStage() {
         metrics={metrics}
         active={cameraMode === "landmarkPaused" && wormPhase === "b"}
         onClick={handleWormClick}
+      />
+      <AmpelHitTarget
+        worldScroll={worldScroll}
+        metrics={metrics}
+        active={SHOW_LANDMARKS && ampelPhase === "b"}
+        onClick={handleAmpelClick}
       />
     </main>
     )}

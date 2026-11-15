@@ -12,6 +12,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -22,6 +23,8 @@ import {
   GRUN_WALK,
   IMAGE_SIZES,
   MOSS_INSTANCE_IDS,
+  AMPEL_FLOAT,
+  AMPEL_SWITCH,
   getAmpelLayout,
   getSporeLayouts,
   SPORE_CLIP_FRAMES,
@@ -115,6 +118,40 @@ function useSceneTextures(files: readonly string[]) {
       texture.needsUpdate = true;
     }
   }, [textures]);
+
+  return textures;
+}
+
+const frameTextureLoader = new THREE.TextureLoader();
+
+/** Loads clip frames without Suspense (mitte / g only — keeps first paint fast). */
+function useLazyClipTextures(files: readonly string[], enabled: boolean) {
+  const [textures, setTextures] = useState<THREE.Texture[]>([]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    const urls = files.map((file) => assetUrl(file));
+    void Promise.all(
+      urls.map(
+        (url) =>
+          new Promise<THREE.Texture>((resolve, reject) => {
+            frameTextureLoader.load(url, resolve, undefined, reject);
+          }),
+      ),
+    ).then((loaded) => {
+      if (cancelled) return;
+      for (const texture of loaded) {
+        texture.colorSpace = THREE.NoColorSpace;
+        texture.anisotropy = 8;
+        texture.needsUpdate = true;
+      }
+      setTextures(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, files]);
 
   return textures;
 }
@@ -705,9 +742,12 @@ function TransformSprite({
   renderOrder,
   getRect,
 }: TransformSpriteProps) {
-  const swFrames = useSceneTextures(useMemo(() => clipFrameFiles(clips.sw), [clips]));
-  const mitteFrames = useSceneTextures(useMemo(() => clipFrameFiles(clips.mitte), [clips]));
-  const gFrames = useSceneTextures(useMemo(() => clipFrameFiles(clips.g), [clips]));
+  const swFiles = useMemo(() => clipFrameFiles(clips.sw), [clips]);
+  const mitteFiles = useMemo(() => clipFrameFiles(clips.mitte), [clips]);
+  const gFiles = useMemo(() => clipFrameFiles(clips.g), [clips]);
+  const swFrames = useSceneTextures(swFiles);
+  const mitteFrames = useLazyClipTextures(mitteFiles, phase !== "b");
+  const gFrames = useLazyClipTextures(gFiles, phase !== "b");
   const meshRef = useRef<THREE.Mesh>(null);
   const outerRef = useRef<THREE.Group>(null);
   const userRef = useRef<THREE.Group>(null);
@@ -744,22 +784,29 @@ function TransformSprite({
       index = loopFrameIndex(now, frames.length, clips.sw.durationMs);
     } else if (mitteElapsed < mitteMs) {
       clipId = "mitte";
-      frames = mitteFrames;
-      index = Math.min(frames.length - 1, Math.floor((mitteElapsed / mitteMs) * frames.length));
+      frames = mitteFrames.length > 0 ? mitteFrames : swFrames;
+      index =
+        mitteFrames.length > 0
+          ? Math.min(frames.length - 1, Math.floor((mitteElapsed / mitteMs) * frames.length))
+          : loopFrameIndex(now, swFrames.length, clips.sw.durationMs);
     } else {
       if (phase === "revealing" && !completedRef.current) {
         completedRef.current = true;
         onCompleteRef.current();
       }
       clipId = "g";
-      frames = gFrames;
+      frames = gFrames.length > 0 ? gFrames : swFrames;
       // Start the green loop on its first frame right where the transformation ends.
       const gElapsed = Number.isFinite(mitteElapsed) ? mitteElapsed - mitteMs : now;
-      index = loopFrameIndex(gElapsed, frames.length, clips.g.durationMs);
+      index =
+        gFrames.length > 0
+          ? loopFrameIndex(gElapsed, frames.length, clips.g.durationMs)
+          : loopFrameIndex(now, swFrames.length, clips.sw.durationMs);
     }
 
     const material = mesh.material as THREE.MeshBasicMaterial;
-    if (material.map !== frames[index]) material.map = frames[index];
+    const map = frames[index] ?? swFrames[0];
+    if (material.map !== map) material.map = map;
 
     // Place the clip's own box (in box px) relative to the character's layout rect.
     const rect = getRect(metrics);
@@ -789,6 +836,105 @@ function TransformSprite({
           toneMapped={false}
         />
       </mesh>
+    </EditableCard>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Traffic light (floats; click → red to green)                                 */
+/* -------------------------------------------------------------------------- */
+
+type AmpelSpriteProps = {
+  phase: RevealPhase;
+  metrics: SceneMetrics;
+  viewRef: WorldViewRef;
+  renderOrder: number;
+};
+
+function AmpelSprite({ phase, metrics, viewRef, renderOrder }: AmpelSpriteProps) {
+  const bMap = useSceneTexture(IMAGE_SIZES.ampel_b.file);
+  const gMap = useSceneTexture(IMAGE_SIZES.ampel_g.file);
+  const outerRef = useRef<THREE.Group>(null);
+  const userRef = useRef<THREE.Group>(null);
+  const floatRef = useRef<THREE.Group>(null);
+  const bMeshRef = useRef<THREE.Mesh>(null);
+  const gMeshRef = useRef<THREE.Mesh>(null);
+  /** Date.now() when the light was clicked (0 = still red). */
+  const switchStartRef = useRef(0);
+
+  useEffect(() => {
+    if (phase === "b") switchStartRef.current = 0;
+    else if (switchStartRef.current === 0) switchStartRef.current = Date.now();
+  }, [phase]);
+
+  useFrame(() => {
+    const outer = outerRef.current;
+    const float = floatRef.current;
+    const bMesh = bMeshRef.current;
+    const gMesh = gMeshRef.current;
+    if (!outer || !float || !bMesh || !gMesh) return;
+
+    const now = Date.now();
+    const rect = getAmpelLayout(metrics);
+    const unit = metrics.height / SCENE_REFERENCE_HEIGHT;
+    outer.position.set(
+      rect.worldX - viewRef.current.worldScroll + rect.width / 2,
+      rect.bottom + rect.height / 2,
+      0,
+    );
+
+    // Float: slow up/down drift with a slightly offset sway.
+    const wave = (now / AMPEL_FLOAT.periodMs) * Math.PI * 2;
+    float.position.y = Math.sin(wave) * AMPEL_FLOAT.amplitudePx * unit;
+    float.rotation.z = Math.sin(wave * 0.5 + 1.3) * THREE.MathUtils.degToRad(AMPEL_FLOAT.tiltDeg);
+
+    bMesh.scale.set(rect.width, rect.height, 1);
+    gMesh.scale.set(rect.width, rect.height, 1);
+
+    const elapsed = switchStartRef.current > 0 ? now - switchStartRef.current : -1;
+    const gMaterial = gMesh.material as THREE.MeshBasicMaterial;
+    if (elapsed < 0) {
+      gMesh.visible = false;
+      bMesh.visible = true;
+      const bMaterial = bMesh.material as THREE.MeshBasicMaterial;
+      bMaterial.opacity = 1;
+    } else {
+      gMesh.visible = true;
+      const t = Math.min(1, elapsed / AMPEL_SWITCH.fadeMs);
+      const ease = t * t * (3 - 2 * t);
+      gMaterial.opacity = ease;
+      gMaterial.color.setScalar(1);
+      const bMaterial = bMesh.material as THREE.MeshBasicMaterial;
+      bMaterial.opacity = 1 - ease;
+      bMesh.visible = bMaterial.opacity > 0.02;
+    }
+  });
+
+  return (
+    <EditableCard id="ampel" outerRef={outerRef} userRef={userRef}>
+      <group ref={floatRef}>
+        <mesh ref={bMeshRef} renderOrder={renderOrder} frustumCulled={false}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={bMap}
+            transparent
+            depthTest={false}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh ref={gMeshRef} renderOrder={renderOrder + 0.01} frustumCulled={false} visible={false}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={gMap}
+            transparent
+            opacity={0}
+            depthTest={false}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
     </EditableCard>
   );
 }
@@ -912,6 +1058,7 @@ export type WebGLWorldProps = {
   grunSourceRef: GrunFrameSourceRef;
   wormPhase: RevealPhase;
   kindPhase: RevealPhase;
+  ampelPhase: RevealPhase;
   mossPhases: MossPhases;
   onWormRevealComplete: () => void;
   onKindRevealComplete: () => void;
@@ -934,10 +1081,6 @@ const wormRect = (metrics: SceneMetrics) => {
     height: worm.height,
   };
 };
-
-const ampelRect = (metrics: SceneMetrics) => getAmpelLayout(metrics);
-
-const noop = () => {};
 
 const steinRect = (metrics: SceneMetrics) => {
   const stein = getSteinLayout(metrics);
@@ -974,6 +1117,7 @@ export default function WebGLWorld({
   grunSourceRef,
   wormPhase,
   kindPhase,
+  ampelPhase,
   mossPhases,
   onWormRevealComplete,
   onKindRevealComplete,
@@ -1068,16 +1212,11 @@ export default function WebGLWorld({
             />
           )}
           {SHOW_LANDMARKS && (
-            <RevealSprite
-              id="ampel"
-              bFile={IMAGE_SIZES.ampel_b.file}
-              gFile={IMAGE_SIZES.ampel_b.file}
-              phase="b"
-              onRevealComplete={noop}
+            <AmpelSprite
+              phase={ampelPhase}
               metrics={metrics}
               viewRef={viewRef}
               renderOrder={3.2}
-              getRect={ampelRect}
             />
           )}
           {SHOW_LANDMARKS &&

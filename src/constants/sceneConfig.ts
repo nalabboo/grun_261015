@@ -8,7 +8,7 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261114-worm-transform";
+export const ASSET_VERSION = "20261115-ampel-worm-steady";
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
@@ -28,6 +28,7 @@ export const IMAGE_SIZES = {
   // character/
   // landmark/
   ampel_b: { file: "landmark/ampel_b.webp", width: 821, height: 1000 },
+  ampel_g: { file: "landmark/ampel_g.webp", width: 821, height: 1000 },
   stein: { file: "landmark/stein.webp", width: 700, height: 637 },
   moss1_b: { file: "landmark/moss1_b.webp", width: 426, height: 242 },
   moss1_g: { file: "landmark/moss1_g.webp", width: 426, height: 242 },
@@ -152,7 +153,7 @@ export const KIND_CLIPS: TransformClipSet = {
 export const SCENE_ASSET_GROUPS = {
   berg: ["berg1", "berg2", "berg3", "berg4"],
   landmark: [
-    "stein", "ampel_b",
+    "stein", "ampel_b", "ampel_g",
     "moss1_b", "moss1_g", "moss2_b", "moss2_g",
   ],
 } as const satisfies Record<string, readonly (keyof typeof IMAGE_SIZES)[]>;
@@ -555,6 +556,24 @@ const REF_GROUND_Y = 284;
 function getRefUnit(metrics: SceneMetrics) {
   return getSteinDimensions(metrics).width / REF_ROCK_WIDTH;
 }
+
+/**
+ * Traffic light: floats gently in the air; click → red (ampel_b) crossfades to green (ampel_g).
+ * Distances in px at 1080p.
+ */
+export const AMPEL_FLOAT = {
+  /** Up/down drift (px). */
+  amplitudePx: 14,
+  /** One up-and-down cycle (ms). */
+  periodMs: 3600,
+  /** Gentle sway (degrees). */
+  tiltDeg: 1.6,
+} as const;
+
+export const AMPEL_SWITCH = {
+  /** Red → green crossfade (ms). */
+  fadeMs: 380,
+} as const;
 
 export function getAmpelLayout(metrics: SceneMetrics) {
   const stein = getSteinLayout(metrics);

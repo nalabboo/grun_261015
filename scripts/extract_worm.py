@@ -10,6 +10,7 @@
 - All clips share one coordinate system: the 604x700 canvas of the former worm_b.png ("worm box").
   worm_sw fills exactly that box. worm_mitte (flips over) and worm_g are cropped to their content;
   their placement in worm-box px is printed for `WORM_CLIPS` in src/constants/sceneConfig.ts.
+- worm_mitte's brief shrink before the flip is undone (`steady_size`).
 - The videos were lined up by matching silhouettes: worm_mitte's first frame = worm_sw's first
   frame, worm_g's first frame = worm_mitte's last frame.
 
@@ -70,6 +71,10 @@ CLIPS = {
         # The pink cheeks are close to the screen colour: only pink that is connected to the
         # real background may turn transparent.
         "outside_only": True,
+        # Frames 5-12 (kept-frame index): the video shrinks the whole worm by ~12% before the
+        # flip. Scale those frames back to the first frame's size (anchored at the feet) so the
+        # worm doesn't visibly shrink when clicked.
+        "steady_size": range(5, 13),
         "scale": 1.1576,  # 1.77 * 0.654 (720px video vs 1080px worme_sw)
         "origin": (-115, -66),
         "crop": "content",
@@ -124,6 +129,30 @@ def key_frame(img: Image.Image, clip: dict) -> Image.Image:
     return Image.fromarray(rgba)
 
 
+def opaque_bbox(img: Image.Image):
+    ys, xs = np.nonzero(np.asarray(img)[..., 3] > 128)
+    return xs.min(), ys.min(), xs.max(), ys.max()
+
+
+def steady_size(frames: list, indices) -> list:
+    """Scales frames in `indices` so their figure size (bbox area) matches frame 0, keeping the
+    feet line and frame 0's horizontal centre in place."""
+    x0, y0, x1, y1 = opaque_bbox(frames[0])
+    area0 = (x1 - x0) * (y1 - y0)
+    anchor_x = (x0 + x1) / 2
+    out = list(frames)
+    for i in indices:
+        bx0, by0, bx1, by1 = opaque_bbox(frames[i])
+        f = float(np.sqrt(area0 / ((bx1 - bx0) * (by1 - by0))))
+        if abs(f - 1.0) < 0.005:
+            continue
+        cx, ay = (bx0 + bx1) / 2, by1
+        # Output (x, y) samples input ((x - ax) / f + cx, (y - ay) / f + ay).
+        coeffs = (1 / f, 0, cx - anchor_x / f, 0, 1 / f, ay - ay / f)
+        out[i] = frames[i].transform(frames[i].size, Image.AFFINE, coeffs, Image.BICUBIC)
+    return out
+
+
 def extract(name: str) -> dict:
     clip = CLIPS[name]
     out_dir = os.path.join(LANDMARK_DIR, clip["out"])
@@ -135,11 +164,13 @@ def extract(name: str) -> dict:
             check=True,
         )
         names = sorted(os.listdir(tmp))[::STEP]
-        scaled = []
-        for frame_name in names:
-            keyed = key_frame(Image.open(os.path.join(tmp, frame_name)), clip)
-            size = (round(keyed.width * clip["scale"]), round(keyed.height * clip["scale"]))
-            scaled.append(keyed.resize(size, Image.LANCZOS))
+        keyed = [key_frame(Image.open(os.path.join(tmp, n)), clip) for n in names]
+    if clip.get("steady_size"):
+        keyed = steady_size(keyed, clip["steady_size"])
+    scaled = []
+    for frame in keyed:
+        size = (round(frame.width * clip["scale"]), round(frame.height * clip["scale"]))
+        scaled.append(frame.resize(size, Image.LANCZOS))
 
     ox, oy = clip["origin"]
     if clip["crop"] == "box":

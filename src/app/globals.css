@@ -38,7 +38,7 @@ body {
 }
 
 .scene-stage--loading {
-  visibility: hidden;
+  cursor: wait;
 }
 
 .scene-stage--landmark-paused {
