@@ -69,7 +69,7 @@ import {
 } from "@/constants/chapter2Subscene24Motion";
 import Chapter2Subscene24ClickMarimos from "@/components/scene2/Chapter2Subscene24ClickMarimos";
 import Chapter2Subscene24GreenSpotlightOverlay from "@/components/scene2/Chapter2Subscene24GreenSpotlightOverlay";
-import PageTurnButton from "@/components/scene2/PageTurnButton";
+import PageTurnCue from "@/components/scene2/PageTurnCue";
 import {
   CHAPTER2_STAGE_HEIGHT,
   CHAPTER2_STAGE_WIDTH,
@@ -1174,7 +1174,7 @@ export default function Chapter2Scene({
       />
 
       {chapter3PageTurnVisible && onChapter3PageTurn && (
-        <PageTurnButton label="3장" onTurn={onChapter3PageTurn} />
+        <PageTurnCue label="3장" onTurn={onChapter3PageTurn} />
       )}
 
     </div>

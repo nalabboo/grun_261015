@@ -15,7 +15,8 @@ import Chapter3Inside from "@/components/scene3/Chapter3Inside";
 import Chapter3Scene from "@/components/scene3/Chapter3Scene";
 import { preloadChapter2BergAssets } from "@/constants/chapter2Config";
 import NextScene from "@/components/scene2/NextScene";
-import PageTurnButton from "@/components/scene2/PageTurnButton";
+import PageFlipOverlay, { PageFlipLeaf } from "@/components/scene2/PageFlipOverlay";
+import PageTurnCue from "@/components/scene2/PageTurnCue";
 import { preloadChapter1TableauAssets } from "@/constants/scene2Config";
 import {
   createGrunFrameSource,
@@ -216,6 +217,16 @@ export default function SceneStage() {
     setChapter2Step(null);
     setChapter3Step("intro");
   }, []);
+
+  /** Page turn in progress, towards this chapter (see PageFlipOverlay). */
+  const [pageFlipTo, setPageFlipTo] = useState<2 | 3 | null>(null);
+  const startPageFlipTo2 = useCallback(() => setPageFlipTo((prev) => prev ?? 2), []);
+  const startPageFlipTo3 = useCallback(() => setPageFlipTo((prev) => prev ?? 3), []);
+  const handlePageFlipCovered = useCallback(() => {
+    if (pageFlipTo === 2) handlePageTurn();
+    else if (pageFlipTo === 3) handleChapter3PageTurn();
+  }, [pageFlipTo, handlePageTurn, handleChapter3PageTurn]);
+  const handlePageFlipDone = useCallback(() => setPageFlipTo(null), []);
 
   const handleChapter3IntroComplete = useCallback(() => {
     setChapter3Step("play");
@@ -781,20 +792,23 @@ export default function SceneStage() {
     </main>
     )}
     {showChapter1Tableau && (
-      <NextScene onRevealComplete={handleTableauRevealComplete} />
-    )}
-    {showChapter1Tableau && tableauRevealed && (
-      <PageTurnButton onTurn={handlePageTurn} />
+      <PageFlipLeaf turning={pageFlipTo === 2}>
+        <NextScene onRevealComplete={handleTableauRevealComplete} />
+        {tableauRevealed && <PageTurnCue onTurn={startPageFlipTo2} />}
+      </PageFlipLeaf>
     )}
     {chapter === 2 && chapter2Step === "play" && chapter2PlayReady && (
-      <>
+      <PageFlipLeaf turning={pageFlipTo === 3}>
         <Chapter2Scene
           onSubscene23ScrollStart={() => {
             /* scene 2-3 motion — wire timeline next */
           }}
-          onChapter3PageTurn={handleChapter3PageTurn}
+          onChapter3PageTurn={startPageFlipTo3}
         />
-      </>
+      </PageFlipLeaf>
+    )}
+    {pageFlipTo !== null && (
+      <PageFlipOverlay onCovered={handlePageFlipCovered} onDone={handlePageFlipDone} />
     )}
     {chapter === 2 && chapter2Step === "intro" && (
       <Chapter2Intro onComplete={handleChapter2IntroComplete} />

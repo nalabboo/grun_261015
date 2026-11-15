@@ -206,8 +206,8 @@ body {
   right: 0;
   bottom: 0;
   z-index: 45;
-  width: 5.5rem;
-  height: 5.5rem;
+  width: 7.5rem;
+  height: 7.5rem;
   padding: 0;
   border: none;
   background: transparent;
@@ -217,22 +217,20 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Curled-up page corner (SVG in PageTurnCue.tsx). */
 .page-turn__sheet {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(135deg, transparent 48%, rgba(0, 0, 0, 0.07) 48%, rgba(0, 0, 0, 0.12) 100%),
-    linear-gradient(315deg, #f7f3ea 0%, #ebe4d4 42%, #d8ccb4 100%);
-  box-shadow: -3px -3px 14px rgba(0, 0, 0, 0.18);
-  clip-path: polygon(100% 0, 100% 100%, 0 100%);
-  transition: transform 0.35s ease, box-shadow 0.35s ease;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transition: transform 0.35s ease;
   transform-origin: 100% 100%;
 }
 
 .page-turn:hover .page-turn__sheet,
 .page-turn:focus-visible .page-turn__sheet {
-  transform: scale(1.06) rotate(-2deg);
-  box-shadow: -6px -6px 20px rgba(0, 0, 0, 0.22);
+  transform: scale(1.12);
 }
 
 .page-turn:active .page-turn__sheet {
@@ -240,19 +238,113 @@ body {
 }
 
 .page-turn__label {
-  position: absolute;
-  right: 0.55rem;
-  bottom: 0.45rem;
   font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 0.65rem;
+  font-size: 9px;
   letter-spacing: 0.06em;
-  color: rgba(40, 36, 28, 0.72);
-  pointer-events: none;
+  fill: rgba(40, 36, 28, 0.72);
 }
 
 .page-turn:focus,
 .page-turn:focus-visible {
   outline: none;
+}
+
+/* The corner lifts a little now and then: "scroll to turn the page". */
+.page-turn .page-turn__sheet {
+  animation: page-turn-lift 2.6s ease-in-out infinite;
+}
+
+.page-turn:hover .page-turn__sheet {
+  animation-play-state: paused;
+}
+
+@keyframes page-turn-lift {
+  0%, 60%, 100% { transform: scale(1); }
+  75% { transform: scale(1.14); }
+}
+
+.page-turn__hint {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 7px;
+  letter-spacing: 0.12em;
+  text-anchor: middle;
+  fill: rgba(40, 36, 28, 0.45);
+}
+
+/* Page turn between chapters (src/constants/pageTurnConfig.ts, scene2/PageFlipOverlay.tsx).
+   The scene being left is wrapped in .page-flip-idle (no box of its own) and becomes
+   .page-flip-leaf when it turns. Each page is peeled from its bottom-right corner: JS sets the
+   clip-path of the part still lying flat and of the folded-over flap (the back of the paper). */
+.page-flip-idle {
+  display: contents;
+}
+
+.page-flip-leaf {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.page-flip-sheet {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-color: #f4efe4;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Lighter paper (like the chapter title page's veil), slightly different tone per sheet. */
+.page-flip-sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(150, 125, 85, var(--page-flip-tone, 0.04)), rgba(150, 125, 85, var(--page-flip-tone, 0.04))),
+    rgba(255, 255, 255, 0.42);
+}
+
+.page-flip-flap {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The flap's shadow on the pages below: the flap shape shifted twice, faintly. (A real blur,
+   `filter: drop-shadow`, makes the turn stutter.) */
+.page-flip-flap__shadow {
+  position: absolute;
+  inset: 0;
+  background: rgba(40, 30, 18, 0.09);
+  transform: translate(-4px, 3px);
+}
+
+.page-flip-flap__shadow--far {
+  background: rgba(40, 30, 18, 0.06);
+  transform: translate(-10px, 7px);
+}
+
+/* Back of the page: paper, light at the fold, a little darker towards the lifted corner. */
+.page-flip-flap__paper {
+  position: absolute;
+  inset: 0;
+  background-color: #f4efe4;
+  background-size: cover;
+  background-position: center;
+}
+
+.page-flip-flap__paper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    var(--page-flip-angle, 270deg),
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(255, 255, 255, 0.4) 45%,
+    rgba(150, 125, 85, 0.14) 100%
+  );
 }
 
 /* Chapter 2 opening: papier + title */
@@ -929,9 +1021,10 @@ body {
   }
 }
 
+/* The title page is uncovered by the page turn (paper on paper), so it doesn't fade in from black. */
 @keyframes chapter2-papier-in {
   from {
-    opacity: 0;
+    opacity: 1;
     filter: brightness(1.15);
   }
   to {

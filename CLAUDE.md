@@ -98,6 +98,7 @@ scripts/                보조 Python 스크립트
 - 코드에서 `@/`는 `src/` 폴더를 뜻합니다 (예: `@/components/SceneStage`).
 - 화면 기준 높이(`SCENE_REFERENCE_HEIGHT`)에 맞춰 크기가 비례 조정되므로, 픽셀 값을 바꿀 때 이 기준을 염두에 둡니다.
 - 3D/브라우저 전용 코드는 파일 맨 위에 `"use client"`가 필요합니다.
+- **장 넘기기** (1→2장, 2→3장): 오른쪽 아래에 종이 모서리가 말려 올라간 표시(`PageTurnCue`, SVG로 그림)가 나타나면 아래로 스크롤(휠·위로 쓸기·↓키, 클릭도 가능)해서 넘깁니다. 지금 장면이 오른쪽 아래 모서리부터 책장처럼 접혀 넘어가고, 빈 종이 여러 장이 촤라라락 이어서 넘어간 뒤 다음 장 표지가 나옵니다. 넘어가는 장면은 `PageFlipLeaf`로 감싸고, 종이·접힌 면은 `PageFlipOverlay`(scene2/)가 그립니다. 속도·종이 장수·모서리 높이 등은 `src/constants/pageTurnConfig.ts`의 `PAGE_TURN`. 접힌 면 그림자에 `filter: drop-shadow`를 쓰면 화면이 멈칫해서, 같은 모양을 살짝 옮긴 반투명 층으로 대신합니다.
 - 커밋 메시지는 `grun_MMDD/s3 설명` 형식을 써 왔습니다 (예: `grun_1110/s3 zeigen`). 2026-11부터는 `v2_grunMMDD/...`도 사용.
 
 ### 움직이는 에셋 (영상 → 프레임)
