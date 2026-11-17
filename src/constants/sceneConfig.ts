@@ -50,8 +50,8 @@ export const GRUN_WALK = {
   cropX: 34,
   cropY: 39,
   loopMs: 1750,
-  /** Frames with both feet together (narrowest stance): grun stops and stands on these. */
-  stopFrames: [12, 29],
+  /** Frames grun stops and stands on (frame_00: once per walk cycle). */
+  stopFrames: [0],
 } as const;
 
 export function grunWalkFrameUrl(index: number) {
@@ -187,11 +187,21 @@ export function getGrunFollowScroll(
 /** Grun walk speed (px/s at reference height 1080). */
 export const GRUN_WALK_SPEED_BASE = 280;
 
-/** Camera pan speed when focusing on stein/worm (px/s at reference height). */
-export const LANDMARK_CAMERA_PAN_SPEED = 160;
-
-/** Start landmark camera when grun is within this distance of worm (viewport width ratio). */
-export const LANDMARK_GRUN_PROXIMITY_RATIO = 0.55;
+/**
+ * Camera at the worm, then at the kid. When the worm comes into view (its centre `enterRatio`
+ * across the screen), the camera glides over `blendMs` to show the worm `focusRatio` across the
+ * screen, keeping grun between `grunMinScreenRatio` and `grunMaxScreenRatio`. Once the worm is
+ * green and grun walks on, it glides on to the kid (`kindFocusRatio`); once the kid is green and
+ * grun walks on, it glides back to following grun.
+ */
+export const WORM_CAMERA = {
+  enterRatio: 0.9,
+  focusRatio: 0.5,
+  kindFocusRatio: 0.5,
+  grunMinScreenRatio: 0.02,
+  grunMaxScreenRatio: 0.62,
+  blendMs: 1600,
+} as const;
 
 /** Scroll lead before worm enters view where white fade begins (viewport width ratio). */
 export const WORM_BACKGROUND_FADE_LEAD_RATIO = 0.34;
@@ -203,10 +213,10 @@ export const GRUN_START_RATIO = 0.1;
 export const GRUN_SCALE = 0.85;
 export const GRUN_OFFSET_Y_RATIO = 10 / SCENE_REFERENCE_HEIGHT;
 /**
- * How grun comes to a stop. He slows down over his last step and ends on a feet-together frame
- * (`GRUN_WALK.stopFrames`) exactly at the stop point. The step is stretched or shortened to fit
- * (`minStretch`..`maxStretch` x a normal step); only when one step can't fit nicely does he take
- * two slowing steps. The walk cycle slows down from full speed to `endRate` x speed, and the
+ * How grun comes to a stop. He slows down over his last walk cycle and ends on a stop frame
+ * (`GRUN_WALK.stopFrames`, frame_00) at the stop point. The cycle is stretched or shortened to fit
+ * (`minStretch`..`maxStretch` x a normal cycle); only when one cycle can't fit nicely does he walk
+ * two. A click target that is very close may be passed a little (never the worm / kid barrier). The walk cycle slows down from full speed to `endRate` x speed, and the
  * position follows the legs, so the feet don't slide.
  */
 /**
@@ -401,8 +411,6 @@ export const GRUN_LANDMARK_STEIN_GAP_PX = 12;
 /** Minimum gap fallback — viewport width ratio (whichever is larger applies). */
 export const GRUN_LANDMARK_STEIN_GAP_RATIO = 0.012;
 
-/** Min left screen margin so grun is not clipped when landmark camera pauses. */
-export const GRUN_LANDMARK_MIN_SCREEN_RATIO = 0.04;
 
 /** Open space after stein before world end (viewport width ratio). */
 export const STEIN_TAIL_RATIO = 0.3;
@@ -749,7 +757,7 @@ export function getLandmarkFocusScroll(metrics: SceneMetrics) {
   return Math.max(0, Math.min(getMaxScroll(metrics), groupCenterWorldX - metrics.width * LANDMARK_FOCUS_CENTER_RATIO));
 }
 
-/** World X where grun stands left of stein when camera pauses. */
+/** World X where grun stands, just left of the stein the worm sits on (worm not green yet). */
 export function getGrunLandmarkStandX(metrics: SceneMetrics) {
   const stein = getSteinLayout(metrics);
   const grunWidth = getGrunDisplayWidth(metrics);
@@ -757,29 +765,72 @@ export function getGrunLandmarkStandX(metrics: SceneMetrics) {
     GRUN_LANDMARK_STEIN_GAP_PX * (metrics.height / SCENE_REFERENCE_HEIGHT),
     metrics.width * GRUN_LANDMARK_STEIN_GAP_RATIO,
   );
-  const focusScroll = getLandmarkFocusScroll(metrics);
-  const maxWorldX = stein.worldX - gap - grunWidth;
-  const minWorldX = focusScroll + metrics.width * GRUN_LANDMARK_MIN_SCREEN_RATIO;
 
-  return Math.max(0, Math.max(minWorldX, maxWorldX));
+  return Math.max(0, stein.worldX - gap - grunWidth);
 }
 
-export function isGrunNearWorm(metrics: SceneMetrics, grunWorldX: number) {
+/** True once the worm has come into view (camera following grun). */
+export function isWormInView(metrics: SceneMetrics, worldScroll: number) {
   const worm = getWormLayout(metrics);
-  const proximity = metrics.width * LANDMARK_GRUN_PROXIMITY_RATIO;
 
-  return grunWorldX >= worm.worldX - proximity;
+  return worm.worldX + worm.width / 2 <= worldScroll + metrics.width * WORM_CAMERA.enterRatio;
+}
+
+/** True once the kid has come into view. */
+export function isKindInView(metrics: SceneMetrics, worldScroll: number) {
+  const kind = getKindLayout(metrics);
+
+  return kind.worldX + kind.width / 2 <= worldScroll + metrics.width * WORM_CAMERA.enterRatio;
+}
+
+/** Camera scroll that shows the worm, with grun still on screen. */
+export function getWormFocusScroll(metrics: SceneMetrics, grunWorldX: number, maxScroll: number) {
+  const worm = getWormLayout(metrics);
+  return getLandmarkCameraScroll(
+    metrics,
+    worm.worldX + worm.width / 2 - metrics.width * WORM_CAMERA.focusRatio,
+    grunWorldX,
+    maxScroll,
+  );
+}
+
+/** Camera scroll that shows the kid, with grun still on screen. */
+export function getKindFocusScroll(metrics: SceneMetrics, grunWorldX: number, maxScroll: number) {
+  const kind = getKindLayout(metrics);
+  return getLandmarkCameraScroll(
+    metrics,
+    kind.worldX + kind.width / 2 - metrics.width * WORM_CAMERA.kindFocusRatio,
+    grunWorldX,
+    maxScroll,
+  );
+}
+
+function getLandmarkCameraScroll(
+  metrics: SceneMetrics,
+  focusScroll: number,
+  grunWorldX: number,
+  maxScroll: number,
+) {
+  const grunWidth = getGrunDisplayWidth(metrics);
+  let scroll = focusScroll;
+  // Keep grun (his centre) in view.
+  const grunCenter = grunWorldX + grunWidth / 2;
+  scroll = Math.min(scroll, grunCenter - metrics.width * WORM_CAMERA.grunMinScreenRatio);
+  scroll = Math.max(scroll, grunCenter - metrics.width * WORM_CAMERA.grunMaxScreenRatio);
+  return Math.max(0, Math.min(scroll, maxScroll));
 }
 
 /**
- * Grun (left edge) can't walk past this world X until the worm has transformed: grun stops just
- * left of the stein (`getGrunLandmarkStandX`), always far enough in to pause at the worm.
+ * Grun (left edge) can't walk past this world X until the worm has transformed: he stops just
+ * left of the stein the worm sits on (`getGrunLandmarkStandX`), but never before the worm has
+ * come into view (so the worm camera and the worm click always start).
  */
 export function getGrunWormBarrierX(metrics: SceneMetrics) {
   const worm = getWormLayout(metrics);
-  const pauseX = worm.worldX - metrics.width * LANDMARK_GRUN_PROXIMITY_RATIO;
+  const inViewX =
+    worm.worldX + worm.width / 2 - metrics.width * (WORM_CAMERA.enterRatio - GRUN_FOLLOW_RATIO);
 
-  return Math.max(getGrunLandmarkStandX(metrics), pauseX + 1);
+  return Math.max(getGrunLandmarkStandX(metrics), inViewX + 1);
 }
 
 function smoothstep(value: number) {

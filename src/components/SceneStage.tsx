@@ -42,12 +42,17 @@ import {
   getPostLandmarkMaxScroll,
   getBackgroundWhiteProgress,
   GRUN_STOP,
+  GRUN_WALK,
   GRUN_STOP_POSE_MS,
   getMsToNextStopPose,
   isAtStopPose,
   getGrunKindBarrierX,
   getGrunWormBarrierX,
-  isGrunNearWorm,
+  isWormInView,
+  getWormFocusScroll,
+  getKindFocusScroll,
+  isKindInView,
+  WORM_CAMERA,
   getMaxGrunWorldX,
   getMaxScroll,
   getSceneMetrics,
@@ -179,6 +184,12 @@ export default function SceneStage() {
     /** Walk-cycle time shown (ms). Standing still, it rests on a feet-together pose. */
     grunWalkPhaseMs: GRUN_STOP_POSE_MS[0],
     grunStop: null as GrunStop | null,
+    /** Camera: 0 = follows grun, 1 = shows the worm / the kid. */
+    wormCameraBlend: 0,
+    kindCameraBlend: 0,
+    kindCameraOn: false,
+    /** Set when grun walks on after the kid turned green: the camera follows grun again. */
+    kindCameraReleased: false,
     grunLastWalkDirection: 1 as -1 | 1,
   });
   const viewRef = useRef<WorldView>({ worldScroll: 0, grunWorldX: 0 });
@@ -284,6 +295,10 @@ export default function SceneStage() {
       state.walkingAfterKindReveal = false;
       state.grunPostRevealArrived = false;
       state.grunStop = null;
+      state.wormCameraBlend = 0;
+      state.kindCameraBlend = 0;
+      state.kindCameraOn = false;
+      state.kindCameraReleased = false;
       state.cameraMode = "grun";
       setTargetWorldX(null);
       setWormPhase("b");
@@ -418,6 +433,7 @@ export default function SceneStage() {
 
       // Stay at the landmark (worm clickable) until the worm has transformed.
       if (state.wormPhase === "g") unlockPostLandmarkMovement(state);
+      if (state.kindPhase === "g") state.kindCameraReleased = true;
       state.grunStop = null;
       state.targetWorldX = clickWorldX;
       setTargetWorldX(clickWorldX);
@@ -433,6 +449,8 @@ export default function SceneStage() {
       getGrunLimitX(state, state.maxGrunX),
     );
 
+    // Walking on after the kid turned green: the camera follows grun again.
+    if (state.kindPhase === "g") state.kindCameraReleased = true;
     state.targetWorldX = clickWorldX;
     state.grunStop = null;
     setTargetWorldX(clickWorldX);
@@ -479,10 +497,24 @@ export default function SceneStage() {
   }, []);
 
   const handleWormRevealComplete = useCallback(() => {
-    stateRef.current.wormPhase = "g";
+    const state = stateRef.current;
+    state.wormPhase = "g";
     setWormPhase("g");
-    tryStartWalkingToKind();
-  }, [tryStartWalkingToKind]);
+    if (state.cameraMode !== "landmarkPaused" || state.postLandmarkUnlocked) return;
+
+    // Grun walks on to the kid by himself; the camera glides on to the kid with him.
+    unlockPostLandmarkMovement(state);
+    if (state.kindPhase === "g") state.kindCameraReleased = true;
+    const kidStandX = Math.min(
+      getGrunKindBarrierX(state.metrics),
+      getGrunLimitX(state, state.maxGrunX),
+    );
+    if (kidStandX > state.grunWorldX + 8) {
+      state.grunStop = null;
+      state.targetWorldX = kidStandX;
+      setTargetWorldX(kidStandX);
+    }
+  }, [unlockPostLandmarkMovement]);
 
   const handleKindClick = useCallback(() => {
     if (stateRef.current.kindPhase !== "b") return;
@@ -579,12 +611,23 @@ export default function SceneStage() {
       const onSecond = !onFirst && distance - reach1 < GRUN_STOP.minStretch * (reach2 - reach1);
       if (onFirst || onSecond) {
         const animTotal = onFirst ? toPose1 : toPose2;
-        const stretch = Math.max(distance, 1) / ((animTotal / 1000) * speed);
+        const natural = (animTotal / 1000) * speed;
+        // A click target may be passed a little rather than taking a tiny, shuffling last
+        // stride; the barrier in front of the worm / kid never.
+        let stepDistance = distance;
+        if (kind === "click") {
+          const room =
+            direction > 0
+              ? Math.max(distance, getGrunLimitX(state, state.maxGrunX) - state.grunWorldX)
+              : Number.POSITIVE_INFINITY;
+          stepDistance = Math.min(Math.max(distance, natural * GRUN_STOP.minStretch), room);
+        }
+        const stretch = Math.max(stepDistance, 1) / natural;
         state.grunStop = {
           kind,
           direction,
           startX: state.grunWorldX,
-          distance,
+          distance: stepDistance,
           animTotal,
           animDone: 0,
           startRate: Math.min(1.6, Math.max(0.6, 1 / stretch)),
@@ -602,8 +645,12 @@ export default function SceneStage() {
     const advanceStop = (state: typeof stateRef.current, delta: number) => {
       const stop = state.grunStop;
       if (!stop) return false;
-      const u = stop.animTotal > 0 ? stop.animDone / stop.animTotal : 1;
-      // Keep walking, then slow down more and more towards the end.
+      // Keep walking, then slow down more and more during the last walk cycle.
+      const decelMs = Math.min(stop.animTotal, GRUN_WALK.loopMs);
+      const u =
+        decelMs > 0
+          ? Math.min(1, Math.max(0, (stop.animDone - (stop.animTotal - decelMs)) / decelMs))
+          : 1;
       const rate = stop.startRate + (GRUN_STOP.endRate - stop.startRate) * u * u;
       const step = Math.min(delta * 1000 * rate, stop.animTotal - stop.animDone);
       stop.animDone += step;
@@ -645,7 +692,7 @@ export default function SceneStage() {
           !state.postLandmarkUnlocked &&
           SHOW_LANDMARKS &&
           width > 0 &&
-          isGrunNearWorm(state.metrics, state.grunWorldX)
+          isWormInView(state.metrics, state.worldScroll)
         ) {
           setCameraModeBoth("landmarkPaused");
         }
@@ -682,11 +729,44 @@ export default function SceneStage() {
 
       if (width > 0) {
         const prevScroll = state.worldScroll;
-        state.worldScroll = getGrunFollowScroll(
+        const followScroll = getGrunFollowScroll(
           state.metrics,
           state.grunWorldX,
           state.maxScroll,
         );
+        // Glide to the worm while grun is held there, then on to the kid, and back to grun
+        // when he walks on past the kid.
+        const wormFocus = state.cameraMode === "landmarkPaused" && !state.postLandmarkUnlocked;
+        // Latches once the kid is on screen after the worm part (the worm view shows the kid).
+        if (
+          SHOW_LANDMARKS &&
+          !wormFocus &&
+          state.postLandmarkUnlocked &&
+          isKindInView(state.metrics, prevScroll)
+        ) {
+          state.kindCameraOn = true;
+        }
+        const kindFocus = state.kindCameraOn && !state.kindCameraReleased;
+        const blendStep = (delta * 1000) / WORM_CAMERA.blendMs;
+        const approach = (value: number, on: boolean) =>
+          on ? Math.min(1, value + blendStep) : Math.max(0, value - blendStep);
+        state.wormCameraBlend = approach(state.wormCameraBlend, wormFocus);
+        state.kindCameraBlend = approach(state.kindCameraBlend, kindFocus);
+        const ease = (b: number) => b * b * (3 - 2 * b);
+        const wormWeight = ease(state.wormCameraBlend);
+        const kindWeight = ease(state.kindCameraBlend);
+        let scroll = followScroll;
+        if (wormWeight > 0) {
+          scroll +=
+            (getWormFocusScroll(state.metrics, state.grunWorldX, state.maxScroll) - followScroll) *
+            wormWeight;
+        }
+        if (kindWeight > 0) {
+          scroll +=
+            (getKindFocusScroll(state.metrics, state.grunWorldX, state.maxScroll) - followScroll) *
+            kindWeight;
+        }
+        state.worldScroll = scroll;
         if (state.worldScroll !== prevScroll) {
           moved = true;
         }
