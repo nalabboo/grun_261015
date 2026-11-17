@@ -50,6 +50,8 @@ export const GRUN_WALK = {
   cropX: 34,
   cropY: 39,
   loopMs: 1750,
+  /** Frames with both feet together (narrowest stance): grun stops and stands on these. */
+  stopFrames: [12, 29],
 } as const;
 
 export function grunWalkFrameUrl(index: number) {
@@ -200,14 +202,57 @@ export const WORM_BACKGROUND_FADE_SPAN_RATIO = 1.55;
 export const GRUN_START_RATIO = 0.1;
 export const GRUN_SCALE = 0.85;
 export const GRUN_OFFSET_Y_RATIO = 10 / SCENE_REFERENCE_HEIGHT;
-/** Full playback duration of one walk cycle (ms). */
-export const GRUN_WALK_LOOP_MS = GRUN_WALK.loopMs;
+/**
+ * How grun comes to a stop. He slows down over his last step and ends on a feet-together frame
+ * (`GRUN_WALK.stopFrames`) exactly at the stop point. The step is stretched or shortened to fit
+ * (`minStretch`..`maxStretch` x a normal step); only when one step can't fit nicely does he take
+ * two slowing steps. The walk cycle slows down from full speed to `endRate` x speed, and the
+ * position follows the legs, so the feet don't slide.
+ */
+/**
+ * Grun breathing while he stands still: he grows a little taller (and a touch narrower) and back,
+ * feet staying on the ground. Starts `delayMs` after he stops and fades in over `fadeMs`; walking
+ * fades it out quickly.
+ */
+export const GRUN_IDLE_BREATH = {
+  /** Extra height at the top of a breath (share of his height). */
+  amplitude: 0.012,
+  /** Width change relative to the height change (narrower when taller). */
+  widthRatio: 0.4,
+  periodMs: 3200,
+  delayMs: 250,
+  fadeMs: 600,
+} as const;
 
-/** Time left in the current walk loop (ms) after `walkPlayStartMs`. */
-export function getRemainingWalkLoopMs(walkPlayStartMs: number, now = Date.now()) {
-  if (walkPlayStartMs <= 0) return GRUN_WALK_LOOP_MS;
-  const phase = (now - walkPlayStartMs) % GRUN_WALK_LOOP_MS;
-  return GRUN_WALK_LOOP_MS - phase;
+export const GRUN_STOP = {
+  endRate: 0.4,
+  minStretch: 0.7,
+  maxStretch: 1.4,
+} as const;
+
+/** Walk-cycle time (ms) in the middle of each feet-together frame. */
+export const GRUN_STOP_POSE_MS = GRUN_WALK.stopFrames.map(
+  (frame) => ((frame + 0.5) * GRUN_WALK.loopMs) / GRUN_WALK.frames,
+);
+
+/** Walk-cycle time to the next feet-together pose strictly ahead of `phaseMs`. */
+export function getMsToNextStopPose(phaseMs: number) {
+  const loop = GRUN_WALK.loopMs;
+  const p = ((phaseMs % loop) + loop) % loop;
+  let best = Infinity;
+  for (const pose of GRUN_STOP_POSE_MS) {
+    for (const candidate of [pose, pose + loop]) {
+      if (candidate - p > 1 && candidate - p < best) best = candidate - p;
+    }
+  }
+  return best;
+}
+
+/** True when `phaseMs` shows a feet-together pose. */
+export function isAtStopPose(phaseMs: number) {
+  const loop = GRUN_WALK.loopMs;
+  const p = ((phaseMs % loop) + loop) % loop;
+  return GRUN_STOP_POSE_MS.some((pose) => Math.abs(p - pose) <= 1);
 }
 
 /** Set false to hide stein/worm while tuning the scene. */

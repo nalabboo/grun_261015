@@ -41,7 +41,10 @@ import {
   getPostLandmarkMaxGrunWorldX,
   getPostLandmarkMaxScroll,
   getBackgroundWhiteProgress,
-  getRemainingWalkLoopMs,
+  GRUN_STOP,
+  GRUN_STOP_POSE_MS,
+  getMsToNextStopPose,
+  isAtStopPose,
   getGrunKindBarrierX,
   getGrunWormBarrierX,
   isGrunNearWorm,
@@ -57,6 +60,21 @@ import {
 const EMPTY_METRICS: SceneMetrics = { height: 0, width: 0, panoramaWidth: 0 };
 
 type GrunSettleKind = "click" | "postReveal" | "postKind";
+
+/** Grun's last step, slowing down onto a feet-together pose at the stop point. */
+type GrunStop = {
+  kind: GrunSettleKind;
+  direction: 1 | -1;
+  startX: number;
+  /** World px this step covers (= distance to the stop point). */
+  distance: number;
+  /** Walk-cycle ms from the start of the step to the pose, and how much has played. */
+  animTotal: number;
+  animDone: number;
+  /** Walk-cycle speed at the start: makes grun's speed continue smoothly when the steps are
+   * stretched or shortened. */
+  startRate: number;
+};
 
 type CameraMode = "grun" | "landmarkPaused";
 
@@ -143,8 +161,6 @@ export default function SceneStage() {
   const [ampelPhase, setAmpelPhase] = useState<"b" | "g">("b");
   const [mossPhases, setMossPhases] = useState<MossPhases>(INITIAL_MOSS_PHASES);
   const [walkingToKind, setWalkingToKind] = useState(false);
-  const [grunIsWalking, setGrunIsWalking] = useState(false);
-  const [grunWalkPlayStart, setGrunWalkPlayStart] = useState(0);
   const stateRef = useRef({
     worldScroll: 0,
     grunWorldX: 0,
@@ -160,11 +176,9 @@ export default function SceneStage() {
     walkingToKind: false,
     walkingAfterKindReveal: false,
     grunPostRevealArrived: false,
-    grunIsWalking: false,
-    grunWalkPlayStart: 0,
-    grunSettlingUntil: 0,
-    grunSettleDirection: 0 as -1 | 0 | 1,
-    grunSettleKind: null as GrunSettleKind | null,
+    /** Walk-cycle time shown (ms). Standing still, it rests on a feet-together pose. */
+    grunWalkPhaseMs: GRUN_STOP_POSE_MS[0],
+    grunStop: null as GrunStop | null,
     grunLastWalkDirection: 1 as -1 | 1,
   });
   const viewRef = useRef<WorldView>({ worldScroll: 0, grunWorldX: 0 });
@@ -269,8 +283,7 @@ export default function SceneStage() {
       state.walkingToKind = false;
       state.walkingAfterKindReveal = false;
       state.grunPostRevealArrived = false;
-      state.grunSettlingUntil = 0;
-      state.grunSettleKind = null;
+      state.grunStop = null;
       state.cameraMode = "grun";
       setTargetWorldX(null);
       setWormPhase("b");
@@ -405,8 +418,7 @@ export default function SceneStage() {
 
       // Stay at the landmark (worm clickable) until the worm has transformed.
       if (state.wormPhase === "g") unlockPostLandmarkMovement(state);
-      state.grunSettlingUntil = 0;
-      state.grunSettleKind = null;
+      state.grunStop = null;
       state.targetWorldX = clickWorldX;
       setTargetWorldX(clickWorldX);
       return;
@@ -422,8 +434,7 @@ export default function SceneStage() {
     );
 
     state.targetWorldX = clickWorldX;
-    state.grunSettlingUntil = 0;
-    state.grunSettleKind = null;
+    state.grunStop = null;
     setTargetWorldX(clickWorldX);
   }, [unlockPostLandmarkMovement]);
 
@@ -506,39 +517,9 @@ export default function SceneStage() {
     let frameId = 0;
     let lastTime = performance.now();
 
-    const beginWalkCycle = (state: typeof stateRef.current) => {
-      if (state.grunWalkPlayStart === 0) {
-        state.grunWalkPlayStart = Date.now();
-        setGrunWalkPlayStart(state.grunWalkPlayStart);
-      }
-    };
-
-    const beginSettle = (
-      state: typeof stateRef.current,
-      direction: number,
-      kind: GrunSettleKind,
-    ) => {
-      const walkDirection =
-        direction !== 0 ? direction : state.grunLastWalkDirection || 1;
-
-      beginWalkCycle(state);
-      state.grunSettlingUntil =
-        Date.now() + getRemainingWalkLoopMs(state.grunWalkPlayStart);
-      state.grunSettleDirection = walkDirection > 0 ? 1 : -1;
-      state.grunSettleKind = kind;
-    };
-
-    const clearWalkCycle = (state: typeof stateRef.current) => {
-      state.grunWalkPlayStart = 0;
-      state.grunSettlingUntil = 0;
-      state.grunSettleDirection = 0;
-      state.grunSettleKind = null;
-      setGrunWalkPlayStart(0);
-    };
-
-    const finishSettle = (state: typeof stateRef.current) => {
-      const kind = state.grunSettleKind;
-      clearWalkCycle(state);
+    const finishStop = (state: typeof stateRef.current) => {
+      const kind = state.grunStop?.kind;
+      state.grunStop = null;
 
       switch (kind) {
         case "click":
@@ -556,6 +537,86 @@ export default function SceneStage() {
       }
     };
 
+    /**
+     * One frame of walking towards `stopX`. Walks at full speed until the stop point is about
+     * one step away, then starts the last step (GrunStop), which ends on a feet-together pose
+     * right at `stopX`.
+     */
+    const walkToward = (
+      state: typeof stateRef.current,
+      stopX: number,
+      kind: GrunSettleKind,
+      speed: number,
+      delta: number,
+    ) => {
+      const dx = stopX - state.grunWorldX;
+      const distance = Math.abs(dx);
+      if (distance <= 4 && isAtStopPose(state.grunWalkPhaseMs)) {
+        // Already standing there.
+        state.grunStop = {
+          kind,
+          direction: state.grunLastWalkDirection,
+          startX: state.grunWorldX,
+          distance: 0,
+          animTotal: 0,
+          animDone: 0,
+          startRate: 1,
+        };
+        finishStop(state);
+        return false;
+      }
+      const direction = (Math.sign(dx) || state.grunLastWalkDirection) as 1 | -1;
+      state.grunLastWalkDirection = direction;
+
+      // The next two feet-together poses, and how far grun gets by then at a normal stride.
+      const toPose1 = getMsToNextStopPose(state.grunWalkPhaseMs);
+      const toPose2 = toPose1 + getMsToNextStopPose(state.grunWalkPhaseMs + toPose1);
+      const reach1 = (toPose1 / 1000) * speed;
+      const reach2 = (toPose2 / 1000) * speed;
+      // Stop within one step if it fits; take two slowing steps only when walking one more
+      // full step would leave a last step that is too short.
+      const onFirst = distance <= reach1 * GRUN_STOP.maxStretch;
+      const onSecond = !onFirst && distance - reach1 < GRUN_STOP.minStretch * (reach2 - reach1);
+      if (onFirst || onSecond) {
+        const animTotal = onFirst ? toPose1 : toPose2;
+        const stretch = Math.max(distance, 1) / ((animTotal / 1000) * speed);
+        state.grunStop = {
+          kind,
+          direction,
+          startX: state.grunWorldX,
+          distance,
+          animTotal,
+          animDone: 0,
+          startRate: Math.min(1.6, Math.max(0.6, 1 / stretch)),
+        };
+        return false;
+      }
+
+      state.grunWalkPhaseMs += delta * 1000;
+      state.grunWorldX += direction * speed * delta;
+      state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
+      return true;
+    };
+
+    /** One frame of the last step: slows down, legs and position in step. */
+    const advanceStop = (state: typeof stateRef.current, delta: number) => {
+      const stop = state.grunStop;
+      if (!stop) return false;
+      const u = stop.animTotal > 0 ? stop.animDone / stop.animTotal : 1;
+      // Keep walking, then slow down more and more towards the end.
+      const rate = stop.startRate + (GRUN_STOP.endRate - stop.startRate) * u * u;
+      const step = Math.min(delta * 1000 * rate, stop.animTotal - stop.animDone);
+      stop.animDone += step;
+      state.grunWalkPhaseMs += step;
+      const progress = stop.animTotal > 0 ? stop.animDone / stop.animTotal : 1;
+      state.grunWorldX = Math.min(
+        stop.startX + stop.direction * stop.distance * progress,
+        getGrunLimitX(state, state.maxGrunX),
+      );
+      if (stop.animDone >= stop.animTotal - 1e-3) finishStop(state);
+      return true;
+    };
+
     const tick = (time: number) => {
       const delta = Math.min((time - lastTime) / 1000, 0.05);
       lastTime = time;
@@ -567,23 +628,17 @@ export default function SceneStage() {
 
       const state = stateRef.current;
       const { width, height } = state.metrics;
-      const grunXAtFrameStart = state.grunWorldX;
       let moved = false;
       const walkSpeed = GRUN_WALK_SPEED_BASE * (height / SCENE_REFERENCE_HEIGHT || 1);
 
-      if (state.cameraMode === "grun") {
-        if (state.targetWorldX !== null && state.grunSettlingUntil === 0) {
-          const dx = state.targetWorldX - state.grunWorldX;
+      // Never walk past the barrier in front of the worm / kid.
+      const limitX = getGrunLimitX(state, state.maxGrunX);
 
-          if (Math.abs(dx) > 4) {
-            beginWalkCycle(state);
-            state.grunLastWalkDirection = (Math.sign(dx) || 1) as 1 | -1;
-            state.grunWorldX += state.grunLastWalkDirection * walkSpeed * delta;
-            state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
-            moved = true;
-          } else {
-            beginSettle(state, state.grunLastWalkDirection, "click");
-          }
+      if (state.cameraMode === "grun") {
+        if (state.targetWorldX !== null && state.grunStop === null) {
+          moved =
+            walkToward(state, Math.min(state.targetWorldX, limitX), "click", walkSpeed, delta) ||
+            moved;
         }
 
         if (
@@ -595,68 +650,34 @@ export default function SceneStage() {
           setCameraModeBoth("landmarkPaused");
         }
       } else if (state.cameraMode === "landmarkPaused" && width > 0) {
-        if (state.targetWorldX !== null && state.grunSettlingUntil === 0) {
+        if (state.targetWorldX !== null && state.grunStop === null) {
           if (state.wormPhase === "g") unlockPostLandmarkMovement(state);
-          const dx = state.targetWorldX - state.grunWorldX;
-
-          if (Math.abs(dx) > 4) {
-            beginWalkCycle(state);
-            state.grunLastWalkDirection = (Math.sign(dx) || 1) as 1 | -1;
-            state.grunWorldX += state.grunLastWalkDirection * walkSpeed * delta;
-            state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
-            moved = true;
-          } else {
-            beginSettle(state, state.grunLastWalkDirection, "click");
-          }
+          moved =
+            walkToward(state, Math.min(state.targetWorldX, limitX), "click", walkSpeed, delta) ||
+            moved;
         } else if (
           state.walkingToKind &&
           areWormMossRevealsComplete(state.wormPhase, state.mossPhases) &&
-          state.grunSettlingUntil === 0
+          state.grunStop === null
         ) {
-          const targetX = Math.min(
-            getGrunPostRevealStandX(state.metrics),
-            getGrunLimitX(state, state.maxGrunX),
-          );
-          const dx = targetX - state.grunWorldX;
-
-          if (Math.abs(dx) > 4) {
-            beginWalkCycle(state);
-            state.grunLastWalkDirection = (Math.sign(dx) || 1) as 1 | -1;
-            state.grunWorldX += state.grunLastWalkDirection * walkSpeed * delta;
-            state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
-            moved = true;
-          } else {
-            beginSettle(state, state.grunLastWalkDirection, "postReveal");
-          }
+          const targetX = Math.min(getGrunPostRevealStandX(state.metrics), limitX);
+          moved = walkToward(state, targetX, "postReveal", walkSpeed, delta) || moved;
         } else if (
           state.walkingAfterKindReveal &&
           state.kindPhase === "g" &&
-          state.grunSettlingUntil === 0
+          state.grunStop === null
         ) {
-          const targetX = getGrunPostKindRevealStandX(state.metrics);
-          const dx = targetX - state.grunWorldX;
-
-          if (Math.abs(dx) > 4) {
-            beginWalkCycle(state);
-            state.grunLastWalkDirection = (Math.sign(dx) || 1) as 1 | -1;
-            state.grunWorldX += state.grunLastWalkDirection * walkSpeed * delta;
-            state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
-            moved = true;
-          } else {
-            beginSettle(state, state.grunLastWalkDirection, "postKind");
-          }
+          const targetX = Math.min(getGrunPostKindRevealStandX(state.metrics), limitX);
+          moved = walkToward(state, targetX, "postKind", walkSpeed, delta) || moved;
         }
       }
 
-      if (state.grunSettlingUntil > 0) {
-        const now = Date.now();
-        if (now < state.grunSettlingUntil) {
-          state.grunWorldX += state.grunSettleDirection * walkSpeed * delta;
-          state.grunWorldX = Math.min(state.grunWorldX, getGrunLimitX(state, state.maxGrunX));
-          moved = true;
-        } else {
-          finishSettle(state);
-        }
+      moved = advanceStop(state, delta) || moved;
+
+      const grunSource = grunSourceRef.current;
+      if (grunSource.timeMs !== state.grunWalkPhaseMs) {
+        grunSource.timeMs = state.grunWalkPhaseMs;
+        grunSource.dirty = true;
       }
 
       if (width > 0) {
@@ -688,15 +709,6 @@ export default function SceneStage() {
       if (moved) {
         setGrunWorldX(state.grunWorldX);
         setWorldScroll(state.worldScroll);
-      }
-
-      const grunMovedThisFrame = Math.abs(state.grunWorldX - grunXAtFrameStart) > 0.01;
-      const isSettling = state.grunSettlingUntil > Date.now();
-      const nextGrunIsWalking = grunMovedThisFrame || isSettling;
-
-      if (nextGrunIsWalking !== state.grunIsWalking) {
-        state.grunIsWalking = nextGrunIsWalking;
-        setGrunIsWalking(nextGrunIsWalking);
       }
 
       frameId = requestAnimationFrame(tick);
@@ -759,11 +771,7 @@ export default function SceneStage() {
           onModeChange={handleEditMode}
         />
       )}
-      <GrunCharacter
-        sourceRef={grunSourceRef}
-        isWalking={grunIsWalking}
-        walkPlayStartMs={grunWalkPlayStart}
-      />
+      <GrunCharacter sourceRef={grunSourceRef} />
       <MossHitTargets
         worldScroll={worldScroll}
         metrics={metrics}

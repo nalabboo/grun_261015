@@ -15,11 +15,9 @@ export type WorldViewRef = MutableRefObject<WorldView>;
 export type GrunFrameSource = {
   /** Walk-cycle frames. Null until they have loaded. */
   movie: WalkMovie | null;
-  /** performance/Date origin of the current walk, matching SceneStage. */
-  playStartMs: number;
-  /** True while grun is walking, so the texture follows the walk frames. */
-  animating: boolean;
-  /** Force a single re-draw (idle pose, or the movie just became ready). */
+  /** Walk-cycle time (ms) to show; SceneStage advances it while grun walks. */
+  timeMs: number;
+  /** Re-draw (the time changed, or the movie just became ready). */
   dirty: boolean;
 };
 
@@ -28,8 +26,7 @@ export type GrunFrameSourceRef = MutableRefObject<GrunFrameSource>;
 export function createGrunFrameSource(): GrunFrameSource {
   return {
     movie: null,
-    playStartMs: 0,
-    animating: false,
+    timeMs: 0,
     dirty: true,
   };
 }

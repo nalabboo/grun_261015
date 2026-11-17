@@ -6,16 +6,13 @@ import { loadWalkMovie } from "@/lib/walkMovie";
 
 type GrunCharacterProps = {
   sourceRef: GrunFrameSourceRef;
-  isWalking: boolean;
-  walkPlayStartMs: number;
 };
 
-/** Loads the walk frames and tells the WebGL quad which frame to show. */
-export default function GrunCharacter({
-  sourceRef,
-  isWalking,
-  walkPlayStartMs,
-}: GrunCharacterProps) {
+/**
+ * Loads the walk frames for the WebGL quad. Which frame shows (`timeMs`) is driven by
+ * SceneStage's walk loop.
+ */
+export default function GrunCharacter({ sourceRef }: GrunCharacterProps) {
   useEffect(() => {
     let cancelled = false;
     loadWalkMovie().then(
@@ -32,13 +29,6 @@ export default function GrunCharacter({
       cancelled = true;
     };
   }, [sourceRef]);
-
-  useEffect(() => {
-    const source = sourceRef.current;
-    source.playStartMs = walkPlayStartMs;
-    source.animating = isWalking && walkPlayStartMs > 0;
-    source.dirty = true;
-  }, [isWalking, sourceRef, walkPlayStartMs]);
 
   return null;
 }

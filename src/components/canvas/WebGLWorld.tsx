@@ -18,6 +18,7 @@ import {
 } from "react";
 import * as THREE from "three";
 import {
+  GRUN_IDLE_BREATH,
   GRUN_OFFSET_Y_RATIO,
   GRUN_SCALE,
   GRUN_WALK,
@@ -955,6 +956,8 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
   const outerRef = useRef<THREE.Group>(null);
   const userRef = useRef<THREE.Group>(null);
   const hasFrameRef = useRef(false);
+  /** Idle breathing: last walk-cycle time seen, when it last changed, and fade-in weight. */
+  const breathRef = useRef({ timeMs: Number.NaN, changedAt: 0, weight: 0 });
 
   const { ctx, texture } = useMemo(() => {
     const canvas = document.createElement("canvas");
@@ -971,7 +974,7 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
 
   useEffect(() => () => texture.dispose(), [texture]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const mesh = meshRef.current;
     const outer = outerRef.current;
     if (!mesh || !outer) return;
@@ -979,9 +982,25 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
     const source = sourceRef.current;
     const movie = source.movie;
 
-    if (ctx && movie && (source.animating || source.dirty)) {
-      const time = source.animating ? Date.now() - source.playStartMs : 0;
-      if (movie.drawAt(time, ctx, source.dirty || !source.animating)) {
+    // Standing still = the walk-cycle time hasn't changed for a moment.
+    const breath = breathRef.current;
+    const now = performance.now();
+    if (source.timeMs !== breath.timeMs) {
+      breath.timeMs = source.timeMs;
+      breath.changedAt = now;
+    }
+    const idleMs = now - breath.changedAt - GRUN_IDLE_BREATH.delayMs;
+    const fadeStep = (delta * 1000) / GRUN_IDLE_BREATH.fadeMs;
+    breath.weight =
+      idleMs > 0
+        ? Math.min(1, breath.weight + fadeStep)
+        : Math.max(0, breath.weight - fadeStep * 4);
+    // 0 → 1 → 0 once per period, starting from rest when he stops.
+    const cycle = idleMs > 0 ? (idleMs % GRUN_IDLE_BREATH.periodMs) / GRUN_IDLE_BREATH.periodMs : 0;
+    const swell = breath.weight * GRUN_IDLE_BREATH.amplitude * (0.5 - 0.5 * Math.cos(cycle * Math.PI * 2));
+
+    if (ctx && movie && source.dirty) {
+      if (movie.drawAt(source.timeMs, ctx, !hasFrameRef.current)) {
         texture.needsUpdate = true;
       }
       source.dirty = false;
@@ -1000,7 +1019,13 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
       -offsetY + displayHeight / 2,
       0,
     );
-    mesh.scale.set(width, displayHeight, 1);
+    // Grow from the feet: scale around the bottom edge.
+    mesh.scale.set(
+      width * (1 - swell * GRUN_IDLE_BREATH.widthRatio),
+      displayHeight * (1 + swell),
+      1,
+    );
+    mesh.position.y = (displayHeight * swell) / 2;
   });
 
   return (
