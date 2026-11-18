@@ -67,7 +67,7 @@ export default function PageTurnCue({ onTurn, label = "2장" }: PageTurnCueProps
     <button
       type="button"
       className="page-turn"
-      aria-label="스크롤해서 다음 장으로 넘기기"
+      aria-label={`스크롤해서 ${label}으로 넘기기`}
       onClick={(event) => {
         event.stopPropagation();
         onTurnRef.current();
@@ -107,23 +107,17 @@ export default function PageTurnCue({ onTurn, label = "2장" }: PageTurnCueProps
         />
         {/* Shadow of the folded corner on the page. */}
         <path
-          d="M40,100 Q36,73 46,46 Q73,37 100,40 Z"
+          d="M40,100 Q49,73 46,46 Q73,49 100,40 Z"
           transform="translate(-1.5 1.5)"
           fill="rgba(30, 24, 16, 0.32)"
           filter="url(#page-fold-blur)"
         />
         <path
-          d="M40,100 Q36,73 46,46 Q73,37 100,40 Z"
+          d="M40,100 Q49,73 46,46 Q73,49 100,40 Z"
           fill="url(#page-fold-flap)"
           stroke="rgba(120, 110, 95, 0.45)"
           strokeWidth="0.5"
         />
-        <text className="page-turn__hint" x="61" y="62" transform="rotate(-45 61 62)">
-          scroll
-        </text>
-        <text className="page-turn__label" x="95" y="95" textAnchor="end">
-          {label}
-        </text>
       </svg>
     </button>
   );

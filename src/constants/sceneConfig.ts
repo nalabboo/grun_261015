@@ -835,6 +835,19 @@ export function getAmpelFocusScroll(metrics: SceneMetrics, grunWorldX: number, m
   );
 }
 
+/**
+ * End of chapter 1: once the traffic light is green, grun walks on by himself towards the right
+ * edge while the camera stays put. When `startOutRatio` of his width is past the edge, a white
+ * light blooms from him and fills the screen over `lightInMs` (before he is fully out). Under the
+ * full white the whole scene is swapped for the closing tableau, and the light clears over
+ * `lightOutMs` — so chapter 1 never fades out while the tableau fades in.
+ */
+export const SCENE1_EXIT = {
+  startOutRatio: 0.3,
+  lightInMs: 1400,
+  lightOutMs: 1300,
+} as const;
+
 /** Until the traffic light is green, grun's front may not come closer to it (ref px at 1080p). */
 export const AMPEL_BLOCK_DISTANCE_PX = 150;
 
@@ -946,17 +959,6 @@ export function getPostLandmarkMaxScroll(metrics: SceneMetrics) {
 
 export function getPostLandmarkMaxGrunWorldX(metrics: SceneMetrics) {
   return getPostLandmarkMaxScroll(metrics) + metrics.width * GRUN_FOLLOW_RATIO + 40;
-}
-
-/** Grun (left edge) world X that ends scene1: grun's center reaches the ampel. */
-export function getSceneEndGrunWorldX(metrics: SceneMetrics) {
-  const ampel = getAmpelLayout(metrics);
-  const grunWidth = getGrunDisplayWidth(metrics);
-
-  return Math.min(
-    ampel.worldX - grunWidth / 2,
-    getPostLandmarkMaxGrunWorldX(metrics) - 8,
-  );
 }
 
 export type SceneMetrics = {

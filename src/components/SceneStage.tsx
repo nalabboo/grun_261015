@@ -35,7 +35,8 @@ import {
   SCENE_REFERENCE_HEIGHT,
   SHOW_LANDMARKS,
   getGrunFollowScroll,
-  getSceneEndGrunWorldX,
+  SCENE1_EXIT,
+  getGrunDisplayWidth,
   getGrunPostKindRevealStandX,
   getGrunPostRevealStandX,
   getPostLandmarkMaxGrunWorldX,
@@ -88,7 +89,8 @@ type GrunStop = {
 type CameraMode = "grun" | "landmarkPaused";
 
 type Chapter = 1 | 2 | 3;
-type Chapter1Phase = "scroll" | "tableau";
+/** "exit": grun walks off screen while a white light fills it (SCENE1_EXIT). */
+type Chapter1Phase = "scroll" | "exit" | "tableau";
 type Chapter2Step = "intro" | "play";
 type Chapter3Step = "intro" | "play" | "inside";
 
@@ -201,6 +203,9 @@ export default function SceneStage() {
     ampelCameraBlend: 0,
     ampelCameraOn: false,
     ampelCameraReleased: false,
+    /** Walking off screen at the end of chapter 1 (camera held at `exitScroll`). */
+    exiting: false,
+    exitScroll: 0,
     /** Set when grun walks on after the kid turned green: the camera follows grun again. */
     kindCameraReleased: false,
     grunLastWalkDirection: 1 as -1 | 1,
@@ -221,6 +226,8 @@ export default function SceneStage() {
   );
   const chapterRef = useRef<Chapter>(DEV_START_CHAPTER);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
+  /** White light at the end of chapter 1: blooming in ("in", from `lightX` % across) or clearing. */
+  const [exitLight, setExitLight] = useState<{ stage: "in" | "out"; lightX: number } | null>(null);
 
   useEffect(() => {
     if (chapter !== 2 || chapter2Step !== "play") {
@@ -316,6 +323,7 @@ export default function SceneStage() {
       state.ampelCameraBlend = 0;
       state.ampelCameraOn = false;
       state.ampelCameraReleased = false;
+      state.exiting = false;
       state.cameraMode = "grun";
       setTargetWorldX(null);
       setWormPhase("b");
@@ -438,6 +446,7 @@ export default function SceneStage() {
     if (editEnabledRef.current) return;
     if (chapterRef.current !== 1 || chapter1PhaseRef.current !== "scroll") return;
     const state = stateRef.current;
+    if (state.exiting) return;
     if (state.metrics.width <= 0) return;
     if (state.cameraMode !== "grun" && state.cameraMode !== "landmarkPaused") return;
 
@@ -566,8 +575,11 @@ export default function SceneStage() {
     // Grun walks on to the kid by himself; the camera glides on to the kid with him.
     unlockPostLandmarkMovement(state);
     if (state.kindPhase === "g") state.kindCameraReleased = true;
+    // Kid already green: walk on to the traffic light instead.
     const kidStandX = Math.min(
-      getGrunKindBarrierX(state.metrics),
+      state.kindPhase === "g"
+        ? getGrunAmpelBarrierX(state.metrics)
+        : getGrunKindBarrierX(state.metrics),
       getGrunLimitX(state, state.maxGrunX),
     );
     if (kidStandX > state.grunWorldX + 8) {
@@ -584,10 +596,23 @@ export default function SceneStage() {
   }, []);
 
   const handleKindRevealComplete = useCallback(() => {
-    stateRef.current.kindPhase = "g";
+    const state = stateRef.current;
+    state.kindPhase = "g";
     // Auto-step after the reveal only belongs to the guided landmark sequence.
-    stateRef.current.walkingAfterKindReveal = stateRef.current.cameraMode === "landmarkPaused";
+    state.walkingAfterKindReveal = state.cameraMode === "landmarkPaused";
     setKindPhase("g");
+    // Past the worm: grun walks on to the traffic light by himself, the camera with him.
+    if (state.cameraMode !== "grun" || !state.postLandmarkUnlocked || state.exiting) return;
+    state.kindCameraReleased = true;
+    const ampelStandX = Math.min(
+      getGrunAmpelBarrierX(state.metrics),
+      getGrunLimitX(state, state.maxGrunX),
+    );
+    if (ampelStandX > state.grunWorldX + 8) {
+      state.grunStop = null;
+      state.targetWorldX = ampelStandX;
+      setTargetWorldX(ampelStandX);
+    }
   }, []);
 
   const handleAmpelClick = useCallback(() => setAmpelPhase("g"), []);
@@ -747,7 +772,7 @@ export default function SceneStage() {
       const delta = Math.min((time - lastTime) / 1000, 0.05);
       lastTime = time;
 
-      if (chapterRef.current !== 1 || chapter1PhaseRef.current !== "scroll") {
+      if (chapterRef.current !== 1 || chapter1PhaseRef.current === "tableau") {
         frameId = requestAnimationFrame(tick);
         return;
       }
@@ -806,7 +831,28 @@ export default function SceneStage() {
         grunSource.dirty = true;
       }
 
-      if (width > 0) {
+      // Traffic light green and grun at it: he walks on by himself, out of the picture.
+      if (
+        !state.exiting &&
+        state.ampelGreen &&
+        width > 0 &&
+        state.grunWorldX >= getGrunAmpelBarrierX(state.metrics) - 2
+      ) {
+        state.exiting = true;
+        state.exitScroll = state.worldScroll;
+        state.maxGrunX = state.worldScroll + width * 3;
+        state.grunStop = null;
+        state.targetWorldX = state.worldScroll + width + getGrunDisplayWidth(state.metrics) * 1.5;
+        setTargetWorldX(state.targetWorldX);
+      }
+
+      if (state.exiting) {
+        // The camera stays; grun walks out on the right.
+        if (state.worldScroll !== state.exitScroll) {
+          state.worldScroll = state.exitScroll;
+          moved = true;
+        }
+      } else if (width > 0) {
         const prevScroll = state.worldScroll;
         const followScroll = getGrunFollowScroll(
           state.metrics,
@@ -869,15 +915,27 @@ export default function SceneStage() {
         }
       }
 
+      // Partly out of the picture: a white light blooms from him and fills the screen; under
+      // the full white the whole scene is swapped for the tableau, then the light clears.
+      const grunWidth = getGrunDisplayWidth(state.metrics);
       if (
-        width > 0 &&
+        state.exiting &&
         chapter1PhaseRef.current === "scroll" &&
-        state.grunWorldX >= getSceneEndGrunWorldX(state.metrics)
+        state.grunWorldX - state.worldScroll >= width - grunWidth * (1 - SCENE1_EXIT.startOutRatio)
       ) {
-        chapter1PhaseRef.current = "tableau";
-        setChapter1Phase("tableau");
-        state.targetWorldX = null;
-        setTargetWorldX(null);
+        chapter1PhaseRef.current = "exit";
+        setChapter1Phase("exit");
+        const grunCenter = state.grunWorldX - state.worldScroll + grunWidth / 2;
+        setExitLight({ stage: "in", lightX: Math.min(100, (grunCenter / width) * 100) });
+        window.setTimeout(() => {
+          if (chapter1PhaseRef.current !== "exit") return;
+          chapter1PhaseRef.current = "tableau";
+          setChapter1Phase("tableau");
+          state.targetWorldX = null;
+          setTargetWorldX(null);
+          setExitLight((light) => (light ? { ...light, stage: "out" } : null));
+          window.setTimeout(() => setExitLight(null), SCENE1_EXIT.lightOutMs);
+        }, SCENE1_EXIT.lightInMs);
       }
 
       viewRef.current.worldScroll = state.worldScroll;
@@ -910,7 +968,7 @@ export default function SceneStage() {
     backgroundColor: `rgb(${backgroundChannel}, ${backgroundChannel}, ${backgroundChannel})`,
   } as React.CSSProperties;
 
-  const showChapter1Scroll = chapter === 1 && chapter1Phase === "scroll";
+  const showChapter1Scroll = chapter === 1 && chapter1Phase !== "tableau";
   const showChapter1Tableau = chapter === 1 && chapter1Phase === "tableau";
 
   return (
@@ -981,6 +1039,19 @@ export default function SceneStage() {
         <NextScene onRevealComplete={handleTableauRevealComplete} />
         {tableauRevealed && <PageTurnCue onTurn={startPageFlipTo2} />}
       </PageFlipLeaf>
+    )}
+    {chapter === 1 && exitLight && (
+      <div
+        className={`scene1-light scene1-light--${exitLight.stage}`}
+        aria-hidden
+        style={
+          {
+            "--scene1-light-x": `${exitLight.lightX}%`,
+            "--scene1-light-in": `${SCENE1_EXIT.lightInMs}ms`,
+            "--scene1-light-out": `${SCENE1_EXIT.lightOutMs}ms`,
+          } as React.CSSProperties
+        }
+      />
     )}
     {chapter === 2 && chapter2Step === "play" && chapter2PlayReady && (
       <PageFlipLeaf turning={pageFlipTo === 3}>
