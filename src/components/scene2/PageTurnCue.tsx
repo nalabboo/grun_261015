@@ -73,52 +73,52 @@ export default function PageTurnCue({ onTurn, label = "2장" }: PageTurnCueProps
         onTurnRef.current();
       }}
     >
+      {/* Dog-eared page: the bottom-right corner is folded over onto the page. */}
       <svg className="page-turn__sheet" viewBox="0 0 100 100" aria-hidden>
         <defs>
-          {/* Next page, seen under the lifted corner: darker close to the fold. */}
-          <linearGradient id="page-curl-under" x1="0.35" y1="0.35" x2="1" y2="1">
-            <stop offset="0" stopColor="#cfc4ad" />
-            <stop offset="0.45" stopColor="#e6decd" />
-            <stop offset="1" stopColor="#f3eee3" />
+          {/* Behind the page, uncovered by the fold: darker close to the fold. */}
+          <linearGradient id="page-fold-under" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#a9a39a" />
+            <stop offset="0.5" stopColor="#c9c4bb" />
+            <stop offset="1" stopColor="#dcd8d0" />
           </linearGradient>
-          {/* The curled corner: a rolled paper catching the light in the middle of the roll. */}
-          <linearGradient id="page-curl-roll" x1="0.32" y1="0.32" x2="0.78" y2="0.78">
-            <stop offset="0" stopColor="#cdbfa2" />
-            <stop offset="0.12" stopColor="#e4d9c3" />
-            <stop offset="0.34" stopColor="#f8f4ea" />
-            <stop offset="0.55" stopColor="#fffefa" />
-            <stop offset="0.82" stopColor="#ebe3d2" />
-            <stop offset="1" stopColor="#cbbfa5" />
+          {/* Back of the folded corner: light along the fold, shaded where it curls at the tip. */}
+          <linearGradient id="page-fold-flap" x1="1" y1="1" x2="0" y2="0">
+            <stop offset="0" stopColor="#ffffff" />
+            <stop offset="0.45" stopColor="#f5f4f0" />
+            <stop offset="0.8" stopColor="#dbd7ce" />
+            <stop offset="1" stopColor="#c6c0b3" />
           </linearGradient>
-          <filter id="page-curl-blur" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="2.4" />
+          <filter id="page-fold-blur" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.2" />
           </filter>
-          <clipPath id="page-curl-under-clip">
-            <polygon points="100,18 100,100 18,100" />
+          <clipPath id="page-fold-under-clip">
+            <polygon points="40,100 100,100 100,40" />
           </clipPath>
         </defs>
-        <polygon points="100,18 100,100 18,100" fill="url(#page-curl-under)" />
-        {/* Shadow of the curl on the page below it, and along the fold on the scene. */}
+        <polygon points="40,100 100,100 100,40" fill="url(#page-fold-under)" />
+        {/* The fold casts a soft shadow into the uncovered corner. */}
         <path
-          d="M100,18 C95,55 55,95 18,100 C46,72 72,46 100,18 Z"
-          transform="translate(4 4)"
-          fill="rgba(40, 30, 18, 0.35)"
-          filter="url(#page-curl-blur)"
-          clipPath="url(#page-curl-under-clip)"
+          d="M40,100 L100,40"
+          stroke="rgba(30, 24, 16, 0.45)"
+          strokeWidth="5"
+          filter="url(#page-fold-blur)"
+          clipPath="url(#page-fold-under-clip)"
+        />
+        {/* Shadow of the folded corner on the page. */}
+        <path
+          d="M40,100 Q36,73 46,46 Q73,37 100,40 Z"
+          transform="translate(-1.5 1.5)"
+          fill="rgba(30, 24, 16, 0.32)"
+          filter="url(#page-fold-blur)"
         />
         <path
-          d="M100,18 L18,100"
-          stroke="rgba(40, 30, 18, 0.4)"
-          strokeWidth="3"
-          filter="url(#page-curl-blur)"
+          d="M40,100 Q36,73 46,46 Q73,37 100,40 Z"
+          fill="url(#page-fold-flap)"
+          stroke="rgba(120, 110, 95, 0.45)"
+          strokeWidth="0.5"
         />
-        <path
-          d="M100,18 C95,55 55,95 18,100 C46,72 72,46 100,18 Z"
-          fill="url(#page-curl-roll)"
-          stroke="rgba(110, 90, 60, 0.5)"
-          strokeWidth="0.7"
-        />
-        <text className="page-turn__hint" x="62" y="64" transform="rotate(-45 62 64)">
+        <text className="page-turn__hint" x="61" y="62" transform="rotate(-45 61 62)">
           scroll
         </text>
         <text className="page-turn__label" x="95" y="95" textAnchor="end">

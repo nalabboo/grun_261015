@@ -26,6 +26,7 @@ import {
   MOSS_INSTANCE_IDS,
   AMPEL_FLOAT,
   AMPEL_SWITCH,
+  AMPEL_MITTE_CLIP,
   getAmpelLayout,
   getSporeLayouts,
   SPORE_CLIP_FRAMES,
@@ -847,35 +848,52 @@ function TransformSprite({
 
 type AmpelSpriteProps = {
   phase: RevealPhase;
+  onSwitchComplete?: () => void;
   metrics: SceneMetrics;
   viewRef: WorldViewRef;
   renderOrder: number;
 };
 
-function AmpelSprite({ phase, metrics, viewRef, renderOrder }: AmpelSpriteProps) {
+function AmpelSprite({ phase, onSwitchComplete, metrics, viewRef, renderOrder }: AmpelSpriteProps) {
+  const onSwitchCompleteRef = useRef(onSwitchComplete);
+  useEffect(() => {
+    onSwitchCompleteRef.current = onSwitchComplete;
+  }, [onSwitchComplete]);
+  const completedRef = useRef(false);
   const bMap = useSceneTexture(IMAGE_SIZES.ampel_b.file);
   const gMap = useSceneTexture(IMAGE_SIZES.ampel_g.file);
+  // The turn clip loads in the background once the light is on stage.
+  const mitteFiles = useMemo(() => clipFrameFiles(AMPEL_MITTE_CLIP), []);
+  const mitteFrames = useLazyClipTextures(mitteFiles, true);
   const outerRef = useRef<THREE.Group>(null);
   const userRef = useRef<THREE.Group>(null);
   const floatRef = useRef<THREE.Group>(null);
   const bMeshRef = useRef<THREE.Mesh>(null);
+  const mitteMeshRef = useRef<THREE.Mesh>(null);
   const gMeshRef = useRef<THREE.Mesh>(null);
-  /** Date.now() when the light was clicked (0 = still red). */
+  /** Date.now() when the turn clip started (0 = still red / not started yet). */
   const switchStartRef = useRef(0);
 
   useEffect(() => {
-    if (phase === "b") switchStartRef.current = 0;
-    else if (switchStartRef.current === 0) switchStartRef.current = Date.now();
+    if (phase === "b") {
+      switchStartRef.current = 0;
+      completedRef.current = false;
+    }
   }, [phase]);
 
   useFrame(() => {
     const outer = outerRef.current;
     const float = floatRef.current;
     const bMesh = bMeshRef.current;
+    const mitteMesh = mitteMeshRef.current;
     const gMesh = gMeshRef.current;
-    if (!outer || !float || !bMesh || !gMesh) return;
+    if (!outer || !float || !bMesh || !mitteMesh || !gMesh) return;
 
     const now = Date.now();
+    // Clicked: start the clip once its frames are ready (red until then).
+    if (phase !== "b" && switchStartRef.current === 0 && mitteFrames.length > 0) {
+      switchStartRef.current = now;
+    }
     const rect = getAmpelLayout(metrics);
     const unit = metrics.height / SCENE_REFERENCE_HEIGHT;
     outer.position.set(
@@ -891,23 +909,53 @@ function AmpelSprite({ phase, metrics, viewRef, renderOrder }: AmpelSpriteProps)
 
     bMesh.scale.set(rect.width, rect.height, 1);
     gMesh.scale.set(rect.width, rect.height, 1);
+    // The clip's own box (in ampel_b box px), relative to the light's centre.
+    const boxUnit = rect.width / IMAGE_SIZES.ampel_b.width;
+    const clip = AMPEL_MITTE_CLIP;
+    mitteMesh.scale.set(clip.width * boxUnit, clip.height * boxUnit, 1);
+    mitteMesh.position.set(
+      (clip.x + clip.width / 2 - IMAGE_SIZES.ampel_b.width / 2) * boxUnit,
+      (IMAGE_SIZES.ampel_b.height / 2 - (clip.y + clip.height / 2)) * boxUnit,
+      0,
+    );
 
     const elapsed = switchStartRef.current > 0 ? now - switchStartRef.current : -1;
+    const mitteMaterial = mitteMesh.material as THREE.MeshBasicMaterial;
     const gMaterial = gMesh.material as THREE.MeshBasicMaterial;
     if (elapsed < 0) {
-      gMesh.visible = false;
+      // Red.
       bMesh.visible = true;
-      const bMaterial = bMesh.material as THREE.MeshBasicMaterial;
-      bMaterial.opacity = 1;
+      mitteMesh.visible = false;
+      gMesh.visible = false;
+    } else if (elapsed < clip.durationMs) {
+      // The turn: its first frame is the red light itself.
+      bMesh.visible = false;
+      mitteMesh.visible = true;
+      gMesh.visible = false;
+      const index = Math.min(
+        mitteFrames.length - 1,
+        Math.floor((elapsed / clip.durationMs) * mitteFrames.length),
+      );
+      if (mitteMaterial.map !== mitteFrames[index]) mitteMaterial.map = mitteFrames[index];
+      mitteMaterial.opacity = 1;
     } else {
-      gMesh.visible = true;
-      const t = Math.min(1, elapsed / AMPEL_SWITCH.fadeMs);
+      if (!completedRef.current) {
+        completedRef.current = true;
+        onSwitchCompleteRef.current?.();
+      }
+      // The green light fades in on top of the clip's last frame, which stays fully opaque
+      // underneath (fading both at once lets the background shine through: a flash).
+      bMesh.visible = false;
+      const raw = (elapsed - clip.durationMs) / AMPEL_SWITCH.fadeMs;
+      const t = Math.min(1, raw);
       const ease = t * t * (3 - 2 * t);
+      gMesh.visible = true;
       gMaterial.opacity = ease;
-      gMaterial.color.setScalar(1);
-      const bMaterial = bMesh.material as THREE.MeshBasicMaterial;
-      bMaterial.opacity = 1 - ease;
-      bMesh.visible = bMaterial.opacity > 0.02;
+      const last = mitteFrames[mitteFrames.length - 1];
+      if (mitteMaterial.map !== last) mitteMaterial.map = last;
+      // Then the last frame fades out underneath; only its slightly different outline shows.
+      mitteMaterial.opacity = Math.max(0, 1 - Math.max(0, raw - 1) * 2);
+      mitteMesh.visible = mitteMaterial.opacity > 0.01;
     }
   });
 
@@ -918,6 +966,15 @@ function AmpelSprite({ phase, metrics, viewRef, renderOrder }: AmpelSpriteProps)
           <planeGeometry args={[1, 1]} />
           <meshBasicMaterial
             map={bMap}
+            transparent
+            depthTest={false}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh ref={mitteMeshRef} renderOrder={renderOrder + 0.005} frustumCulled={false} visible={false}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
             transparent
             depthTest={false}
             depthWrite={false}
@@ -1087,6 +1144,8 @@ export type WebGLWorldProps = {
   mossPhases: MossPhases;
   onWormRevealComplete: () => void;
   onKindRevealComplete: () => void;
+  /** The traffic light has finished turning green. */
+  onAmpelSwitchComplete?: () => void;
   onMossRevealComplete: (id: MossInstanceId) => void;
   editor: EditorState;
   onReady?: () => void;
@@ -1146,6 +1205,7 @@ export default function WebGLWorld({
   mossPhases,
   onWormRevealComplete,
   onKindRevealComplete,
+  onAmpelSwitchComplete,
   onMossRevealComplete,
   editor,
   onReady,
@@ -1239,6 +1299,7 @@ export default function WebGLWorld({
           {SHOW_LANDMARKS && (
             <AmpelSprite
               phase={ampelPhase}
+              onSwitchComplete={onAmpelSwitchComplete}
               metrics={metrics}
               viewRef={viewRef}
               renderOrder={3.2}

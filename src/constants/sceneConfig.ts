@@ -8,7 +8,7 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261116-ai3";
+export const ASSET_VERSION = "20261118-ampel-g2";
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
@@ -198,6 +198,7 @@ export const WORM_CAMERA = {
   enterRatio: 0.9,
   focusRatio: 0.5,
   kindFocusRatio: 0.5,
+  ampelFocusRatio: 0.5,
   grunMinScreenRatio: 0.02,
   grunMaxScreenRatio: 0.62,
   blendMs: 1600,
@@ -628,7 +629,8 @@ function getRefUnit(metrics: SceneMetrics) {
 }
 
 /**
- * Traffic light: floats gently in the air; click → red (ampel_b) crossfades to green (ampel_g).
+ * Traffic light: floats gently in the air; click → the turn clip (AMPEL_MITTE_CLIP) plays once,
+ * then it stays green (ampel_g).
  * Distances in px at 1080p.
  */
 export const AMPEL_FLOAT = {
@@ -641,8 +643,23 @@ export const AMPEL_FLOAT = {
 } as const;
 
 export const AMPEL_SWITCH = {
-  /** Red → green crossfade (ms). */
+  /** Fade from the clip's last frame to ampel_g (ms). */
   fadeMs: 380,
+} as const;
+
+/**
+ * Red → green turn, played once after the click (source_videos/ampel_mitte.mp4, white background,
+ * cut out by `scripts/extract_ampel.py`, 24 fps). Placed in ampel_b's 821x1000 box px; its first
+ * frame matches ampel_b. The last frame differs a little from ampel_g, so it fades into it.
+ */
+export const AMPEL_MITTE_CLIP = {
+  dir: "landmark/ampel_mitte",
+  frames: 73,
+  durationMs: 3042,
+  x: -34,
+  y: -2,
+  width: 889,
+  height: 989,
 } as const;
 
 export function getAmpelLayout(metrics: SceneMetrics) {
@@ -798,6 +815,35 @@ export function isKindInView(metrics: SceneMetrics, worldScroll: number) {
   const kind = getKindLayout(metrics);
 
   return kind.worldX + kind.width / 2 <= worldScroll + metrics.width * WORM_CAMERA.enterRatio;
+}
+
+/** True once the traffic light has come into view. */
+export function isAmpelInView(metrics: SceneMetrics, worldScroll: number) {
+  const ampel = getAmpelLayout(metrics);
+
+  return ampel.worldX + ampel.width / 2 <= worldScroll + metrics.width * WORM_CAMERA.enterRatio;
+}
+
+/** Camera scroll that shows the traffic light, with grun still on screen. */
+export function getAmpelFocusScroll(metrics: SceneMetrics, grunWorldX: number, maxScroll: number) {
+  const ampel = getAmpelLayout(metrics);
+  return getLandmarkCameraScroll(
+    metrics,
+    ampel.worldX + ampel.width / 2 - metrics.width * WORM_CAMERA.ampelFocusRatio,
+    grunWorldX,
+    maxScroll,
+  );
+}
+
+/** Until the traffic light is green, grun's front may not come closer to it (ref px at 1080p). */
+export const AMPEL_BLOCK_DISTANCE_PX = 150;
+
+/** Largest grun world X (left edge) allowed while the traffic light is still red. */
+export function getGrunAmpelBarrierX(metrics: SceneMetrics) {
+  const ampel = getAmpelLayout(metrics);
+  const distance = AMPEL_BLOCK_DISTANCE_PX * (metrics.height / SCENE_REFERENCE_HEIGHT);
+
+  return ampel.worldX - distance - getGrunDisplayWidth(metrics) * GRUN_FRONT_RATIO;
 }
 
 /** Camera scroll that shows the worm, with grun still on screen. */

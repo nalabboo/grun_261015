@@ -53,6 +53,9 @@ import {
   getWormFocusScroll,
   getKindFocusScroll,
   isKindInView,
+  isAmpelInView,
+  getAmpelFocusScroll,
+  getGrunAmpelBarrierX,
   WORM_CAMERA,
   getMaxGrunWorldX,
   getMaxScroll,
@@ -135,6 +138,7 @@ function getGrunLimitX(
   state: {
     wormPhase: "b" | "revealing" | "g";
     kindPhase: "b" | "revealing" | "g";
+    ampelGreen: boolean;
     metrics: SceneMetrics;
   },
   maxX: number,
@@ -143,6 +147,7 @@ function getGrunLimitX(
   let limit = maxX;
   if (state.wormPhase !== "g") limit = Math.min(limit, getGrunWormBarrierX(state.metrics));
   if (state.kindPhase !== "g") limit = Math.min(limit, getGrunKindBarrierX(state.metrics));
+  if (!state.ampelGreen) limit = Math.min(limit, getGrunAmpelBarrierX(state.metrics));
   return limit;
 }
 
@@ -191,6 +196,11 @@ export default function SceneStage() {
     wormCameraBlend: 0,
     kindCameraBlend: 0,
     kindCameraOn: false,
+    /** Traffic light: green once its turn clip has played; camera like the kid's. */
+    ampelGreen: false,
+    ampelCameraBlend: 0,
+    ampelCameraOn: false,
+    ampelCameraReleased: false,
     /** Set when grun walks on after the kid turned green: the camera follows grun again. */
     kindCameraReleased: false,
     grunLastWalkDirection: 1 as -1 | 1,
@@ -302,6 +312,10 @@ export default function SceneStage() {
       state.kindCameraBlend = 0;
       state.kindCameraOn = false;
       state.kindCameraReleased = false;
+      state.ampelGreen = false;
+      state.ampelCameraBlend = 0;
+      state.ampelCameraOn = false;
+      state.ampelCameraReleased = false;
       state.cameraMode = "grun";
       setTargetWorldX(null);
       setWormPhase("b");
@@ -440,6 +454,7 @@ export default function SceneStage() {
       unlockPostLandmarkMovement(state);
     }
     if (state.kindPhase === "g") state.kindCameraReleased = true;
+    if (state.ampelGreen) state.ampelCameraReleased = true;
 
     const scale = state.metrics.height / SCENE_REFERENCE_HEIGHT || 1;
     const maxX =
@@ -576,6 +591,10 @@ export default function SceneStage() {
   }, []);
 
   const handleAmpelClick = useCallback(() => setAmpelPhase("g"), []);
+  /** The traffic light's turn clip has played: grun may walk on. */
+  const handleAmpelSwitchComplete = useCallback(() => {
+    stateRef.current.ampelGreen = true;
+  }, []);
 
   const handleMossClick = useCallback((id: MossInstanceId) => {
     if (stateRef.current.mossPhases[id] !== "b") return;
@@ -807,14 +826,27 @@ export default function SceneStage() {
           state.kindCameraOn = true;
         }
         const kindFocus = state.kindCameraOn && !state.kindCameraReleased;
+        // Then the traffic light, once grun has left the kid.
+        if (
+          SHOW_LANDMARKS &&
+          !wormFocus &&
+          !kindFocus &&
+          state.postLandmarkUnlocked &&
+          isAmpelInView(state.metrics, prevScroll)
+        ) {
+          state.ampelCameraOn = true;
+        }
+        const ampelFocus = state.ampelCameraOn && !state.ampelCameraReleased;
         const blendStep = (delta * 1000) / WORM_CAMERA.blendMs;
         const approach = (value: number, on: boolean) =>
           on ? Math.min(1, value + blendStep) : Math.max(0, value - blendStep);
         state.wormCameraBlend = approach(state.wormCameraBlend, wormFocus);
         state.kindCameraBlend = approach(state.kindCameraBlend, kindFocus);
+        state.ampelCameraBlend = approach(state.ampelCameraBlend, ampelFocus);
         const ease = (b: number) => b * b * (3 - 2 * b);
         const wormWeight = ease(state.wormCameraBlend);
         const kindWeight = ease(state.kindCameraBlend);
+        const ampelWeight = ease(state.ampelCameraBlend);
         let scroll = followScroll;
         if (wormWeight > 0) {
           scroll +=
@@ -825,6 +857,11 @@ export default function SceneStage() {
           scroll +=
             (getKindFocusScroll(state.metrics, state.grunWorldX, state.maxScroll) - followScroll) *
             kindWeight;
+        }
+        if (ampelWeight > 0) {
+          scroll +=
+            (getAmpelFocusScroll(state.metrics, state.grunWorldX, state.maxScroll) - followScroll) *
+            ampelWeight;
         }
         state.worldScroll = scroll;
         if (state.worldScroll !== prevScroll) {
@@ -898,6 +935,7 @@ export default function SceneStage() {
         mossPhases={mossPhases}
         onWormRevealComplete={handleWormRevealComplete}
         onKindRevealComplete={handleKindRevealComplete}
+        onAmpelSwitchComplete={handleAmpelSwitchComplete}
         onMossRevealComplete={handleMossRevealComplete}
         editor={editor}
         onReady={handleGlReady}
