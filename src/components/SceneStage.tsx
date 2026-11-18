@@ -42,6 +42,7 @@ import {
   getPostLandmarkMaxScroll,
   getBackgroundWhiteProgress,
   GRUN_STOP,
+  SCROLL_WALK,
   GRUN_WALK,
   GRUN_STOP_POSE_MS,
   getMsToNextStopPose,
@@ -184,6 +185,8 @@ export default function SceneStage() {
     /** Walk-cycle time shown (ms). Standing still, it rests on a feet-together pose. */
     grunWalkPhaseMs: GRUN_STOP_POSE_MS[0],
     grunStop: null as GrunStop | null,
+    /** Grun keeps walking at full speed until this time (performance.now) while scrolling. */
+    scrollWalkUntil: 0,
     /** Camera: 0 = follows grun, 1 = shows the worm / the kid. */
     wormCameraBlend: 0,
     kindCameraBlend: 0,
@@ -412,49 +415,92 @@ export default function SceneStage() {
     setCameraMode("grun");
   }, []);
 
-  const handleClick = useCallback((event: React.MouseEvent<HTMLElement>) => {
-    if (event.detail > 1) return;
-    // Layer edit mode: clicks belong to TransformControls, not to grun walking.
+  /**
+   * Scrolling down walks grun forward: moves his target ahead by the scroll distance (capped a
+   * little ahead of him). Scrolling up drops what is left of the way.
+   */
+  const pushWalkForward = useCallback((amount: number) => {
+    // Layer edit mode: input belongs to TransformControls, not to grun walking.
     if (editEnabledRef.current) return;
-
+    if (chapterRef.current !== 1 || chapter1PhaseRef.current !== "scroll") return;
     const state = stateRef.current;
-    if (chapterRef.current !== 1) return;
+    if (state.metrics.width <= 0) return;
+    if (state.cameraMode !== "grun" && state.cameraMode !== "landmarkPaused") return;
 
-    if (state.cameraMode === "landmarkPaused") {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const clickScreenX = event.clientX - rect.left;
-      const clickWorldX = Math.min(
-        Math.max(0, clickScreenX + state.worldScroll),
-        getPostLandmarkMaxGrunWorldX(state.metrics),
-        getGrunLimitX(state, getPostLandmarkMaxGrunWorldX(state.metrics)),
-      );
-
-      if (clickWorldX <= state.grunWorldX + 8) return;
-
-      // Stay at the landmark (worm clickable) until the worm has transformed.
-      if (state.wormPhase === "g") unlockPostLandmarkMovement(state);
-      if (state.kindPhase === "g") state.kindCameraReleased = true;
-      state.grunStop = null;
-      state.targetWorldX = clickWorldX;
-      setTargetWorldX(clickWorldX);
+    if (amount <= 0) {
+      if (state.targetWorldX !== null && state.grunStop === null) {
+        state.targetWorldX = state.grunWorldX;
+      }
+      state.scrollWalkUntil = 0;
       return;
     }
 
-    if (state.cameraMode !== "grun") return;
-
-    const rect = event.currentTarget.getBoundingClientRect();
-    const clickScreenX = event.clientX - rect.left;
-    const clickWorldX = Math.min(
-      Math.max(0, clickScreenX + state.worldScroll),
-      getGrunLimitX(state, state.maxGrunX),
-    );
-
-    // Walking on after the kid turned green: the camera follows grun again.
+    // Leaving the worm once it has transformed; walking on after the kid turned green.
+    if (state.cameraMode === "landmarkPaused" && state.wormPhase === "g") {
+      unlockPostLandmarkMovement(state);
+    }
     if (state.kindPhase === "g") state.kindCameraReleased = true;
-    state.targetWorldX = clickWorldX;
-    state.grunStop = null;
-    setTargetWorldX(clickWorldX);
+
+    const scale = state.metrics.height / SCENE_REFERENCE_HEIGHT || 1;
+    const maxX =
+      state.cameraMode === "landmarkPaused"
+        ? getPostLandmarkMaxGrunWorldX(state.metrics)
+        : state.maxGrunX;
+    const limitX = getGrunLimitX(state, maxX);
+    const maxLead =
+      ((GRUN_WALK_SPEED_BASE * scale * GRUN_WALK.loopMs) / 1000) * SCROLL_WALK.maxLeadCycles;
+    const from = Math.max(state.targetWorldX ?? state.grunWorldX, state.grunWorldX);
+    const next = Math.min(
+      from + amount * scale * SCROLL_WALK.gain,
+      state.grunWorldX + maxLead,
+      limitX,
+    );
+    state.scrollWalkUntil = performance.now() + SCROLL_WALK.holdMs;
+    if (next <= (state.targetWorldX ?? state.grunWorldX) + 0.5) return;
+
+    // Already slowing down to a stop short of the new target: keep walking instead.
+    const stop = state.grunStop;
+    if (stop && stop.kind === "click" && next > stop.startX + stop.direction * stop.distance + 2) {
+      state.grunStop = null;
+    }
+    state.targetWorldX = next;
   }, [unlockPostLandmarkMovement]);
+
+  useEffect(() => {
+    if (chapter !== 1 || chapter1Phase !== "scroll") return;
+    let touchY: number | null = null;
+    const onWheel = (event: WheelEvent) => {
+      // Lines / pages → px for mice that report them.
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+      pushWalkForward(event.deltaY * unit);
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      touchY = event.touches[0]?.clientY ?? null;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY;
+      if (touchY === null || y === undefined) return;
+      pushWalkForward((touchY - y) * SCROLL_WALK.touchGain);
+      touchY = y;
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (["ArrowDown", "ArrowRight", "PageDown", " "].includes(event.key)) {
+        pushWalkForward(SCROLL_WALK.keyStepPx);
+      } else if (["ArrowUp", "ArrowLeft", "PageUp"].includes(event.key)) {
+        pushWalkForward(-1);
+      }
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [chapter, chapter1Phase, pushWalkForward]);
 
   const handleGlReady = useCallback(() => setGlReady(true), []);
 
@@ -599,6 +645,20 @@ export default function SceneStage() {
       }
       const direction = (Math.sign(dx) || state.grunLastWalkDirection) as 1 | -1;
       state.grunLastWalkDirection = direction;
+
+      // While the reader keeps scrolling, just keep walking (no stop planned yet), unless he
+      // is walking up to the worm / kid barrier.
+      const scrolling =
+        kind === "click" &&
+        performance.now() < state.scrollWalkUntil &&
+        stopX < getGrunLimitX(state, state.maxGrunX) - 1;
+      if (scrolling) {
+        if (distance <= 1) return false;
+        const step = Math.min(speed * delta, distance);
+        state.grunWalkPhaseMs += (step / speed) * 1000;
+        state.grunWorldX += direction * step;
+        return true;
+      }
 
       // The next two feet-together poses, and how far grun gets by then at a normal stride.
       const toPose1 = getMsToNextStopPose(state.grunWalkPhaseMs);
@@ -821,9 +881,8 @@ export default function SceneStage() {
     {showChapter1Scroll && (
     <main
       ref={stageRef}
-      className={`scene-stage relative h-screen w-screen overflow-hidden cursor-pointer${showScene ? "" : " scene-stage--loading"}${editor.enabled ? " scene-stage--editing" : ""}`}
+      className={`scene-stage relative h-screen w-screen overflow-hidden${showScene ? "" : " scene-stage--loading"}${editor.enabled ? " scene-stage--editing" : ""}`}
       style={sceneStyle}
-      onClick={handleClick}
       onDoubleClick={(event) => {
         event.preventDefault();
         event.stopPropagation();

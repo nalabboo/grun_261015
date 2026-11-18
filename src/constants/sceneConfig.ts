@@ -224,6 +224,23 @@ export const GRUN_OFFSET_Y_RATIO = 10 / SCENE_REFERENCE_HEIGHT;
  * feet staying on the ground. Starts `delayMs` after he stops and fades in over `fadeMs`; walking
  * fades it out quickly.
  */
+/**
+ * Grun walks while the reader scrolls down (wheel / trackpad, swipe up, ↓ → Space PageDown).
+ * Each scroll moves his walk target ahead by `gain` x the scroll distance (1080p px), at most
+ * `maxLeadCycles` walk cycles ahead of him, so he stops soon after the scrolling stops. While
+ * scrolling (and `holdMs` after the last scroll) he keeps walking at full speed; then he comes to
+ * his usual stop (`GRUN_STOP`). Scrolling up drops the rest of the way.
+ */
+export const SCROLL_WALK = {
+  gain: 1.5,
+  maxLeadCycles: 1.2,
+  holdMs: 180,
+  /** Distance (1080p px) one key press is worth. */
+  keyStepPx: 300,
+  /** Swipe distance multiplier (finger px → scroll px). */
+  touchGain: 2,
+} as const;
+
 export const GRUN_IDLE_BREATH = {
   /** Extra height at the top of a breath (share of his height). */
   amplitude: 0.012,
