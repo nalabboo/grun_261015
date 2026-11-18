@@ -393,6 +393,96 @@ body {
   );
 }
 
+/* Book opening (before scene 1): intro/intro_papier.jpg */
+.book-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  outline: none;
+  background-color: #f4efe4;
+  background-size: cover;
+  background-position: center;
+  animation: chapter2-papier-in 1.1s ease-out forwards;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.intro-floaters {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.intro-floaters__anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.intro-floaters__sprite {
+  display: block;
+  width: auto;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center center;
+}
+
+.book-intro__logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  line-height: 0;
+  /* Colour plate sets height; sw canvas is absolutely positioned over it. */
+  container-type: inline-size;
+}
+
+.book-intro__ricori--color {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.book-intro__ricori-sw-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.book-intro__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: radial-gradient(
+    ellipse at 50% 42%,
+    rgba(255, 255, 255, 0.28),
+    rgba(255, 255, 255, 0.06) 55%,
+    rgba(0, 0, 0, 0.05)
+  );
+  pointer-events: none;
+}
+
+.book-intro--out {
+  opacity: 0;
+  transition: opacity 1.4s ease-in-out;
+  pointer-events: none;
+}
+
 /* Chapter 2 opening: papier + title */
 .chapter2-intro {
   position: fixed;
@@ -769,10 +859,6 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-}
-
-.chapter2-green-spotlight-target {
-  /* Marker for circular holes in Chapter2Subscene24GreenSpotlightOverlay */
 }
 
 .chapter2-papier-bg {

@@ -16,6 +16,7 @@ import Chapter3Inside from "@/components/scene3/Chapter3Inside";
 import Chapter3Scene from "@/components/scene3/Chapter3Scene";
 import { preloadChapter2BergAssets } from "@/constants/chapter2Config";
 import NextScene from "@/components/scene2/NextScene";
+import BookIntro from "@/components/intro/BookIntro";
 import PageFlipOverlay, { PageFlipLeaf } from "@/components/scene2/PageFlipOverlay";
 import PageTurnCue from "@/components/scene2/PageTurnCue";
 import { preloadChapter1TableauAssets } from "@/constants/scene2Config";
@@ -117,6 +118,18 @@ function getDevStartChapter(): Chapter {
 }
 
 const DEV_START_CHAPTER = getDevStartChapter();
+
+function devSkipBookIntro(): boolean {
+  if (process.env.NODE_ENV !== "development") return false;
+  return process.env.NEXT_PUBLIC_DEV_CH1 === "scroll";
+}
+
+function resolveBookIntroOpen(params: URLSearchParams, chapter: Chapter): boolean {
+  if (chapter !== 1) return false;
+  if (params.get("ch1") === "scroll") return false;
+  if (devSkipBookIntro()) return false;
+  return true;
+}
 
 function devChapter3StepFromEnv(): Chapter3Step | null {
   const step = process.env.NEXT_PUBLIC_DEV_CH3;
@@ -229,6 +242,9 @@ export default function SceneStage() {
   const prevHeightRef = useRef(0);
   const backgroundWhiteMaxRef = useRef(0);
   const [chapter, setChapter] = useState<Chapter>(DEV_START_CHAPTER);
+  const [bookIntroOpen, setBookIntroOpen] = useState(() =>
+    resolveBookIntroOpen(new URLSearchParams(), DEV_START_CHAPTER),
+  );
   const [chapter1Phase, setChapter1Phase] = useState<Chapter1Phase>("scroll");
   const [tableauRevealed, setTableauRevealed] = useState(false);
   const [chapter2Step, setChapter2Step] = useState<Chapter2Step | null>(
@@ -264,6 +280,10 @@ export default function SceneStage() {
     void preloadChapter2BergAssets();
     stateRef.current.targetWorldX = null;
     setTargetWorldX(null);
+  }, []);
+
+  const handleBookIntroComplete = useCallback(() => {
+    setBookIntroOpen(false);
   }, []);
 
   const handleChapter2IntroComplete = useCallback(() => {
@@ -317,6 +337,8 @@ export default function SceneStage() {
     } else {
       setChapter3Step(null);
     }
+
+    setBookIntroOpen(resolveBookIntroOpen(params, target));
 
     if (target === 1) {
       const state = stateRef.current;
@@ -982,7 +1004,7 @@ export default function SceneStage() {
     backgroundColor: `rgb(${backgroundChannel}, ${backgroundChannel}, ${backgroundChannel})`,
   } as React.CSSProperties;
 
-  const showChapter1Scroll = chapter === 1 && chapter1Phase !== "tableau";
+  const showChapter1Scroll = chapter === 1 && chapter1Phase !== "tableau" && !bookIntroOpen;
   const showChapter1Tableau = chapter === 1 && chapter1Phase === "tableau";
 
   return (
@@ -1083,6 +1105,9 @@ export default function SceneStage() {
     )}
     {pageFlipTo !== null && (
       <PageFlipOverlay onCovered={handlePageFlipCovered} onDone={handlePageFlipDone} />
+    )}
+    {chapter === 1 && bookIntroOpen && (
+      <BookIntro onComplete={handleBookIntroComplete} />
     )}
     {chapter === 2 && chapter2Step === "intro" && (
       <Chapter2Intro onComplete={handleChapter2IntroComplete} />
