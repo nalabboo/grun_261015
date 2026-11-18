@@ -39,6 +39,14 @@ import {
   WORM_CLIPS,
   sporeFrameUrls,
   SCENE_LAYERS,
+  STAR_SKY,
+  HIMMEL_BACKDROP,
+  type MoonSkyLayout,
+  MOON_LOOK,
+  MOON_ORBIT,
+  getSkyWhiteStartScroll,
+  getBackgroundWhiteProgress,
+  getMaxScroll,
   SCENE_PERSPECTIVE_RATIO,
   SCENE_REFERENCE_HEIGHT,
   SHOW_LANDMARKS,
@@ -390,6 +398,365 @@ function BergLayer({ layerKey, metrics, viewRef, renderOrder }: BergLayerProps) 
         <planeGeometry args={[1, 1]} />
       </mesh>
     </EditableCard>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Sky backdrop (one painted himmel picture, behind stars)                    */
+/* -------------------------------------------------------------------------- */
+
+function HimmelBackdrop({
+  metrics,
+  viewRef,
+  renderOrder,
+}: {
+  metrics: SceneMetrics;
+  viewRef: WorldViewRef;
+  renderOrder: number;
+}) {
+  const asset = IMAGE_SIZES.hinter_test;
+  const texture = useSceneTexture(asset.file);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const whiteRef = useRef(0);
+
+
+  useFrame(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    const scroll = viewRef.current.worldScroll;
+    const white = Math.max(whiteRef.current, getBackgroundWhiteProgress(metrics, scroll));
+    whiteRef.current = white;
+    const fade = 1 - white;
+    const parallax = HIMMEL_BACKDROP.parallax;
+    // Everything the camera shows of this layer over the whole walk.
+    const span = metrics.width + getMaxScroll(metrics) * parallax;
+    const height = metrics.height;
+    const aspect = asset.width / asset.height;
+    // One picture: at least screen-high, and wide enough for the whole span.
+    const pictureH = Math.max(height, span / aspect);
+    const pictureW = pictureH * aspect;
+
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    material.opacity = HIMMEL_BACKDROP.opacity * fade;
+
+    mesh.visible = fade > 0.01;
+    mesh.position.set(pictureW / 2 - scroll * parallax, height / 2, 0);
+    mesh.scale.set(pictureW, pictureH, 1);
+  });
+
+  return (
+    <mesh ref={meshRef} renderOrder={renderOrder} frustumCulled={false}>
+      <planeGeometry args={[1, 1]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        depthTest={false}
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Star sky (behind berg4)                                                    */
+/* -------------------------------------------------------------------------- */
+
+type Star = {
+  image: number;
+  /** Screen x (px) at scroll 0, and how much the star follows the scroll. */
+  x: number;
+  parallax: number;
+  /** Centre height from the top (share of the screen height). */
+  y: number;
+  /** Height at 1080p (px). */
+  size: number;
+  opacity: number;
+  twinkleMs: number;
+  phase: number;
+  spin: number;
+  angle: number;
+};
+
+/** Small seeded random, so the sky looks the same on every visit. */
+function seededRandom(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildStars(metrics: SceneMetrics, twinkleSeed: number): Star[] {
+  const layout = seededRandom(STAR_SKY.seed);
+  const twinkle = seededRandom(twinkleSeed);
+  const maxScroll = getMaxScroll(metrics);
+  const stars: Star[] = [];
+  for (const layer of STAR_SKY.layers) {
+    // The stretch of sky this layer shows over the whole walk.
+    const span = metrics.width + maxScroll * layer.parallax;
+    const count = Math.ceil((span / metrics.width) * layer.perScreen);
+    const cell = span / count;
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        image: Math.floor(layout() * STAR_SKY.images.length),
+        // One star per cell, placed loosely inside it: spread out, but not in a grid.
+        x: (i + 0.15 + layout() * 0.7) * cell,
+        parallax: layer.parallax,
+        y: layer.y[0] + layout() * (layer.y[1] - layer.y[0]),
+        size: layer.sizePx[0] + layout() * (layer.sizePx[1] - layer.sizePx[0]),
+        opacity: layer.opacity * (0.75 + layout() * 0.25),
+        twinkleMs:
+          STAR_SKY.twinkleMs[0] + twinkle() * (STAR_SKY.twinkleMs[1] - STAR_SKY.twinkleMs[0]),
+        phase: twinkle() * Math.PI * 2,
+        spin: (layout() * 2 - 1) * STAR_SKY.spinDegPerSec,
+        angle: layout() * 360,
+      });
+    }
+  }
+  return stars;
+}
+
+function StarSky({
+  metrics,
+  viewRef,
+  renderOrder,
+}: {
+  metrics: SceneMetrics;
+  viewRef: WorldViewRef;
+  renderOrder: number;
+}) {
+  const files = useMemo(() => STAR_SKY.images.map((key) => IMAGE_SIZES[key].file), []);
+  const textures = useSceneTextures(files);
+  /** New twinkle offsets each mount; star layout stays on STAR_SKY.seed. */
+  const twinkleSeed = useMemo(
+    () => (Math.random() * 0xffffffff) >>> 0,
+    [],
+  );
+  const stars = useMemo(() => buildStars(metrics, twinkleSeed), [metrics, twinkleSeed]);
+  const meshRefs = useRef<(THREE.Mesh | null)[]>([]);
+  /** The sky only ever gets lighter (as the page background does). */
+  const whiteRef = useRef(0);
+
+  useFrame(() => {
+    const scroll = viewRef.current.worldScroll;
+    const white = Math.max(whiteRef.current, getBackgroundWhiteProgress(metrics, scroll));
+    whiteRef.current = white;
+    const fade = 1 - white;
+    const unit = metrics.height / SCENE_REFERENCE_HEIGHT;
+    const seconds = performance.now() / 1000;
+
+    stars.forEach((star, index) => {
+      const mesh = meshRefs.current[index];
+      if (!mesh) return;
+      const image = IMAGE_SIZES[STAR_SKY.images[star.image]];
+      const height = star.size * unit;
+      const width = height * (image.width / image.height);
+      const x = star.x - scroll * star.parallax;
+      const onScreen = x > -width && x < metrics.width + width;
+      mesh.visible = fade > 0.01 && onScreen;
+      if (!mesh.visible) return;
+
+      // Twinkle: dims and comes back, each star on its own beat.
+      const wave = 0.5 - 0.5 * Math.cos((seconds * 1000 * Math.PI * 2) / star.twinkleMs + star.phase);
+      const glow = 1 - STAR_SKY.twinkleDepth * wave;
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      material.opacity = star.opacity * glow * fade;
+
+      const pulse = 0.94 + 0.06 * glow;
+      mesh.position.set(x, metrics.height * (1 - star.y), 0);
+      mesh.scale.set(width * pulse, height * pulse, 1);
+      mesh.rotation.z = THREE.MathUtils.degToRad(star.angle + star.spin * seconds);
+    });
+  });
+
+  return (
+    <group>
+      {stars.map((star, index) => (
+        <mesh
+          key={index}
+          ref={(mesh) => {
+            meshRefs.current[index] = mesh;
+          }}
+          renderOrder={renderOrder}
+          frustumCulled={false}
+          visible={false}
+        >
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={textures[star.image]}
+            transparent
+            depthTest={false}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+const MOON_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+/** mond.png on a ball: clean round edge, curved surface, light from one side, soft glow. */
+const MOON_FRAGMENT = /* glsl */ `
+  uniform sampler2D map;
+  uniform float opacity;
+  uniform vec2 imageCenter;
+  uniform float imageRadius;
+  uniform vec3 lightDir;
+  uniform float shadow;
+  uniform float lit;
+  uniform float limbDarkening;
+  uniform float roundness;
+  uniform float glowScale;
+  uniform float glowStrength;
+  uniform float glowFalloff;
+  uniform float edgeSoftness;
+  uniform float spin;
+  varying vec2 vUv;
+
+  void main() {
+    // p: position on the moon's disc (radius 1), the quad is glowScale x larger.
+    vec2 p = (vUv - 0.5) * 2.0 * glowScale;
+    float r = length(p);
+
+    float rr = min(r, 0.999);
+    float z = sqrt(max(0.0, 1.0 - rr * rr));
+
+    // Rotation: turn the ball round its vertical axis by spin. The painting only shows one
+    // face, so the far side is the same face mirrored.
+    vec2 pc = r > 0.999 ? p / r * 0.999 : p;
+    float lat = asin(clamp(pc.y, -1.0, 1.0));
+    float lon = atan(pc.x, sqrt(max(0.0, 1.0 - pc.x * pc.x - pc.y * pc.y))) + spin;
+    // Flat look: the face as seen straight on (stretches where the far side turns into view).
+    vec2 straight = vec2(sin(lon) * cos(lat), pc.y);
+    // Round look: the painting wrapped evenly round the ball, mirrored at the back, so turning
+    // it never stretches the pattern.
+    float folded = 1.0 - abs(mod(lon / 1.5707963 + 1.0, 4.0) - 2.0);
+    vec2 wrapped = vec2(folded * cos(lat), lat / 1.5707963);
+    vec2 q = mix(straight, wrapped, roundness);
+    vec3 surface = texture2D(map, imageCenter + q * imageRadius).rgb;
+
+    // Ball lighting and a darker rim.
+    vec3 normal = vec3(p, z);
+    float diffuse = clamp(dot(normalize(normal), normalize(lightDir)), 0.0, 1.0);
+    float light = mix(shadow, lit, diffuse);
+    light *= mix(1.0 - limbDarkening, 1.0, sqrt(z));
+    vec3 moon = surface * light;
+    float moonAlpha = 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, r);
+
+    // Moonlight around it.
+    float glowAlpha = glowStrength * exp(-max(r - 1.0, 0.0) * glowFalloff) * step(1.0 - edgeSoftness, r);
+    glowAlpha *= 1.0 - smoothstep(glowScale * 0.85, glowScale, r);
+    vec3 glow = vec3(0.92, 0.95, 1.0);
+
+    float alpha = moonAlpha + glowAlpha * (1.0 - moonAlpha);
+    vec3 color = alpha > 0.0 ? (moon * moonAlpha + glow * glowAlpha * (1.0 - moonAlpha)) / alpha : vec3(0.0);
+    gl_FragColor = vec4(color, alpha * opacity);
+  }
+`;
+
+function MoonSky({
+  layout,
+  metrics,
+  viewRef,
+  renderOrder,
+}: {
+  layout: MoonSkyLayout;
+  metrics: SceneMetrics;
+  viewRef: WorldViewRef;
+  renderOrder: number;
+}) {
+  const texture = useSceneTexture(IMAGE_SIZES.mond.file);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const whiteRef = useRef(0);
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: MOON_VERTEX,
+        fragmentShader: MOON_FRAGMENT,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        uniforms: {
+          map: { value: texture },
+          opacity: { value: 1 },
+          imageCenter: { value: new THREE.Vector2(...MOON_LOOK.imageCenter) },
+          imageRadius: { value: MOON_LOOK.imageRadius },
+          lightDir: { value: new THREE.Vector3(...MOON_LOOK.light) },
+          shadow: { value: MOON_LOOK.shadow },
+          lit: { value: MOON_LOOK.lit },
+          limbDarkening: { value: MOON_LOOK.limbDarkening },
+          roundness: { value: MOON_LOOK.roundness },
+          glowScale: { value: MOON_LOOK.glowScale },
+          glowStrength: { value: MOON_LOOK.glowStrength },
+          glowFalloff: { value: MOON_LOOK.glowFalloff },
+          edgeSoftness: { value: 0.02 },
+          spin: { value: 0 },
+        },
+      }),
+    [texture],
+  );
+
+  useEffect(() => () => material.dispose(), [material]);
+
+  useFrame(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const scroll = viewRef.current.worldScroll;
+    const white = Math.max(whiteRef.current, getBackgroundWhiteProgress(metrics, scroll));
+    whiteRef.current = white;
+    // How far along its path the moon is: 0 at the start, 1 once it has set behind the mountains.
+    const setScroll = Math.max(1, getSkyWhiteStartScroll(metrics) * MOON_ORBIT.setAt);
+    const progress = Math.min(1, Math.max(0, scroll / setScroll));
+    const end = MOON_ORBIT.end;
+    // Revolution: a parabola, rising a little first, then sinking towards `end`.
+    const screenX = layout.screenXRatio + (end.screenXRatio - layout.screenXRatio) * progress;
+    const yFromTop =
+      layout.yFromTop +
+      (end.yFromTop - layout.yFromTop) * progress -
+      MOON_ORBIT.arcHeight * 4 * progress * (1 - progress);
+    const setFade =
+      1 - Math.min(1, Math.max(0, (progress - MOON_ORBIT.fadeFrom) / (1 - MOON_ORBIT.fadeFrom)));
+    const fade = (1 - white) * setFade;
+    const unit = metrics.height / SCENE_REFERENCE_HEIGHT;
+    const diameter = layout.sizePx * unit;
+    const quad = diameter * MOON_LOOK.glowScale;
+    const x = screenX * metrics.width;
+    const onScreen = x > -quad && x < metrics.width + quad;
+    mesh.visible = fade > 0.01 && onScreen;
+    if (!mesh.visible) return;
+    material.uniforms.opacity.value = layout.opacity * fade;
+    // Rotation, in step with the walk.
+    material.uniforms.spin.value = progress * MOON_ORBIT.spinTurns * Math.PI * 2;
+    // About two screen pixels of soft edge, whatever the size.
+    material.uniforms.edgeSoftness.value = Math.min(0.2, 4 / Math.max(diameter, 1));
+    mesh.position.set(x, metrics.height * (1 - yFromTop), 0);
+    mesh.scale.set(quad, quad, 1);
+  });
+
+  return (
+    <mesh
+      ref={meshRef}
+      renderOrder={renderOrder}
+      frustumCulled={false}
+      visible={false}
+      material={material}
+    >
+      <planeGeometry args={[1, 1]} />
+    </mesh>
   );
 }
 
@@ -1148,6 +1515,7 @@ export type WebGLWorldProps = {
   onAmpelSwitchComplete?: () => void;
   onMossRevealComplete: (id: MossInstanceId) => void;
   editor: EditorState;
+  moonSky: MoonSkyLayout;
   onReady?: () => void;
 };
 
@@ -1208,6 +1576,7 @@ export default function WebGLWorld({
   onAmpelSwitchComplete,
   onMossRevealComplete,
   editor,
+  moonSky,
   onReady,
 }: WebGLWorldProps) {
   const hasMetrics = metrics.height > 0;
@@ -1225,6 +1594,9 @@ export default function WebGLWorld({
       <PixelCamera />
       {hasMetrics && (
         <>
+          <HimmelBackdrop metrics={metrics} viewRef={viewRef} renderOrder={0.08} />
+          <StarSky metrics={metrics} viewRef={viewRef} renderOrder={0.5} />
+          <MoonSky layout={moonSky} metrics={metrics} viewRef={viewRef} renderOrder={0.52} />
           <BergLayer layerKey="berg4" metrics={metrics} viewRef={viewRef} renderOrder={1} />
           <BergLayer layerKey="berg3" metrics={metrics} viewRef={viewRef} renderOrder={2} />
           {SHOW_LANDMARKS &&

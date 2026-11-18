@@ -8,7 +8,7 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261118-ampel-g2";
+export const ASSET_VERSION = "20261119-kind-mitte2";
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
@@ -25,6 +25,12 @@ export const IMAGE_SIZES = {
   berg2: { file: "berg/berg2_4.webp", width: 5760, height: 1080 },
   berg3: { file: "berg/berg3_3.webp", width: 5760, height: 1304 },
   berg4: { file: "berg/berg4_3.webp", width: 5760, height: 1305 },
+  // himmel/ (star sky, see STAR_SKY)
+  stern_s1: { file: "himmel/stern_s1.webp", width: 210, height: 204 },
+  stern_s3: { file: "himmel/stern_s3.webp", width: 148, height: 156 },
+  stern_s4: { file: "himmel/stern_s4.webp", width: 137, height: 204 },
+  mond: { file: "himmel/mond.webp", width: 300, height: 301 },
+  hinter_test: { file: "himmel/hinter_test3.webp", width: 1376, height: 768 },
   // character/
   // landmark/
   ampel_b: { file: "landmark/ampel_b.webp", width: 821, height: 1000 },
@@ -141,12 +147,12 @@ export const KIND_BOX = { width: 509, height: 678 } as const;
  * Kid clips cut out of source_videos/*.mp4 by `scripts/extract_kind.py` (every 3rd frame of the
  * 60 fps videos, ~20 fps):
  *  - sw:    grey idle loop (kind1_sw.mp4) — before the click
- *  - mitte: grey → green transformation (kind_mitte.mp4) — plays once after the click
+ *  - mitte: grey → green, spinning round (kind_mitte2.mp4, 24 fps) — plays once after the click
  *  - g:     green idle loop (kind_g.mp4) — after the transformation
  */
 export const KIND_CLIPS: TransformClipSet = {
   sw: { dir: "character/kind_sw", frames: 35, durationMs: 1750, x: 0, y: 0, width: 509, height: 678 },
-  mitte: { dir: "character/kind_mitte", frames: 60, durationMs: 3000, x: -78, y: -17, width: 656, height: 721 },
+  mitte: { dir: "character/kind_mitte", frames: 73, durationMs: 3042, x: -79, y: -33, width: 646, height: 712 },
   g: { dir: "character/kind_g", frames: 49, durationMs: 2450, x: 67, y: 13, width: 377, height: 661 },
 };
 
@@ -204,8 +210,13 @@ export const WORM_CAMERA = {
   blendMs: 1600,
 } as const;
 
-/** Scroll lead before worm enters view where white fade begins (viewport width ratio). */
-export const WORM_BACKGROUND_FADE_LEAD_RATIO = 0.34;
+/**
+ * The sky is fully white this far (viewport width ratio of scroll) before the camera starts
+ * gliding to the worm (WORM_CAMERA.enterRatio), so the brightening is over before the focus.
+ * Includes ~0.26 for the page background's 1.8 s colour transition (.scene-stage in
+ * globals.css), which lags behind at grun's walking speed.
+ */
+export const WORM_BACKGROUND_DONE_BEFORE_FOCUS_RATIO = 0.4;
 
 /** Scroll span until background is fully white after fade begins (viewport width ratio). */
 export const WORM_BACKGROUND_FADE_SPAN_RATIO = 1.55;
@@ -321,6 +332,133 @@ export function getDepthBrightness(depthPx: number) {
   const t = span === 0 ? 1 : (depthPx - BERG4_DEPTH_PX) / span;
   const clamped = Math.min(1, Math.max(0, t));
   return DEPTH_LIGHT_FAR + (DEPTH_LIGHT_NEAR - DEPTH_LIGHT_FAR) * clamped;
+}
+
+/**
+ * Star sky behind berg4 (the farthest mountains), while the sky is still dark. Three depths: far
+ * stars are small, dim and move least with the camera; near ones are bigger and brighter (all
+ * slower than berg4's parallax 0.07, so they sit behind it). Each star twinkles on its own beat
+ * and turns very slowly. Twinkle period and phase are randomized each page load; positions use
+ * `seed`. They fade out as the background turns white near the worm.
+ * `sizePx` is the star's height at 1080p; `y` is the band (share of the screen height from the
+ * top); `perScreen` is how many stars per screen width.
+ */
+/**
+ * Painted night sky behind the stars / berg4 (himmel/hinter_test3). One single picture, never
+ * repeated (so no seam): it is scaled up just enough to cover everything the camera shows over
+ * the whole walk at this `parallax`, and centred vertically (a little of the top and bottom is
+ * cut off when it has to grow). Fades with the white background near the worm.
+ */
+export const HIMMEL_BACKDROP = {
+  parallax: 0.035,
+  opacity: 1,
+} as const;
+
+export const STAR_SKY = {
+  images: ["stern_s1", "stern_s3", "stern_s4"] as const,
+  layers: [
+    { parallax: 0.015, perScreen: 26, sizePx: [10, 16], opacity: 0.45, y: [0.02, 0.36] },
+    { parallax: 0.03, perScreen: 14, sizePx: [18, 28], opacity: 0.72, y: [0.03, 0.32] },
+    { parallax: 0.05, perScreen: 6, sizePx: [32, 46], opacity: 0.92, y: [0.04, 0.26] },
+  ],
+  /** One twinkle (bright → dim → bright), varied per star between these (ms). */
+  twinkleMs: [2200, 5200] as const,
+  /** How dim a star gets at the bottom of a twinkle (share of its opacity). */
+  twinkleDepth: 0.55,
+  /** Slow turn (degrees per second), varied per star up to this. */
+  spinDegPerSec: 4,
+  seed: 7,
+} as const;
+
+/**
+ * Moon in the dark sky (behind berg4). Visible from scene start; fades with the stars when the
+ * background whitens near the worm. `sizePx` is the moon's diameter at 1080p (the soft moonlight
+ * around it comes on top, see MOON_LOOK).
+ */
+export const MOON_SKY = {
+  screenXRatio: 0.72,
+  yFromTop: 0.11,
+  sizePx: 170,
+  parallax: 0.018,
+  opacity: 1,
+} as const;
+
+/**
+ * How the moon is drawn (WebGLWorld `MoonSky` shader): mond.png cut to a clean circle, its surface
+ * bent round like a ball, lit from the upper left (`light`), darker towards the rim, with a soft
+ * glow around it.
+ */
+export const MOON_LOOK = {
+  /** Disc in mond.png: centre and radius as a share of the image size. */
+  imageCenter: [0.497, 0.497] as const,
+  imageRadius: 0.44,
+  /** Direction the light comes from (x right, y up, z towards the viewer). */
+  light: [-0.55, 0.5, 0.67] as const,
+  /** Brightness on the dark side / the lit side. */
+  shadow: 0.58,
+  lit: 1.28,
+  /** How much darker the very rim gets (0 = none). */
+  limbDarkening: 0.25,
+  /** How strongly the surface pattern curves round the ball (0 = flat). */
+  roundness: 0.95,
+  /** Glow: size of the whole quad relative to the moon, strength and falloff. */
+  glowScale: 1.9,
+  glowStrength: 0.16,
+  glowFalloff: 3.2,
+} as const;
+
+/**
+ * The moon moves as the reader walks on (driven by the scroll, not by time). From its start
+ * (MOON_SKY's position, at scroll 0) it travels along a parabola (revolution) to `end`, rising a
+ * little first (`arcHeight`, share of the screen height) and then sinking behind the mountains,
+ * while its surface turns round `spinTurns` times (rotation). It is down by `setAt` x the scroll
+ * where the sky starts to whiten near the worm, and fades out over the last `fadeFrom`.. part.
+ * MOON_SKY.parallax is not used any more: the path is in screen space.
+ */
+export const MOON_ORBIT = {
+  end: { screenXRatio: 0.38, yFromTop: 0.85 },
+  arcHeight: 0.22,
+  spinTurns: 0.6,
+  setAt: 0.85,
+  fadeFrom: 0.88,
+} as const;
+
+/**
+ * Scroll where the dark sky starts to turn white: early enough to be fully white just before
+ * the camera starts gliding to the worm.
+ */
+export function getSkyWhiteStartScroll(metrics: SceneMetrics) {
+  const worm = getWormLayout(metrics);
+  // Scroll (camera following grun) at which the worm camera starts (see isWormInView).
+  const wormFocusScroll = worm.worldX + worm.width / 2 - metrics.width * WORM_CAMERA.enterRatio;
+  return (
+    wormFocusScroll -
+    metrics.width * (WORM_BACKGROUND_DONE_BEFORE_FOCUS_RATIO + WORM_BACKGROUND_FADE_SPAN_RATIO)
+  );
+}
+
+export type MoonSkyLayout = {
+  screenXRatio: number;
+  yFromTop: number;
+  sizePx: number;
+  parallax: number;
+  opacity: number;
+};
+
+export function moonSkyFromConfig(): MoonSkyLayout {
+  return { ...MOON_SKY };
+}
+
+/** Paste into `sceneConfig.ts` after tuning in the dev moon panel. */
+export function formatMoonSkyForConfig(layout: Pick<MoonSkyLayout, "screenXRatio" | "yFromTop" | "sizePx">) {
+  const r = (n: number) => Math.round(n * 1000) / 1000;
+  return `export const MOON_SKY = {
+  screenXRatio: ${r(layout.screenXRatio)},
+  yFromTop: ${r(layout.yFromTop)},
+  sizePx: ${Math.round(layout.sizePx)},
+  parallax: ${MOON_SKY.parallax},
+  opacity: ${MOON_SKY.opacity},
+} as const;`;
 }
 
 export const SCENE_LAYERS = {
@@ -916,10 +1054,7 @@ function smoothstep(value: number) {
 
 /** 0 = black, 1 = white — eases in just before worm enters view. */
 export function getBackgroundWhiteProgress(metrics: SceneMetrics, worldScroll: number) {
-  const worm = getWormLayout(metrics);
-  const wormEnterScroll = worm.worldX - metrics.width;
-  const fadeStartScroll =
-    wormEnterScroll - metrics.width * WORM_BACKGROUND_FADE_LEAD_RATIO;
+  const fadeStartScroll = getSkyWhiteStartScroll(metrics);
   const fadeEndScroll = fadeStartScroll + metrics.width * WORM_BACKGROUND_FADE_SPAN_RATIO;
 
   if (worldScroll <= fadeStartScroll) return 0;

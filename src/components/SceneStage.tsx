@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import GrunCharacter from "@/components/GrunCharacter";
 import LayerEditorPanel from "@/components/LayerEditorPanel";
+import MoonEditorPanel, { loadDevMoonSky } from "@/components/MoonEditorPanel";
 import WormHitTarget from "@/components/WormHitTarget";
 import AmpelHitTarget from "@/components/AmpelHitTarget";
 import KindHitTarget from "@/components/KindHitTarget";
@@ -65,6 +66,8 @@ import {
   type MossInstanceId,
   type MossPhases,
   type SceneMetrics,
+  type MoonSkyLayout,
+  moonSkyFromConfig,
 } from "@/constants/sceneConfig";
 
 const EMPTY_METRICS: SceneMetrics = { height: 0, width: 0, panoramaWidth: 0 };
@@ -132,6 +135,10 @@ const DEV_LAYER_EDITOR =
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_LAYER_EDIT === "1";
 
+const DEV_MOON_EDITOR =
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_DEV_MOON_EDIT === "1";
+
 /**
  * Rightmost grun world X allowed right now: `maxX`, and — until each has transformed — the
  * barrier in front of the worm (`getGrunWormBarrierX`) and the kid (`KIND_BLOCK_DISTANCE_PX`).
@@ -167,6 +174,13 @@ export default function SceneStage() {
     selectedId: null,
     mode: "translate",
   });
+  const [moonSky, setMoonSky] = useState<MoonSkyLayout>(() => moonSkyFromConfig());
+  useEffect(() => {
+    if (!DEV_MOON_EDITOR) return;
+    const saved = loadDevMoonSky();
+    if (!saved) return;
+    setMoonSky((prev) => ({ ...prev, ...saved }));
+  }, []);
   const editEnabledRef = useRef(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>("grun");
   const [wormPhase, setWormPhase] = useState<"b" | "revealing" | "g">("b");
@@ -996,8 +1010,12 @@ export default function SceneStage() {
         onAmpelSwitchComplete={handleAmpelSwitchComplete}
         onMossRevealComplete={handleMossRevealComplete}
         editor={editor}
+        moonSky={moonSky}
         onReady={handleGlReady}
       />
+      {DEV_MOON_EDITOR && (
+        <MoonEditorPanel layout={moonSky} onChange={setMoonSky} />
+      )}
       {DEV_LAYER_EDITOR && (
         <LayerEditorPanel
           editor={editor}

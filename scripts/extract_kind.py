@@ -1,10 +1,10 @@
 """Extracts the kid's three clips for chapter 1 and removes the screen background.
 
   ../source_videos/kind1_sw.mp4   -> public/scene1/character/kind_sw/     grey idle loop
-  ../source_videos/kind_mitte.mp4 -> public/scene1/character/kind_mitte/  grey -> green, plays once
+  ../source_videos/kind_mitte2.mp4 -> public/scene1/character/kind_mitte/ grey -> green, plays once
   ../source_videos/kind_g.mp4     -> public/scene1/character/kind_g/      green idle loop
 
-- Every 3rd frame of the 60 fps videos is kept (~20 fps).
+- Every 3rd frame of the 60 fps videos is kept (~20 fps); kind_mitte2 (24 fps) keeps every frame.
 - Each video has its own screen colour; only that colour becomes transparent.
 - Semi-transparent edge pixels are "un-mixed" from the screen colour so no fringe remains.
 - All clips share one coordinate system: the 509x678 box of the former kind_sw.png ("kid box",
@@ -12,7 +12,10 @@
   sparkles) and kind_g are cropped to their content and may reach outside it; their placement in
   kid-box px is printed for `KIND_CLIPS` in src/constants/sceneConfig.ts.
 - The videos were lined up by matching silhouettes: kind_mitte = kind1_sw shifted 150px right;
-  kind_g's kid sits 13px left / 7px higher than kind_mitte's last frame.
+  kind_g's kid sits 13px left / 7px higher than kind_mitte's last frame. kind_mitte2 (the kid
+  spins round while turning green, replaces kind_mitte.mp4) is a 1440x1440 video at a different
+  scale; its first and last frames were matched to kind_mitte's (silhouette IoU 0.99), so
+  kind_sw and kind_g line up with it unchanged.
 
 Requires:  pip install imageio-ffmpeg numpy pillow
 Run:       python3 scripts/extract_kind.py            (all)
@@ -36,7 +39,8 @@ CHARACTER_DIR = os.path.join(ROOT, "public/scene1/character")
 
 STEP = 3
 KID_BOX = (509, 678)
-# Video px -> kid-box px: kid = video * SCALE + origin (origin = where the video's top-left lands).
+# Video px -> kid-box px: kid = video * scale + origin (origin = where the video's top-left lands).
+# `SCALE` unless a clip sets its own `scale`.
 SCALE = 0.6821
 
 
@@ -62,20 +66,16 @@ CLIPS = {
         "crop": "box",
     },
     "mitte": {
-        "video": "kind_mitte.mp4",
+        "video": "kind_mitte2.mp4",
         "out": "kind_mitte",
-        "screen": (0.0, 95.0, 252.0),
+        "screen": (0.0, 93.0, 253.0),
         "key": blueness,
         "solid": 70.0,
         "clear": 130.0,
         "spill": 0.0,
-        # The swirls' soft glow picks up the bright blue screen everywhere, not just at edges.
-        "spill_everywhere": True,
-        # The final burst of rays runs past the video frame and is cut off by its border.
-        # Fade everything out towards the border so the rays dissolve instead of ending in a
-        # straight line. The kid's own area (video px) only gets a thin fade.
-        "edge_fade": {"px": 170, "protect": (236, 30, 777, 1080), "protect_px": 30},
-        "origin": (-91, -30),  # (-150 * SCALE + 11, -30)
+        "step": 1,  # 24 fps video
+        "scale": 0.526,
+        "origin": (-129, -40),
         "crop": "content",
     },
     "g": {
@@ -139,7 +139,7 @@ def extract(name: str) -> dict:
              os.path.join(tmp, "f_%03d.png")],
             check=True,
         )
-        names = sorted(os.listdir(tmp))[::STEP]
+        names = sorted(os.listdir(tmp))[:: clip.get("step", STEP)]
         scaled = []
         fade_mask = None
         for frame_name in names:
@@ -150,7 +150,8 @@ def extract(name: str) -> dict:
                 rgba = np.asarray(keyed).copy()
                 rgba[..., 3] = (rgba[..., 3] * fade_mask).round().astype(np.uint8)
                 keyed = Image.fromarray(rgba)
-            size = (round(keyed.width * SCALE), round(keyed.height * SCALE))
+            scale = clip.get("scale", SCALE)
+            size = (round(keyed.width * scale), round(keyed.height * scale))
             scaled.append(keyed.resize(size, Image.LANCZOS))
 
     ox, oy = clip["origin"]
