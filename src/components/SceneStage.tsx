@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import GrunCharacter from "@/components/GrunCharacter";
+import ScrollProgress from "@/components/ScrollProgress";
 import LayerEditorPanel from "@/components/LayerEditorPanel";
 import WormHitTarget from "@/components/WormHitTarget";
 import AmpelHitTarget from "@/components/AmpelHitTarget";
@@ -1041,6 +1042,11 @@ export default function SceneStage() {
         />
       )}
       <GrunCharacter sourceRef={grunSourceRef} />
+      <ScrollProgress
+        metrics={metrics}
+        viewRef={viewRef}
+        visible={!bookIntroOpen && chapter1Phase === "scroll"}
+      />
       <MossHitTargets
         worldScroll={worldScroll}
         metrics={metrics}

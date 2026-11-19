@@ -261,6 +261,46 @@ body {
   to { opacity: 0; }
 }
 
+/* Chapter 1 scroll indicator (ScrollProgress.tsx): thin translucent track, small brown pill
+   with a soft glow that moves down as grun walks on. */
+.scroll-progress {
+  position: absolute;
+  right: clamp(10px, 1.6vw, 28px);
+  top: 50%;
+  z-index: 20;
+  width: 8px;
+  height: var(--scroll-track-h, 36vh);
+  transform: translateY(-50%);
+  border-radius: 999px;
+  /* Light over the dark night sky, dark over the bright sky: --scroll-ink (0..255) is set from
+     how white the sky is (ScrollProgress.tsx). */
+  background: rgba(var(--scroll-ink, 255), var(--scroll-ink, 255), var(--scroll-ink, 255), 0.25);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.scroll-progress--on {
+  opacity: 1;
+}
+
+.scroll-progress__thumb {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 8px;
+  height: var(--scroll-thumb-h, 18px);
+  border-radius: 999px;
+  background: rgb(var(--scroll-ink, 255), var(--scroll-ink, 255), var(--scroll-ink, 255));
+  box-shadow: 0 0 6px
+    rgba(var(--scroll-ink, 255), var(--scroll-ink, 255), var(--scroll-ink, 255), 0.4);
+  transform: translate(
+    -50%,
+    calc((var(--scroll-track-h, 36vh) - var(--scroll-thumb-h, 18px)) * var(--scroll-progress, 0))
+  );
+  will-change: transform;
+}
+
 /* Chapter 1 → 2: bottom-right page corner */
 .page-turn {
   position: fixed;

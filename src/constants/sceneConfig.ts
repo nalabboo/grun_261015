@@ -222,6 +222,19 @@ export const WORM_BACKGROUND_DONE_BEFORE_FOCUS_RATIO = 0.4;
 export const WORM_BACKGROUND_FADE_SPAN_RATIO = 1.55;
 
 export const GRUN_START_RATIO = 0.1;
+
+/**
+ * Chapter 1 scroll indicator on the right edge (ScrollProgress.tsx, `.scroll-progress` in
+ * globals.css): track height (share of the screen), pill height (px) and how quickly the pill
+ * glides after grun (0..1 per frame).
+ */
+export const SCROLL_PROGRESS = {
+  trackHeightVh: 36,
+  thumbHeightPx: 18,
+  ease: 0.12,
+  /** Grey (0..255) the indicator turns to over the bright sky (white over the dark sky). */
+  darkInk: 55,
+} as const;
 export const GRUN_SCALE = 0.85;
 export const GRUN_OFFSET_Y_RATIO = 10 / SCENE_REFERENCE_HEIGHT;
 /**
