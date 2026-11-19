@@ -404,7 +404,6 @@ body {
   background-position: center;
   animation: chapter2-papier-in 1.1s ease-out forwards;
   touch-action: none;
-  cursor: crosshair;
 }
 
 .intro-floaters {
@@ -441,9 +440,13 @@ body {
   line-height: 0;
   /* Colour plate sets height; sw canvas is absolutely positioned over it. */
   container-type: inline-size;
+  /* Printed into the paper rather than lying on it: the grey plate is multiplied with the paper,
+     so its light / white parts let the paper's grain show through. */
+  mix-blend-mode: multiply;
 }
 
-.book-intro__ricori--color {
+.book-intro__ricori--sizer {
+  visibility: hidden;
   position: relative;
   z-index: 1;
   display: block;
@@ -451,6 +454,12 @@ body {
   height: auto;
   pointer-events: none;
   user-select: none;
+}
+
+/* Colour layer: on top, NOT multiplied, so RICORI1_2 keeps its own colours. */
+.book-intro__logo--color {
+  mix-blend-mode: normal;
+  pointer-events: none;
 }
 
 .book-intro__ricori-sw-canvas {

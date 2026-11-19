@@ -98,6 +98,7 @@ scripts/                보조 Python 스크립트
 - 코드에서 `@/`는 `src/` 폴더를 뜻합니다 (예: `@/components/SceneStage`).
 - 화면 기준 높이(`SCENE_REFERENCE_HEIGHT`)에 맞춰 크기가 비례 조정되므로, 픽셀 값을 바꿀 때 이 기준을 염두에 둡니다.
 - 3D/브라우저 전용 코드는 파일 맨 위에 `"use client"`가 필요합니다.
+- **인트로(책 표지)**: `BookIntro.tsx`. 회색 로고(`RICORI1_2sw_clean.png`)를 마우스로 문지르면 아래의 색깔 로고(`RICORI1_2.png`)가 드러납니다. 회색 로고만 종이와 곱하기(`mix-blend-mode: multiply`, `.book-intro__logo`)로 섞어 종이에 찍힌 것처럼 보이게 합니다. 색깔 로고는 원래 색 그대로 보이도록 곱하지 않은 별도 캔버스(`.book-intro__logo--color`)에, 문지른 자리에만 그립니다(같은 지우개 모양으로 회색은 지우고 색은 칠함). `_clean`은 회색 로고 가장자리를 1~2px 넓힌 파일로, 색깔 로고의 가장자리가 연두색 선으로 비치지 않게 합니다(원본 `RICORI1_2sw.png`는 그대로 둠). 지우개는 동그라미가 아니라 울퉁불퉁한 모양 + 가장자리 부스러기(`introConfig.ts`의 `INTRO_SCRATCH`: `brushRadiusPx`, `roughness`, `crumbs`). 그림을 바꾸면 `INTRO_ASSET_VERSION`을 올립니다.
 - **장 넘기기** (1→2장, 2→3장): 오른쪽 아래에 종이 귀퉁이가 안쪽으로 접힌 표시(`PageTurnCue`, SVG로 그림)가 나타나면 아래로 스크롤(휠·위로 쓸기·↓키, 클릭도 가능)해서 넘깁니다. 지금 장면이 오른쪽 아래 모서리부터 책장처럼 접혀 넘어가고, 빈 종이 여러 장이 촤라라락 이어서 넘어간 뒤 다음 장 표지가 나옵니다. 넘어가는 장면은 `PageFlipLeaf`로 감싸고, 종이·접힌 면은 `PageFlipOverlay`(scene2/)가 그립니다. 속도·종이 장수·모서리 높이 등은 `src/constants/pageTurnConfig.ts`의 `PAGE_TURN`. 접힌 면 그림자에 `filter: drop-shadow`를 쓰면 화면이 멈칫해서, 같은 모양을 살짝 옮긴 반투명 층으로 대신합니다.
 - 커밋 메시지는 `grun_MMDD/s3 설명` 형식을 써 왔습니다 (예: `grun_1110/s3 zeigen`). 2026-11부터는 `v2_grunMMDD/...`도 사용.
 
