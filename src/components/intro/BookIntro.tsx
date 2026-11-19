@@ -11,10 +11,36 @@ import {
   INTRO_RICORI1_2SW,
   INTRO_RICORI1_2SW_URL,
   INTRO_SCRATCH,
+  INTRO_ZOOM,
 } from "@/constants/introConfig";
 
 type BookIntroProps = {
   onComplete: () => void;
+  /**
+   * Scene 1 is set up behind the intro (the zoom shows it through the title). Setting it up
+   * blocks the page for a moment, so the floaters only start once it is ready and the page draws
+   * smoothly again — a still screen doesn't look frozen.
+   */
+  sceneReady?: boolean;
+};
+
+/**
+ * Paper mask with a title-shaped hole, set from the start with the hole parked far off screen:
+ * switching a mask on at the start of the zoom made the paper flash away for a frame or two.
+ */
+const BG_MASK = `url(${INTRO_RICORI1_2_URL}), linear-gradient(#000, #000)`;
+const bgMaskStyle: React.CSSProperties = {
+  maskImage: BG_MASK,
+  WebkitMaskImage: BG_MASK,
+  maskRepeat: "no-repeat",
+  WebkitMaskRepeat: "no-repeat",
+  maskSize: "100px 26px, 100% 100%",
+  WebkitMaskSize: "100px 26px, 100% 100%",
+  // Just off the top-left corner (a huge offset was not honoured and the hole showed on screen).
+  maskPosition: "-400px -400px, 0 0",
+  WebkitMaskPosition: "-400px -400px, 0 0",
+  maskComposite: "exclude",
+  WebkitMaskComposite: "xor",
 };
 
 const logoWidthCss = `min(${INTRO_RICORI1_2SW.widthVw}vw, ${INTRO_RICORI1_2SW.maxWidthPx}px)`;
@@ -58,30 +84,31 @@ function roughDab(x: number, y: number, radius: number): Dab[] {
   return shapes;
 }
 
+/** The paper cover over the colour layer reaches this far past the logo box (px), so the title's
+ * shadow and the brush's edge stay covered until rubbed. */
+const COVER_PAD = 48;
+
 type Layers = {
   sw: CanvasRenderingContext2D;
-  color: CanvasRenderingContext2D;
-  colorImage: HTMLImageElement | null;
-  width: number;
-  height: number;
+  cover: CanvasRenderingContext2D;
 };
 
-/** Rubs one dab: takes it out of the grey plate and paints the colour plate into that spot. */
+/**
+ * Rubs one dab: takes it out of the grey plate and out of the paper cover, uncovering the
+ * (pre-lit, static) colour title underneath. Only cheap shape fills — nothing is redrawn.
+ */
 function scratchDot(layers: Layers, x: number, y: number, radius: number) {
-  const { sw, color, colorImage, width, height } = layers;
+  const { sw, cover } = layers;
+  sw.globalCompositeOperation = "destination-out";
+  cover.globalCompositeOperation = "destination-out";
   for (const { path, alpha } of roughDab(x, y, radius)) {
-    sw.globalCompositeOperation = "destination-out";
     sw.globalAlpha = alpha;
     sw.fill(path);
-    if (colorImage) {
-      color.save();
-      color.globalAlpha = alpha;
-      color.clip(path);
-      color.drawImage(colorImage, 0, 0, width, height);
-      color.restore();
-    }
+    cover.globalAlpha = alpha;
+    cover.fill(path);
   }
   sw.globalAlpha = 1;
+  cover.globalAlpha = 1;
 }
 
 function scratchStroke(
@@ -101,17 +128,28 @@ function scratchStroke(
 }
 
 /**
- * Opening screen — the grey plate (`RICORI1_2sw`) is multiplied into the paper; rubbing it
- * takes it away and paints the colour plate (`RICORI1_2`) into those spots, in its own colours
- * (a separate, non-blended canvas on top).
+ * Opening screen. Back to front: page paper + veil, the colour title (`RICORI1_2`, drawn once and
+ * never changed), a paper cover over it (canvas: same paper and veil light as the page), and the
+ * grey plate (`RICORI1_2sw`, multiplied into the paper). Rubbing erases the grey plate and the
+ * cover in the same rough shapes, uncovering the colour title.
  */
-export default function BookIntro({ onComplete }: BookIntroProps) {
+export default function BookIntro({
+  onComplete,
+  sceneReady = true,
+}: BookIntroProps) {
   const [fadingOut, setFadingOut] = useState(false);
+  /** The title is complete: zoom into it (once scene 1 is ready). */
+  const [titleDone, setTitleDone] = useState(false);
+  const [zooming, setZooming] = useState(false);
+  const bgRef = useRef<HTMLDivElement>(null);
+  const colorLayerRef = useRef<HTMLDivElement>(null);
+  /** Title-shape pixels of the grey canvas (alpha), to measure how much has been rubbed. */
+  const plateMaskRef = useRef<Uint8Array | null>(null);
   const logoRef = useRef<HTMLDivElement>(null);
   const swCanvasRef = useRef<HTMLCanvasElement>(null);
   const swImageRef = useRef<HTMLImageElement | null>(null);
-  const colorCanvasRef = useRef<HTMLCanvasElement>(null);
-  const colorImageRef = useRef<HTMLImageElement | null>(null);
+  const coverCanvasRef = useRef<HTMLCanvasElement>(null);
+  const paperImageRef = useRef<HTMLImageElement | null>(null);
   const drawingRef = useRef(false);
   const lastRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -134,30 +172,84 @@ export default function BookIntro({ onComplete }: BookIntroProps) {
     ctx.globalCompositeOperation = "source-over";
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(sw, 0, 0, w, h);
-    // Colour layer starts empty (nothing rubbed yet).
-    const colorCanvas = colorCanvasRef.current;
-    if (colorCanvas) {
-      colorCanvas.width = canvas.width;
-      colorCanvas.height = canvas.height;
-      colorCanvas.style.width = `${w}px`;
-      colorCanvas.style.height = `${h}px`;
-      colorCanvas.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
     lastRef.current = null;
+    // Which grey-canvas pixels belong to the title (to measure rubbing progress).
+    {
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const mask = new Uint8Array(canvas.width * canvas.height);
+      for (let i = 0; i < mask.length; i++) mask[i] = data[i * 4 + 3] > 128 ? 1 : 0;
+      plateMaskRef.current = mask;
+    }
+
+    // Paper cover: the page's paper (same `cover` placement), cut to the logo box + padding.
+    const coverCanvas = coverCanvasRef.current;
+    const page = wrap.offsetParent as HTMLElement | null;
+    if (!coverCanvas || !page) return;
+    const cw = w + COVER_PAD * 2;
+    const ch = h + COVER_PAD * 2;
+    coverCanvas.width = Math.round(cw * dpr);
+    coverCanvas.height = Math.round(ch * dpr);
+    coverCanvas.style.width = `${cw}px`;
+    coverCanvas.style.height = `${ch}px`;
+    const cover = coverCanvas.getContext("2d");
+    if (!cover) return;
+    cover.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cover.globalCompositeOperation = "source-over";
+    cover.fillStyle = INTRO_SCRATCH.coverColor;
+    cover.fillRect(0, 0, cw, ch);
+    const paper = paperImageRef.current;
+    if (paper?.complete && paper.naturalWidth > 0) {
+      const pageRect = page.getBoundingClientRect();
+      const logoRect = wrap.getBoundingClientRect();
+      const scale = Math.max(
+        pageRect.width / paper.naturalWidth,
+        pageRect.height / paper.naturalHeight,
+      );
+      const dw = paper.naturalWidth * scale;
+      const dh = paper.naturalHeight * scale;
+      const originX = logoRect.left - pageRect.left - COVER_PAD;
+      const originY = logoRect.top - pageRect.top - COVER_PAD;
+      cover.drawImage(
+        paper,
+        (pageRect.width - dw) / 2 - originX,
+        (pageRect.height - dh) / 2 - originY,
+        dw,
+        dh,
+      );
+    }
+    // The veil's light (`.book-intro__veil`: radial-gradient(ellipse at 50% 42%, ...), sized to
+    // the farthest corner), so the cover matches the page around it.
+    {
+      const pageRect = page.getBoundingClientRect();
+      const logoRect = wrap.getBoundingClientRect();
+      const pw = pageRect.width;
+      const ph = pageRect.height;
+      const cx = pw * 0.5;
+      const cy = ph * 0.42;
+      const rx = Math.max(cx, pw - cx) * Math.SQRT2;
+      const ry = Math.max(cy, ph - cy) * Math.SQRT2;
+      const originX = logoRect.left - pageRect.left - COVER_PAD;
+      const originY = logoRect.top - pageRect.top - COVER_PAD;
+      cover.save();
+      cover.translate(cx - originX, cy - originY);
+      cover.scale(1, ry / rx);
+      const light = cover.createRadialGradient(0, 0, 0, 0, 0, rx);
+      light.addColorStop(0, "rgba(255, 255, 255, 0.28)");
+      light.addColorStop(0.55, "rgba(255, 255, 255, 0.06)");
+      light.addColorStop(1, "rgba(0, 0, 0, 0.05)");
+      cover.fillStyle = light;
+      cover.fillRect(-rx * 2, -rx * 2, rx * 4, rx * 4);
+      cover.restore();
+    }
+    // Dabs are given in logo-box coordinates.
+    cover.setTransform(dpr, 0, 0, dpr, COVER_PAD * dpr, COVER_PAD * dpr);
   }, []);
 
   const getLayers = useCallback((): Layers | null => {
     const sw = swCanvasRef.current?.getContext("2d");
-    const color = colorCanvasRef.current?.getContext("2d");
-    const wrap = logoRef.current;
-    if (!sw || !color || !wrap) return null;
-    return {
-      sw,
-      color,
-      colorImage: colorImageRef.current,
-      width: wrap.clientWidth,
-      height: wrap.clientHeight,
-    };
+    const cover = coverCanvasRef.current?.getContext("2d");
+    if (!sw || !cover) return null;
+    return { sw, cover };
   }, []);
 
   useEffect(() => {
@@ -168,11 +260,12 @@ export default function BookIntro({ onComplete }: BookIntroProps) {
       swImageRef.current = sw;
       paintSwLayer();
     };
-    const color = new Image();
-    color.decoding = "async";
-    color.src = INTRO_RICORI1_2_URL;
-    color.onload = () => {
-      colorImageRef.current = color;
+    const paper = new Image();
+    paper.decoding = "async";
+    paper.src = INTRO_PAPIER_URL;
+    paper.onload = () => {
+      paperImageRef.current = paper;
+      paintSwLayer();
     };
   }, [paintSwLayer]);
 
@@ -224,26 +317,128 @@ export default function BookIntro({ onComplete }: BookIntroProps) {
     [fadingOut, pointerInLogo, getLayers],
   );
 
-  const endStroke = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
-    lastRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+  /** Share of the title already rubbed green (sampled every 3rd pixel). */
+  const revealedRatio = useCallback(() => {
+    const canvas = swCanvasRef.current;
+    const mask = plateMaskRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !mask || !ctx || mask.length !== canvas.width * canvas.height) return 0;
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let plate = 0;
+    let rubbed = 0;
+    for (let i = 0; i < mask.length; i += 3) {
+      if (!mask[i]) continue;
+      plate++;
+      if (data[i * 4 + 3] < 60) rubbed++;
     }
+    return plate > 0 ? rubbed / plate : 0;
   }, []);
 
+  const endStroke = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!drawingRef.current) return;
+      drawingRef.current = false;
+      lastRef.current = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      if (!titleDone && revealedRatio() >= INTRO_ZOOM.revealedRatio) setTitleDone(true);
+    },
+    [titleDone, revealedRatio],
+  );
+
+  /** Scene 1 is ready and the page draws smoothly: floaters may move, the zoom may start. */
+  const [warm, setWarm] = useState(false);
+  const titleDoneAtRef = useRef(0);
+  useEffect(() => {
+    if (titleDone) titleDoneAtRef.current = performance.now();
+  }, [titleDone]);
+
+  // Scene 1 keeps uploading pictures for a moment after it reports ready: wait until the page
+  // draws smoothly again (enough short frames in a row).
+  useEffect(() => {
+    if (!sceneReady || warm) return;
+    let frame = 0;
+    let smooth = 0;
+    let last = performance.now();
+    const watch = (now: number) => {
+      smooth = now - last < INTRO_ZOOM.smoothFrameMs ? smooth + 1 : 0;
+      last = now;
+      if (smooth >= INTRO_ZOOM.smoothFrames) setWarm(true);
+      else frame = requestAnimationFrame(watch);
+    };
+    frame = requestAnimationFrame(watch);
+    return () => cancelAnimationFrame(frame);
+  }, [sceneReady, warm]);
+
+  // Zoom into the title: it grows (speeding up) round a thick spot in a letter; outside it the
+  // paper stays (masked), inside it the colour fades so scene 1 shows through, until it fills
+  // the screen.
+  useEffect(() => {
+    if (!titleDone || !warm || fadingOut) return;
+    let frame = 0;
+    let started = 0;
+    // `delayMs` after the title was completed (at once if scene 1 only got ready later).
+    const wait = Math.max(0, INTRO_ZOOM.delayMs - (performance.now() - titleDoneAtRef.current));
+    const timer = window.setTimeout(() => startZoom(), wait);
+    const startZoom = () => {
+      const logo = logoRef.current;
+      const bg = bgRef.current;
+      const layer = colorLayerRef.current;
+      if (!logo || !bg || !layer) return;
+      setZooming(true);
+      const rect = logo.getBoundingClientRect();
+      const ox = rect.width * INTRO_ZOOM.origin[0];
+      const oy = rect.height * INTRO_ZOOM.origin[1];
+      const originX = rect.left + ox;
+      const originY = rect.top + oy;
+      layer.style.transformOrigin = `${ox}px ${oy}px`;
+      const apply = (t: number) => {
+        // Speeding up, evenly in "zoom" (exponential scale).
+        const eased = t * t * t;
+        const scale = Math.exp(Math.log(INTRO_ZOOM.maxScale) * eased);
+        layer.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        const w = rect.width * scale;
+        const h = rect.height * scale;
+        const size = `${w}px ${h}px, 100% 100%`;
+        const pos = `${originX - ox * scale}px ${originY - oy * scale}px, 0 0`;
+        bg.style.maskSize = size;
+        bg.style.webkitMaskSize = size;
+        bg.style.maskPosition = pos;
+        bg.style.webkitMaskPosition = pos;
+        const win = Math.min(
+          1,
+          Math.max(0, (t - INTRO_ZOOM.windowFrom) / (INTRO_ZOOM.windowTo - INTRO_ZOOM.windowFrom)),
+        );
+        layer.style.opacity = String(1 - win);
+      };
+      // The mask is on from the start (hole parked off screen, see bgMaskStyle): only move it.
+      apply(0);
+      const tick = (now: number) => {
+        if (!started) started = now;
+        const t = Math.min(1, (now - started) / INTRO_ZOOM.durationMs);
+        apply(t);
+        if (t < 1) frame = requestAnimationFrame(tick);
+        else onComplete();
+      };
+      frame = requestAnimationFrame(tick);
+    };
+    return () => {
+      window.clearTimeout(timer);
+      cancelAnimationFrame(frame);
+    };
+  }, [titleDone, warm, fadingOut, onComplete]);
+
   const beginExit = useCallback(() => {
-    if (fadingOut) return;
+    if (fadingOut || zooming) return;
     setFadingOut(true);
     window.setTimeout(onComplete, BOOK_INTRO_FADEOUT_MS);
-  }, [fadingOut, onComplete]);
+  }, [fadingOut, zooming, onComplete]);
 
   return (
     <div
-      className={`book-intro${fadingOut ? " book-intro--out" : ""}`}
+      className={`book-intro${fadingOut ? " book-intro--out" : ""}${titleDone ? " book-intro--done" : ""}${zooming ? " book-intro--zooming" : ""}`}
       style={{
-        backgroundImage: `url(${INTRO_PAPIER_URL})`,
         cursor: `url(${INTRO_MOND_K_CURSOR_URL}) 32 32, crosshair`,
       }}
       onKeyDown={(event) => {
@@ -259,7 +454,16 @@ export default function BookIntro({ onComplete }: BookIntroProps) {
       onPointerCancel={endStroke}
       onPointerLeave={endStroke}
     >
-      <div className="book-intro__veil" aria-hidden />
+      {/* Paper + veil. During the zoom it is masked: a hole in the title's shape lets scene 1
+          show through. */}
+      <div
+        ref={bgRef}
+        className="book-intro__bg"
+        style={{ backgroundImage: `url(${INTRO_PAPIER_URL})`, ...bgMaskStyle }}
+        aria-hidden
+      >
+        <div className="book-intro__veil" />
+      </div>
       <div
         ref={logoRef}
         className="book-intro__logo"
@@ -278,18 +482,32 @@ export default function BookIntro({ onComplete }: BookIntroProps) {
         />
         <canvas ref={swCanvasRef} className="book-intro__ricori-sw-canvas" />
       </div>
-      {/* The rubbed-in colour, in its own colours (not blended with the paper). */}
+      {/* Colour title in its own colours, under a paper cover that rubbing erases. */}
       <div
+        ref={colorLayerRef}
         className="book-intro__logo book-intro__logo--color"
-        style={{
-          width: logoWidthCss,
-          aspectRatio: `${INTRO_RICORI1_2.width} / ${INTRO_RICORI1_2.height}`,
-        }}
+        style={{ width: logoWidthCss }}
         aria-hidden
       >
-        <canvas ref={colorCanvasRef} className="book-intro__ricori-sw-canvas" />
+        <img
+          className="book-intro__ricori book-intro__ricori--color"
+          src={INTRO_RICORI1_2_URL}
+          width={INTRO_RICORI1_2.width}
+          height={INTRO_RICORI1_2.height}
+          alt=""
+          decoding="async"
+          draggable={false}
+        />
+        <canvas
+          ref={coverCanvasRef}
+          className="book-intro__ricori-cover"
+          style={{ left: -COVER_PAD, top: -COVER_PAD }}
+        />
       </div>
-      <IntroFloaters />
+      {/* Floaters start once scene 1 is set up (see `warm`). */}
+      <div className={`book-intro__floaters-wrap${warm ? " book-intro__floaters-wrap--on" : ""}`}>
+        {warm && <IntroFloaters />}
+      </div>
     </div>
   );
 }

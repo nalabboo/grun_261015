@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import GrunCharacter from "@/components/GrunCharacter";
 import LayerEditorPanel from "@/components/LayerEditorPanel";
-import MoonEditorPanel, { loadDevMoonSky } from "@/components/MoonEditorPanel";
 import WormHitTarget from "@/components/WormHitTarget";
 import AmpelHitTarget from "@/components/AmpelHitTarget";
 import KindHitTarget from "@/components/KindHitTarget";
@@ -67,8 +66,7 @@ import {
   type MossInstanceId,
   type MossPhases,
   type SceneMetrics,
-  type MoonSkyLayout,
-  moonSkyFromConfig,
+  MOON_SKY,
 } from "@/constants/sceneConfig";
 
 const EMPTY_METRICS: SceneMetrics = { height: 0, width: 0, panoramaWidth: 0 };
@@ -148,9 +146,6 @@ const DEV_LAYER_EDITOR =
   process.env.NODE_ENV === "development" &&
   process.env.NEXT_PUBLIC_DEV_LAYER_EDIT === "1";
 
-const DEV_MOON_EDITOR =
-  process.env.NODE_ENV === "development" &&
-  process.env.NEXT_PUBLIC_DEV_MOON_EDIT === "1";
 
 /**
  * Rightmost grun world X allowed right now: `maxX`, and — until each has transformed — the
@@ -187,13 +182,6 @@ export default function SceneStage() {
     selectedId: null,
     mode: "translate",
   });
-  const [moonSky, setMoonSky] = useState<MoonSkyLayout>(() => moonSkyFromConfig());
-  useEffect(() => {
-    if (!DEV_MOON_EDITOR) return;
-    const saved = loadDevMoonSky();
-    if (!saved) return;
-    setMoonSky((prev) => ({ ...prev, ...saved }));
-  }, []);
   const editEnabledRef = useRef(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>("grun");
   const [wormPhase, setWormPhase] = useState<"b" | "revealing" | "g">("b");
@@ -245,6 +233,10 @@ export default function SceneStage() {
   const [bookIntroOpen, setBookIntroOpen] = useState(() =>
     resolveBookIntroOpen(new URLSearchParams(), DEV_START_CHAPTER),
   );
+  const bookIntroOpenRef = useRef(bookIntroOpen);
+  useEffect(() => {
+    bookIntroOpenRef.current = bookIntroOpen;
+  }, [bookIntroOpen]);
   const [chapter1Phase, setChapter1Phase] = useState<Chapter1Phase>("scroll");
   const [tableauRevealed, setTableauRevealed] = useState(false);
   const [chapter2Step, setChapter2Step] = useState<Chapter2Step | null>(
@@ -463,7 +455,8 @@ export default function SceneStage() {
     const observer = new ResizeObserver(updateLayout);
     observer.observe(stage);
     return () => observer.disconnect();
-  }, [ready]);
+    // The stage mounts late when the book intro is open (see showChapter1Scroll).
+  }, [ready, bookIntroOpen]);
 
   const unlockPostLandmarkMovement = useCallback((state: typeof stateRef.current) => {
     state.maxScroll = getPostLandmarkMaxScroll(state.metrics);
@@ -481,6 +474,8 @@ export default function SceneStage() {
     // Layer edit mode: input belongs to TransformControls, not to grun walking.
     if (editEnabledRef.current) return;
     if (chapterRef.current !== 1 || chapter1PhaseRef.current !== "scroll") return;
+    // Scene 1 waits under the book intro until it is gone.
+    if (bookIntroOpenRef.current) return;
     const state = stateRef.current;
     if (state.exiting) return;
     if (state.metrics.width <= 0) return;
@@ -1004,7 +999,9 @@ export default function SceneStage() {
     backgroundColor: `rgb(${backgroundChannel}, ${backgroundChannel}, ${backgroundChannel})`,
   } as React.CSSProperties;
 
-  const showChapter1Scroll = chapter === 1 && chapter1Phase !== "tableau" && !bookIntroOpen;
+  // Set up under the book intro from the start (it shows through the intro's zoom). The intro
+  // keeps still until it is ready, so the setup's pause doesn't look like stutter.
+  const showChapter1Scroll = chapter === 1 && chapter1Phase !== "tableau";
   const showChapter1Tableau = chapter === 1 && chapter1Phase === "tableau";
 
   return (
@@ -1032,12 +1029,9 @@ export default function SceneStage() {
         onAmpelSwitchComplete={handleAmpelSwitchComplete}
         onMossRevealComplete={handleMossRevealComplete}
         editor={editor}
-        moonSky={moonSky}
+        moonSky={MOON_SKY}
         onReady={handleGlReady}
       />
-      {DEV_MOON_EDITOR && (
-        <MoonEditorPanel layout={moonSky} onChange={setMoonSky} />
-      )}
       {DEV_LAYER_EDITOR && (
         <LayerEditorPanel
           editor={editor}
@@ -1107,7 +1101,10 @@ export default function SceneStage() {
       <PageFlipOverlay onCovered={handlePageFlipCovered} onDone={handlePageFlipDone} />
     )}
     {chapter === 1 && bookIntroOpen && (
-      <BookIntro onComplete={handleBookIntroComplete} />
+      <BookIntro
+        onComplete={handleBookIntroComplete}
+        sceneReady={glReady}
+      />
     )}
     {chapter === 2 && chapter2Step === "intro" && (
       <Chapter2Intro onComplete={handleChapter2IntroComplete} />

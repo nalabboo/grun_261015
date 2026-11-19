@@ -45,5 +45,27 @@ export const INTRO_SCRATCH = {
   coverColor: "#f4efe4",
 } as const;
 
-/** Crossfade when leaving the book intro for scene 1. */
+/**
+ * Leaving the intro (like lusion.co's intro): once `revealedRatio` of the title is rubbed green,
+ * the green title zooms in (scale 1 → `maxScale` over `durationMs`, speeding up), centred on
+ * `origin` (a thick spot inside a letter, share of the title image) and scene 1 shows through
+ * the letters: everything outside the title stays paper, the title itself turns into a window
+ * (its colour fades out between `windowFrom` and `windowTo` of the zoom) until it fills the
+ * screen. Scene 1 is set up behind the intro from the start; the zoom waits for it if needed.
+ */
+export const INTRO_ZOOM = {
+  revealedRatio: 0.8,
+  durationMs: 1800,
+  maxScale: 48,
+  origin: [0.4057, 0.7559] as const,
+  windowFrom: 0.2,
+  windowTo: 0.55,
+  /** Pause after the title is completed, before the zoom starts. */
+  delayMs: 1000,
+  /** "Smooth": this many frames in a row, each shorter than `smoothFrameMs`. */
+  smoothFrames: 20,
+  smoothFrameMs: 40,
+} as const;
+
+/** Crossfade when leaving the book intro for scene 1 (Enter / Space). */
 export const BOOK_INTRO_FADEOUT_MS = 1400;

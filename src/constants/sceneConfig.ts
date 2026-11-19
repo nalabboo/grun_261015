@@ -376,9 +376,9 @@ export const STAR_SKY = {
  * around it comes on top, see MOON_LOOK).
  */
 export const MOON_SKY = {
-  screenXRatio: 0.72,
-  yFromTop: 0.11,
-  sizePx: 170,
+  screenXRatio: 0.815,
+  yFromTop: 0.195,
+  sizePx: 317,
   parallax: 0.018,
   opacity: 1,
 } as const;
@@ -444,22 +444,6 @@ export type MoonSkyLayout = {
   parallax: number;
   opacity: number;
 };
-
-export function moonSkyFromConfig(): MoonSkyLayout {
-  return { ...MOON_SKY };
-}
-
-/** Paste into `sceneConfig.ts` after tuning in the dev moon panel. */
-export function formatMoonSkyForConfig(layout: Pick<MoonSkyLayout, "screenXRatio" | "yFromTop" | "sizePx">) {
-  const r = (n: number) => Math.round(n * 1000) / 1000;
-  return `export const MOON_SKY = {
-  screenXRatio: ${r(layout.screenXRatio)},
-  yFromTop: ${r(layout.yFromTop)},
-  sizePx: ${Math.round(layout.sizePx)},
-  parallax: ${MOON_SKY.parallax},
-  opacity: ${MOON_SKY.opacity},
-} as const;`;
-}
 
 export const SCENE_LAYERS = {
   berg4: {
