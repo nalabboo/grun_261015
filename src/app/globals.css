@@ -261,8 +261,7 @@ body {
   to { opacity: 0; }
 }
 
-/* Chapter 1 scroll indicator (ScrollProgress.tsx): thin translucent track, small brown pill
-   with a soft glow that moves down as grun walks on. */
+/* Chapter scroll indicator (ScrollProgress.tsx, Chapter2ScrollProgress.tsx). */
 .scroll-progress {
   position: absolute;
   right: clamp(10px, 1.6vw, 28px);
@@ -282,6 +281,12 @@ body {
 
 .scroll-progress--on {
   opacity: 1;
+}
+
+/* Chapter 2: pinned to the window above the scene stack. */
+.scroll-progress--viewport {
+  position: fixed;
+  z-index: 46;
 }
 
 .scroll-progress__thumb {
@@ -543,6 +548,11 @@ body {
   z-index: 3;
   mix-blend-mode: normal;
   pointer-events: none;
+  visibility: hidden;
+}
+
+.book-intro__logo--color.book-intro__logo--ready {
+  visibility: visible;
 }
 
 .book-intro__ricori--color {
@@ -560,6 +570,7 @@ body {
   display: block;
   will-change: transform;
   pointer-events: none;
+  background: transparent;
 }
 
 .book-intro__ricori-sw-canvas {
@@ -571,6 +582,12 @@ body {
   display: block;
   pointer-events: none;
   user-select: none;
+  background: transparent;
+  opacity: 0;
+}
+
+.book-intro--scratch-ready .book-intro__ricori-sw-canvas {
+  opacity: 1;
 }
 
 .book-intro__veil {

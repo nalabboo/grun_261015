@@ -5,6 +5,8 @@ import GrunCharacter from "@/components/GrunCharacter";
 import ScrollProgress from "@/components/ScrollProgress";
 import { armPageFlipSound } from "@/lib/pageFlipSound";
 import { AmbientLoop } from "@/lib/ambientLoop";
+import { BgmLoop } from "@/lib/bgmLoop";
+import { GappedAmbient } from "@/lib/gappedAmbient";
 import { playFootstep } from "@/lib/footstepSound";
 import LayerEditorPanel from "@/components/LayerEditorPanel";
 import WormHitTarget from "@/components/WormHitTarget";
@@ -36,6 +38,8 @@ import {
   areWormMossRevealsComplete,
   GRUN_START_RATIO,
   SCENE1_AMBIENT,
+  SCENE1_BGM,
+  SCENE1_BIRDS,
   GRUN_FOOTSTEPS,
   assetUrl,
   GRUN_WALK_SPEED_BASE,
@@ -304,19 +308,56 @@ export default function SceneStage() {
 
   // Wind through chapter 1, from the book intro until the page turns to chapter 2.
   const windRef = useRef<AmbientLoop | null>(null);
-  const windOn = chapter === 1 && pageFlipTo === null;
+  const birdsRef = useRef<GappedAmbient | null>(null);
+  const bgmRef = useRef<BgmLoop | null>(null);
+  const chapter1AmbienceOn = chapter === 1 && pageFlipTo === null;
+  /** After the book intro — walking scene, not the title rub. */
+  const chapter1PlayOn = chapter1AmbienceOn && !bookIntroOpen;
   useEffect(() => {
-    windRef.current ??= new AmbientLoop({
-      url: assetUrl(SCENE1_AMBIENT.file),
-      volume: SCENE1_AMBIENT.volume,
-      fadeInMs: SCENE1_AMBIENT.fadeInMs,
-      fadeOutMs: SCENE1_AMBIENT.fadeOutMs,
-      crossfadeMs: SCENE1_AMBIENT.crossfadeMs,
-    });
-    if (windOn) windRef.current.start();
-    else windRef.current.stop();
-  }, [windOn]);
-  useEffect(() => () => windRef.current?.stop(), []);
+    if (chapter1AmbienceOn && SCENE1_BGM.enabled) {
+      bgmRef.current ??= new BgmLoop({
+        url: assetUrl(SCENE1_BGM.file),
+        volume: SCENE1_BGM.volume,
+        fadeInMs: SCENE1_BGM.fadeInMs,
+        fadeOutMs: SCENE1_BGM.fadeOutMs,
+      });
+      bgmRef.current.start();
+    } else {
+      bgmRef.current?.stop();
+    }
+    if (chapter1AmbienceOn && SCENE1_AMBIENT.enabled) {
+      windRef.current ??= new AmbientLoop({
+        url: assetUrl(SCENE1_AMBIENT.file),
+        volume: SCENE1_AMBIENT.volume,
+        fadeInMs: SCENE1_AMBIENT.fadeInMs,
+        fadeOutMs: SCENE1_AMBIENT.fadeOutMs,
+        crossfadeMs: SCENE1_AMBIENT.crossfadeMs,
+      });
+      windRef.current.start();
+    } else {
+      windRef.current?.stop();
+    }
+    if (chapter1PlayOn && SCENE1_BIRDS.enabled) {
+      birdsRef.current ??= new GappedAmbient({
+        url: assetUrl(SCENE1_BIRDS.file),
+        volume: SCENE1_BIRDS.volume,
+        gapMs: SCENE1_BIRDS.gapMs,
+        fadeInMs: SCENE1_BIRDS.fadeInMs,
+        fadeOutMs: SCENE1_BIRDS.fadeOutMs,
+      });
+      birdsRef.current.start();
+    } else {
+      birdsRef.current?.stop();
+    }
+  }, [chapter1AmbienceOn, bookIntroOpen]);
+  useEffect(
+    () => () => {
+      bgmRef.current?.stop();
+      windRef.current?.stop();
+      birdsRef.current?.stop();
+    },
+    [],
+  );
   const startPageFlipTo2 = useCallback(() => setPageFlipTo((prev) => prev ?? 2), []);
   const startPageFlipTo3 = useCallback(() => setPageFlipTo((prev) => prev ?? 3), []);
   const handlePageFlipCovered = useCallback(() => {

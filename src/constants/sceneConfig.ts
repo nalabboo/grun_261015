@@ -8,11 +8,15 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261120-nowald";
+export const ASSET_VERSION = "20261120-papier";
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
-  return `/${SCENE_ID}/${relativePath}?v=${ASSET_VERSION}`;
+  const path = relativePath
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  return `/${SCENE_ID}/${path}?v=${ASSET_VERSION}`;
 }
 
 /**
@@ -237,18 +241,44 @@ export const GRUN_FOOTSTEPS = {
 } as const;
 
 /**
+ * Chapter 1 BGM (`scene1/sound/#1_bgm_2.wav`, src/lib/bgmLoop.ts). Loops from the book intro until
+ * the page turns to chapter 2 (after the reader's first click).
+ */
+export const SCENE1_BGM = {
+  enabled: true,
+  file: "sound/#1_bgm_2.wav",
+  volume: 0.65,
+  fadeInMs: 2500,
+  fadeOutMs: 1500,
+} as const;
+
+/**
  * Wind ambience through all of chapter 1 (scene1/sound/wind.mp3 — made from wind.wav, 18 dB
  * louder, 128 kbps). Starts with the book intro — at the reader's first click / rub, as browsers
  * don't allow sound before that — keeps looping seamlessly (passes overlap by `crossfadeMs`)
  * through the closing tableau, and fades out when the page turns to chapter 2.
  */
 export const SCENE1_AMBIENT = {
+  enabled: false,
   file: "sound/wind.mp3",
   /** Overall loop loudness (1 = unity; was 1.4 when wind.wav was normalized quieter). */
   volume: 0.55,
   fadeInMs: 3000,
   fadeOutMs: 1500,
   crossfadeMs: 3000,
+} as const;
+
+/**
+ * Bird calls in chapter 1 (`scene1/sound/birds.wav`, src/lib/gappedAmbient.ts): plays the clip
+ * once, waits `gapMs`, then plays again. Starts when chapter 1 play begins (after the book intro).
+ */
+export const SCENE1_BIRDS = {
+  enabled: true,
+  file: "sound/birds.wav",
+  volume: 0.5,
+  gapMs: 3000,
+  fadeInMs: 800,
+  fadeOutMs: 1200,
 } as const;
 
 /**

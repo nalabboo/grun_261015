@@ -17,6 +17,7 @@ import {
   CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN,
   CHAPTER2_PAPIER_BG_URL,
 } from "@/constants/chapter2Config";
+import { getChapter2ScrollIndicatorProgress } from "@/constants/chapter2ScrollProgress";
 import {
   CHAPTER2_SUBSCENE_SCROLL_MAX,
   getChapter2PropScrollOpacity,
@@ -33,6 +34,7 @@ import {
 import {
   canChapter2ScrollStartSubscene23,
   CHAPTER2_SUBSCENE_23_SCROLL_ACCUM_MAX,
+  CHAPTER2_SUBSCENE_23_HOLD_ELAPSED_SEC,
   CHAPTER2_SUBSCENE_23_SCROLL_WHEEL_GAIN,
   getChapter2BergSubscene23YOffset,
   isChapter2Subscene23ScrollAccumReady,
@@ -46,7 +48,6 @@ import {
   getChapter2LaublRevealPropMotion,
   getChapter2Subscene23IntroProgress,
   getChapter2YellowGelbExitVisibility,
-  CHAPTER2_SUBSCENE_23_HOLD_ELAPSED_SEC,
   isChapter2Subscene23MotionComplete,
 } from "@/constants/chapter2Subscene23Motion";
 import {
@@ -92,6 +93,7 @@ import Chapter2PropLayer from "@/components/scene2/Chapter2PropLayer";
 import Chapter2FloatingBubbles from "@/components/scene2/Chapter2FloatingBubbles";
 import Chapter2FloatingMarimos from "@/components/scene2/Chapter2FloatingMarimos";
 import Chapter2FloatingNabis from "@/components/scene2/Chapter2FloatingNabis";
+import Chapter2ScrollProgress from "@/components/scene2/Chapter2ScrollProgress";
 import Chapter2VogelFlyby from "@/components/scene2/Chapter2VogelFlyby";
 import { CHAPTER2_VOGEL } from "@/constants/chapter2VogelConfig";
 import {
@@ -171,6 +173,8 @@ export default function Chapter2Scene({
     DEV_CHAPTER2_START_AT_SUBSCENE_23_HOLD || DEV_CHAPTER2_START_AT_SUBSCENE_23;
   const scrollTargetRef = useRef(devChapter2Skip ? CHAPTER2_SUBSCENE_SCROLL_MAX : 0);
   const scrollSmoothRef = useRef(devChapter2Skip ? CHAPTER2_SUBSCENE_SCROLL_MAX : 0);
+  const scrollIndicatorRef = useRef(0);
+  const greenSpotlightZoomRef = useRef(0);
   const playbackPhaseRef = useRef<Chapter2SubscenePlaybackPhase>(
     DEV_CHAPTER2_START_AT_SUBSCENE_23_HOLD
       ? "2-3-complete"
@@ -422,6 +426,26 @@ export default function Chapter2Scene({
           (scrollTargetRef.current - scrollSmoothRef.current) * SCROLL_SMOOTH;
       }
 
+      const elapsed23Sec =
+        playbackPhase === "2-3-playing" && subscene23StartMsRef.current > 0
+          ? (performance.now() - subscene23StartMsRef.current) / 1000
+          : playbackPhase === "2-3-complete" || playbackPhase === "2-4-playing"
+            ? CHAPTER2_SUBSCENE_23_HOLD_ELAPSED_SEC
+            : 0;
+      const elapsed24Sec =
+        playbackPhase === "2-4-playing" && subscene24StartMsRef.current > 0
+          ? (performance.now() - subscene24StartMsRef.current) / 1000
+          : 0;
+      scrollIndicatorRef.current = getChapter2ScrollIndicatorProgress({
+        phase: playbackPhase,
+        scroll22: scrollSmoothRef.current,
+        scroll23Accum: subscene23ScrollAccumRef.current,
+        scroll24Accum: subscene24ScrollAccumRef.current,
+        elapsed23Sec,
+        elapsed24Sec,
+        greenSpotlightZoom: greenSpotlightZoomRef.current,
+      });
+
       setFrame((f) => f + 1);
       raf = requestAnimationFrame(tick);
     };
@@ -530,6 +554,7 @@ export default function Chapter2Scene({
       greenSpotlightTimelineStartRef.current = 0;
       setLockedSpotlightHole(null);
       setGreenSpotlightZoom(0);
+      greenSpotlightZoomRef.current = 0;
       return;
     }
 
@@ -577,15 +602,16 @@ export default function Chapter2Scene({
 
     const tick = (now: number) => {
       const elapsed = now - greenSpotlightTimelineStartRef.current;
-      if (elapsed < zoomDelay) {
-        setGreenSpotlightZoom(0);
-      } else {
+      let zoom = 0;
+      if (elapsed >= zoomDelay) {
         const t = Math.min(
           1,
           (elapsed - zoomDelay) / CHAPTER2_GREEN_SPOTLIGHT_ZOOM_DURATION_MS,
         );
-        setGreenSpotlightZoom(1 - (1 - t) ** 2.1);
+        zoom = 1 - (1 - t) ** 2.1;
       }
+      greenSpotlightZoomRef.current = zoom;
+      setGreenSpotlightZoom(zoom);
       raf = requestAnimationFrame(tick);
     };
 
@@ -1176,6 +1202,8 @@ export default function Chapter2Scene({
       {chapter3PageTurnVisible && onChapter3PageTurn && (
         <PageTurnCue label="3장" onTurn={onChapter3PageTurn} />
       )}
+
+      <Chapter2ScrollProgress progressRef={scrollIndicatorRef} visible={!editor.enabled} />
 
     </div>
   );

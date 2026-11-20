@@ -153,15 +153,24 @@ export default function BookIntro({
   const paperImageRef = useRef<HTMLImageElement | null>(null);
   const drawingRef = useRef(false);
   const lastRef = useRef<{ x: number; y: number } | null>(null);
+  const paintRafRef = useRef(0);
+  const [scratchReady, setScratchReady] = useState(false);
 
   const paintSwLayer = useCallback(() => {
     const wrap = logoRef.current;
     const canvas = swCanvasRef.current;
     const sw = swImageRef.current;
-    if (!wrap || !canvas || !sw?.complete) return;
+    const paper = paperImageRef.current;
+    if (!wrap || !canvas || !sw?.complete || !paper?.complete || paper.naturalWidth === 0) {
+      setScratchReady(false);
+      return;
+    }
     const w = wrap.clientWidth;
     const h = wrap.clientHeight;
-    if (w <= 0 || h <= 0) return;
+    if (w <= 0 || h <= 0) {
+      setScratchReady(false);
+      return;
+    }
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
@@ -196,43 +205,48 @@ export default function BookIntro({
     if (!cover) return;
     cover.setTransform(dpr, 0, 0, dpr, 0, 0);
     cover.globalCompositeOperation = "source-over";
-    cover.fillStyle = INTRO_SCRATCH.coverColor;
-    cover.fillRect(0, 0, cw, ch);
-    const paper = paperImageRef.current;
-    if (paper?.complete && paper.naturalWidth > 0) {
-      const pageRect = page.getBoundingClientRect();
-      const logoRect = wrap.getBoundingClientRect();
-      const scale = Math.max(
-        pageRect.width / paper.naturalWidth,
-        pageRect.height / paper.naturalHeight,
-      );
-      const dw = paper.naturalWidth * scale;
-      const dh = paper.naturalHeight * scale;
-      const originX = logoRect.left - pageRect.left - COVER_PAD;
-      const originY = logoRect.top - pageRect.top - COVER_PAD;
-      cover.drawImage(
-        paper,
-        (pageRect.width - dw) / 2 - originX,
-        (pageRect.height - dh) / 2 - originY,
-        dw,
-        dh,
-      );
-    }
+    cover.clearRect(0, 0, cw, ch);
+    const pageRect = page.getBoundingClientRect();
+    const logoRect = wrap.getBoundingClientRect();
+    const scale = Math.max(
+      pageRect.width / paper.naturalWidth,
+      pageRect.height / paper.naturalHeight,
+    );
+    const dw = paper.naturalWidth * scale;
+    const dh = paper.naturalHeight * scale;
+    const pagePaperLeft = (pageRect.width - dw) / 2;
+    const pagePaperTop = (pageRect.height - dh) / 2;
+    const coverLeftInPage = logoRect.left - pageRect.left - COVER_PAD;
+    const coverTopInPage = logoRect.top - pageRect.top - COVER_PAD;
+    const srcX = (coverLeftInPage - pagePaperLeft) / scale;
+    const srcY = (coverTopInPage - pagePaperTop) / scale;
+    const srcW = cw / scale;
+    const srcH = ch / scale;
+    const bleed = 3 / scale;
+    cover.drawImage(
+      paper,
+      srcX - bleed,
+      srcY - bleed,
+      srcW + bleed * 2,
+      srcH + bleed * 2,
+      0,
+      0,
+      cw,
+      ch,
+    );
     // The veil's light (`.book-intro__veil`: radial-gradient(ellipse at 50% 42%, ...), sized to
     // the farthest corner), so the cover matches the page around it.
     {
-      const pageRect = page.getBoundingClientRect();
-      const logoRect = wrap.getBoundingClientRect();
       const pw = pageRect.width;
       const ph = pageRect.height;
       const cx = pw * 0.5;
       const cy = ph * 0.42;
       const rx = Math.max(cx, pw - cx) * Math.SQRT2;
       const ry = Math.max(cy, ph - cy) * Math.SQRT2;
-      const originX = logoRect.left - pageRect.left - COVER_PAD;
-      const originY = logoRect.top - pageRect.top - COVER_PAD;
+      const veilOriginX = logoRect.left - pageRect.left - COVER_PAD;
+      const veilOriginY = logoRect.top - pageRect.top - COVER_PAD;
       cover.save();
-      cover.translate(cx - originX, cy - originY);
+      cover.translate(cx - veilOriginX, cy - veilOriginY);
       cover.scale(1, ry / rx);
       const light = cover.createRadialGradient(0, 0, 0, 0, 0, rx);
       light.addColorStop(0, "rgba(255, 255, 255, 0.28)");
@@ -244,7 +258,13 @@ export default function BookIntro({
     }
     // Dabs are given in logo-box coordinates.
     cover.setTransform(dpr, 0, 0, dpr, COVER_PAD * dpr, COVER_PAD * dpr);
+    setScratchReady(true);
   }, []);
+
+  const schedulePaintSwLayer = useCallback(() => {
+    window.cancelAnimationFrame(paintRafRef.current);
+    paintRafRef.current = window.requestAnimationFrame(() => paintSwLayer());
+  }, [paintSwLayer]);
 
   const getLayers = useCallback((): Layers | null => {
     const sw = swCanvasRef.current?.getContext("2d");
@@ -259,24 +279,25 @@ export default function BookIntro({
     sw.src = INTRO_RICORI1_2SW_URL;
     sw.onload = () => {
       swImageRef.current = sw;
-      paintSwLayer();
+      schedulePaintSwLayer();
     };
-    const paper = new Image();
-    paper.decoding = "async";
-    paper.src = INTRO_PAPIER_URL;
-    paper.onload = () => {
-      paperImageRef.current = paper;
-      paintSwLayer();
+    const paperImg = new Image();
+    paperImg.decoding = "async";
+    paperImg.src = INTRO_PAPIER_URL;
+    paperImg.onload = () => {
+      paperImageRef.current = paperImg;
+      schedulePaintSwLayer();
     };
-  }, [paintSwLayer]);
+    return () => window.cancelAnimationFrame(paintRafRef.current);
+  }, [schedulePaintSwLayer]);
 
   useEffect(() => {
     const wrap = logoRef.current;
     if (!wrap) return;
-    const observer = new ResizeObserver(() => paintSwLayer());
+    const observer = new ResizeObserver(() => schedulePaintSwLayer());
     observer.observe(wrap);
     return () => observer.disconnect();
-  }, [paintSwLayer]);
+  }, [schedulePaintSwLayer]);
 
   const pointerInLogo = useCallback((clientX: number, clientY: number) => {
     const wrap = logoRef.current;
@@ -439,7 +460,7 @@ export default function BookIntro({
 
   return (
     <div
-      className={`book-intro${fadingOut ? " book-intro--out" : ""}${titleDone ? " book-intro--done" : ""}${zooming ? " book-intro--zooming" : ""}`}
+      className={`book-intro${fadingOut ? " book-intro--out" : ""}${titleDone ? " book-intro--done" : ""}${zooming ? " book-intro--zooming" : ""}${scratchReady ? " book-intro--scratch-ready" : ""}`}
       style={{
         cursor: `url(${INTRO_MOND_K_CURSOR_URL}) 32 32, crosshair`,
       }}
@@ -488,7 +509,7 @@ export default function BookIntro({
       {/* Colour title in its own colours, under a paper cover that rubbing erases. */}
       <div
         ref={colorLayerRef}
-        className="book-intro__logo book-intro__logo--color"
+        className={`book-intro__logo book-intro__logo--color${scratchReady ? " book-intro__logo--ready" : ""}`}
         style={{ width: logoWidthCss }}
         aria-hidden
       >
