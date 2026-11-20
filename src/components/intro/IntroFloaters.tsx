@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import {
   INTRO_FLOATER_INSTANCES,
+  INTRO_MARIMO_BURST,
   INTRO_MARIMO_PHYSICS,
   type IntroFloaterInstance,
 } from "@/constants/introFloatersConfig";
@@ -103,12 +104,59 @@ function resolveWallCollisions(
   }
 }
 
+type IntroFloatersProps = {
+  /** Increments on each intro click; client coords of the burst centre. */
+  burstSeq: number;
+  burstX: number;
+  burstY: number;
+};
+
+function applyBurst(bodies: MarimoBody[], x: number, y: number, viewportHeight: number) {
+  const scale = viewportHeight / REF_H;
+  const n = bodies.length;
+  const { speedPx, speedJitter, spinDegPerSec, spinJitter } = INTRO_MARIMO_BURST;
+  for (let i = 0; i < n; i++) {
+    const body = bodies[i];
+    const angle = (i / n) * Math.PI * 2 + body.spec.phase * 0.17;
+    const speed = speedPx * scale * (1 - speedJitter * 0.5 + Math.random() * speedJitter);
+    body.x = x;
+    body.y = y;
+    body.vx = Math.cos(angle) * speed;
+    body.vy = Math.sin(angle) * speed;
+    body.spin =
+      (body.spec.spinDegPerSec +
+        spinDegPerSec * (1 - spinJitter * 0.5 + Math.random() * spinJitter)) *
+      (Math.random() > 0.5 ? 1 : -1);
+  }
+}
+
 /** Marimos drift across the viewport; cursor proximity pushes them away. */
-export default function IntroFloaters() {
+export default function IntroFloaters({ burstSeq, burstX, burstY }: IntroFloatersProps) {
   const anchorRefs = useRef<(HTMLDivElement | null)[]>([]);
   const bodiesRef = useRef<MarimoBody[] | null>(null);
   const cursorRef = useRef({ x: 0, y: 0, active: false });
   const sizeRef = useRef({ width: 0, height: 0 });
+  const visibleRef = useRef(false);
+  const lastBurstSeqRef = useRef(0);
+
+  useEffect(() => {
+    if (burstSeq <= 0 || burstSeq === lastBurstSeqRef.current) return;
+    lastBurstSeqRef.current = burstSeq;
+    visibleRef.current = true;
+    let frame = 0;
+    const tryBurst = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const bodies = bodiesRef.current;
+      if (!bodies || width <= 0 || height <= 0) {
+        frame = requestAnimationFrame(tryBurst);
+        return;
+      }
+      applyBurst(bodies, burstX, burstY, height);
+    };
+    tryBurst();
+    return () => cancelAnimationFrame(frame);
+  }, [burstSeq, burstX, burstY]);
 
   useEffect(() => {
     const syncBodiesToViewport = (width: number, height: number) => {
@@ -250,7 +298,7 @@ export default function IntroFloaters() {
         body.angle += body.spin * dt;
         body.spin *= spinDamp;
         if (!el) continue;
-        el.style.opacity = "1";
+        el.style.opacity = visibleRef.current ? "1" : "0";
         el.style.transform = `translate3d(${body.x}px, ${body.y}px, 0) translate(-50%, -50%) rotate(${body.angle}deg)`;
       }
 
@@ -274,6 +322,7 @@ export default function IntroFloaters() {
             anchorRefs.current[index] = node;
           }}
           className="intro-floaters__anchor"
+          style={{ opacity: 0 }}
         >
           <img
             src={spec.src}

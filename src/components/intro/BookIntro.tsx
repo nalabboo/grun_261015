@@ -13,6 +13,7 @@ import {
   INTRO_ZOOM,
 } from "@/constants/introConfig";
 import { unlockAudio } from "@/lib/audioContext";
+import { scratchSoundEnd, scratchSoundMove, scratchSoundStart } from "@/lib/scratchSound";
 
 type BookIntroProps = {
   onComplete: () => void;
@@ -154,6 +155,11 @@ export default function BookIntro({
   const lastRef = useRef<{ x: number; y: number } | null>(null);
   const paintRafRef = useRef(0);
   const [scratchReady, setScratchReady] = useState(false);
+  const [marimosRevealed, setMarimosRevealed] = useState(false);
+  const [marimoBurst, setMarimoBurst] = useState({ seq: 0, x: 0, y: 0 });
+  const marimoBurstOnceRef = useRef(false);
+  /** Scene 1 is ready and the page draws smoothly: floaters may move, the zoom may start. */
+  const [warm, setWarm] = useState(false);
 
   const paintSwLayer = useCallback(() => {
     const wrap = logoRef.current;
@@ -312,6 +318,11 @@ export default function BookIntro({
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       unlockAudio();
+      if (!fadingOut && !marimoBurstOnceRef.current) {
+        marimoBurstOnceRef.current = true;
+        setMarimosRevealed(true);
+        setMarimoBurst({ seq: 1, x: event.clientX, y: event.clientY });
+      }
       if (fadingOut) return;
       const pos = pointerInLogo(event.clientX, event.clientY);
       const layers = getLayers();
@@ -320,6 +331,7 @@ export default function BookIntro({
       drawingRef.current = true;
       lastRef.current = pos;
       event.currentTarget.setPointerCapture(event.pointerId);
+      scratchSoundStart(pos.x, pos.y);
       scratchDot(layers, pos.x, pos.y, INTRO_SCRATCH.brushRadiusPx);
     },
     [fadingOut, pointerInLogo, getLayers],
@@ -334,6 +346,7 @@ export default function BookIntro({
       if (!pos || !layers || !last) return;
       event.preventDefault();
       scratchStroke(layers, last.x, last.y, pos.x, pos.y, INTRO_SCRATCH.brushRadiusPx);
+      scratchSoundMove(pos.x, pos.y);
       lastRef.current = pos;
     },
     [fadingOut, pointerInLogo, getLayers],
@@ -361,6 +374,7 @@ export default function BookIntro({
       if (!drawingRef.current) return;
       drawingRef.current = false;
       lastRef.current = null;
+      scratchSoundEnd();
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
       }
@@ -369,8 +383,9 @@ export default function BookIntro({
     [titleDone, revealedRatio],
   );
 
-  /** Scene 1 is ready and the page draws smoothly: floaters may move, the zoom may start. */
-  const [warm, setWarm] = useState(false);
+  // Never leave the rubbing sound running if the intro closes mid-stroke.
+  useEffect(() => scratchSoundEnd, []);
+
   const titleDoneAtRef = useRef(0);
   useEffect(() => {
     if (titleDone) titleDoneAtRef.current = performance.now();
@@ -525,8 +540,14 @@ export default function BookIntro({
         />
       </div>
       {/* Floaters start once scene 1 is set up (see `warm`). */}
-      <div className={`book-intro__floaters-wrap${warm ? " book-intro__floaters-wrap--on" : ""}`}>
-        {warm && <IntroFloaters />}
+      <div
+        className={`book-intro__floaters-wrap${marimosRevealed ? " book-intro__floaters-wrap--on" : ""}`}
+      >
+        <IntroFloaters
+          burstSeq={marimoBurst.seq}
+          burstX={marimoBurst.x}
+          burstY={marimoBurst.y}
+        />
       </div>
     </div>
   );

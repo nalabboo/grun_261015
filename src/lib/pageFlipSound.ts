@@ -36,19 +36,19 @@ export const armPageFlipSound = armAudio;
 export function playPageFlipSound() {
   if (!PAGE_TURN_SOUND.enabled) return;
   whenAudioRunning((ctx) => {
-  void getBuffer(ctx).then((audio) => {
-    if (!audio || ctx.state !== "running") return;
-    const source = ctx.createBufferSource();
-    source.buffer = audio;
-    if (PAGE_TURN_SOUND.playbackRate !== 1) {
-      source.playbackRate.value = PAGE_TURN_SOUND.playbackRate;
-    }
-    const gain = ctx.createGain();
-    gain.gain.value = PAGE_TURN_SOUND.volume;
-    source.connect(gain).connect(getAudioOutput(ctx));
-    const at = ctx.currentTime + 0.02;
-    source.start(at);
-    source.onended = () => gain.disconnect();
-  });
+    void getBuffer(ctx).then((audio) => {
+      if (!audio || ctx.state !== "running") return;
+      const source = ctx.createBufferSource();
+      source.buffer = audio;
+      if (PAGE_TURN_SOUND.playbackRate !== 1) {
+        source.playbackRate.value = PAGE_TURN_SOUND.playbackRate;
+      }
+      const gain = ctx.createGain();
+      gain.gain.value = PAGE_TURN_SOUND.volume;
+      source.connect(gain).connect(getAudioOutput(ctx));
+      const at = ctx.currentTime + 0.02;
+      source.start(at);
+      source.onended = () => gain.disconnect();
+    });
   });
 }

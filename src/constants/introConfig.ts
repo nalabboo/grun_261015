@@ -46,6 +46,23 @@ export const INTRO_SCRATCH = {
 } as const;
 
 /**
+ * Rubbing sound ("슥삭슥삭") while erasing the title, made in code (src/lib/scratchSound.ts, no
+ * sound file): paper-rub noise whose loudness follows how fast the pointer moves, so every stroke
+ * swells and fades; strokes one way sound a little brighter than the other.
+ */
+export const INTRO_SCRATCH_SOUND = {
+  enabled: true,
+  /** Overall loudness, 0..1 (and above to boost). */
+  volume: 0.3,
+  /** Pointer speed (px per ms) that gives full loudness; slower strokes are softer. */
+  fullSpeedPxPerMs: 1.4,
+  /** Main colour of the rub (Hz): lower = duller / softer paper, higher = scratchier. */
+  toneHz: 1400,
+  /** How much brighter one stroke direction is than the other (0 = same). */
+  directionTone: 0.22,
+} as const;
+
+/**
  * Leaving the intro (like lusion.co's intro): once `revealedRatio` of the title is rubbed green,
  * the green title zooms in (scale 1 → `maxScale` over `durationMs`, speeding up), centred on
  * `origin` (a thick spot inside a letter, share of the title image) and scene 1 shows through

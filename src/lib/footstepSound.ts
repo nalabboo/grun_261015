@@ -1,3 +1,5 @@
+"use client";
+
 import { GRUN_FOOTSTEPS } from "@/constants/sceneConfig";
 import { getAudioOutput, whenAudioRunning } from "@/lib/audioContext";
 
@@ -52,7 +54,6 @@ function burst(
   source.onended = () => amp.disconnect();
 }
 
-/** One footfall. `strength` 0..1 (slower steps are softer). */
 function playFootstepOnContext(ctx: AudioContext, strength: number) {
   const s = Math.max(0.15, Math.min(1, strength)) * rand(0.8, 1);
   const out = ctx.createGain();

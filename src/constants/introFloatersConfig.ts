@@ -91,6 +91,14 @@ export const INTRO_MARIMO_PHYSICS = {
   collisionIterations: 4,
 } as const;
 
+/** Intro click: marimos spawn at the pointer and burst outward (px/s at 1080p height). */
+export const INTRO_MARIMO_BURST = {
+  speedPx: 260,
+  speedJitter: 0.35,
+  spinDegPerSec: 52,
+  spinJitter: 0.5,
+} as const;
+
 function buildIntroFloaters(): IntroFloaterInstance[] {
   return Array.from({ length: INTRO_FLOATER_COUNT }, (_, index) => {
     const rand = seededRandom(88_001 + index * 791);

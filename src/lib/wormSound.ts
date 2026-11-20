@@ -25,18 +25,18 @@ function getBuffer(ctx: AudioContext) {
 export function playWormTransformSound() {
   if (!WORM_TRANSFORM_SOUND.enabled) return;
   whenAudioRunning((ctx) => {
-  void getBuffer(ctx).then((audio) => {
-    if (!audio || ctx.state !== "running") return;
-    const source = ctx.createBufferSource();
-    source.buffer = audio;
-    if (WORM_TRANSFORM_SOUND.playbackRate !== 1) {
-      source.playbackRate.value = WORM_TRANSFORM_SOUND.playbackRate;
-    }
-    const gain = ctx.createGain();
-    gain.gain.value = WORM_TRANSFORM_SOUND.volume;
-    source.connect(gain).connect(getAudioOutput(ctx));
-    source.start(ctx.currentTime + 0.02);
-    source.onended = () => gain.disconnect();
-  });
+    void getBuffer(ctx).then((audio) => {
+      if (!audio || ctx.state !== "running") return;
+      const source = ctx.createBufferSource();
+      source.buffer = audio;
+      if (WORM_TRANSFORM_SOUND.playbackRate !== 1) {
+        source.playbackRate.value = WORM_TRANSFORM_SOUND.playbackRate;
+      }
+      const gain = ctx.createGain();
+      gain.gain.value = WORM_TRANSFORM_SOUND.volume;
+      source.connect(gain).connect(getAudioOutput(ctx));
+      source.start(ctx.currentTime + 0.02);
+      source.onended = () => gain.disconnect();
+    });
   });
 }
