@@ -8,6 +8,9 @@ import { AmbientLoop } from "@/lib/ambientLoop";
 import { BgmLoop } from "@/lib/bgmLoop";
 import { GappedAmbient } from "@/lib/gappedAmbient";
 import { playFootstep } from "@/lib/footstepSound";
+import { unlockAudio } from "@/lib/audioContext";
+import { playKindTransformSound } from "@/lib/kindSound";
+import { playWormTransformSound } from "@/lib/wormSound";
 import LayerEditorPanel from "@/components/LayerEditorPanel";
 import WormHitTarget from "@/components/WormHitTarget";
 import AmpelHitTarget from "@/components/AmpelHitTarget";
@@ -42,6 +45,7 @@ import {
   SCENE1_BIRDS,
   GRUN_FOOTSTEPS,
   assetUrl,
+  grunBlingCursorCss,
   GRUN_WALK_SPEED_BASE,
   INITIAL_MOSS_PHASES,
   SCENE_REFERENCE_HEIGHT,
@@ -264,6 +268,22 @@ export default function SceneStage() {
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
   /** White light at the end of chapter 1: blooming in ("in", from `lightX` % across) or clearing. */
   const [exitLight, setExitLight] = useState<{ stage: "in" | "out"; lightX: number } | null>(null);
+
+  useEffect(() => {
+    const on = chapter === 1 || chapter === 2;
+    const root = document.documentElement;
+    if (on) {
+      root.classList.add("grun-cursor-active");
+      root.style.setProperty("--grun-cursor", grunBlingCursorCss());
+    } else {
+      root.classList.remove("grun-cursor-active");
+      root.style.removeProperty("--grun-cursor");
+    }
+    return () => {
+      root.classList.remove("grun-cursor-active");
+      root.style.removeProperty("--grun-cursor");
+    };
+  }, [chapter]);
 
   useEffect(() => {
     if (chapter !== 2 || chapter2Step !== "play") {
@@ -662,6 +682,7 @@ export default function SceneStage() {
     if (stateRef.current.wormPhase !== "b") return;
     stateRef.current.wormPhase = "revealing";
     setWormPhase("revealing");
+    playWormTransformSound();
   }, []);
 
   const handleWormRevealComplete = useCallback(() => {
@@ -691,6 +712,7 @@ export default function SceneStage() {
     if (stateRef.current.kindPhase !== "b") return;
     stateRef.current.kindPhase = "revealing";
     setKindPhase("revealing");
+    playKindTransformSound();
   }, []);
 
   const handleKindRevealComplete = useCallback(() => {
@@ -1100,6 +1122,7 @@ export default function SceneStage() {
       ref={stageRef}
       className={`scene-stage relative h-screen w-screen overflow-hidden${showScene ? "" : " scene-stage--loading"}${editor.enabled ? " scene-stage--editing" : ""}`}
       style={sceneStyle}
+      onPointerDownCapture={() => unlockAudio()}
       onDoubleClick={(event) => {
         event.preventDefault();
         event.stopPropagation();

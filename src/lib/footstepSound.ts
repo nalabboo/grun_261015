@@ -1,5 +1,5 @@
 import { GRUN_FOOTSTEPS } from "@/constants/sceneConfig";
-import { getAudioContext, getAudioOutput } from "@/lib/audioContext";
+import { getAudioOutput, whenAudioRunning } from "@/lib/audioContext";
 
 /**
  * Grun's bare feet on grass, synthesised with Web Audio (no sound file): every footfall is a
@@ -53,21 +53,19 @@ function burst(
 }
 
 /** One footfall. `strength` 0..1 (slower steps are softer). */
-export function playFootstep(strength = 1) {
-  if (!GRUN_FOOTSTEPS.enabled) return;
-  const ctx = getAudioContext();
-  if (!ctx || ctx.state !== "running") return;
+function playFootstepOnContext(ctx: AudioContext, strength: number) {
   const s = Math.max(0.15, Math.min(1, strength)) * rand(0.8, 1);
   const out = ctx.createGain();
   out.gain.value = GRUN_FOOTSTEPS.volume * s;
   out.connect(getAudioOutput(ctx));
   const at = ctx.currentTime + 0.005;
 
-  // Heel, then the ball of the foot: two soft, low thuds close together.
-  burst(ctx, out, at, rand(0.07, 0.1), 0.9, "lowpass", rand(160, 240), 0.9, 0.15);
-  burst(ctx, out, at + rand(0.04, 0.07), rand(0.06, 0.09), 0.55, "lowpass", rand(220, 320), 0.8, 0.2);
+  // Heel, then the ball of the foot: two soft thuds close together (not too low, so laptop
+  // speakers still play them).
+  burst(ctx, out, at, rand(0.07, 0.1), 0.9, "lowpass", rand(280, 400), 0.9, 0.15);
+  burst(ctx, out, at + rand(0.04, 0.07), rand(0.06, 0.09), 0.55, "lowpass", rand(360, 520), 0.8, 0.2);
   // Grass brushing round the foot: an airy swish.
-  burst(ctx, out, at + 0.01, rand(0.12, 0.2), 0.32, "bandpass", rand(2400, 3600), 0.7, 0.3, rand(4500, 6500));
+  burst(ctx, out, at + 0.01, rand(0.12, 0.2), 0.45, "bandpass", rand(2400, 3600), 0.7, 0.3, rand(4500, 6500));
   // A few blades bending / snapping softly.
   const blades = Math.round(rand(2, 5));
   for (let i = 0; i < blades; i++) {
@@ -75,4 +73,10 @@ export function playFootstep(strength = 1) {
   }
 
   window.setTimeout(() => out.disconnect(), 600);
+}
+
+/** One footfall. `strength` 0..1 (slower steps are softer). */
+export function playFootstep(strength = 1) {
+  if (!GRUN_FOOTSTEPS.enabled) return;
+  whenAudioRunning((ctx) => playFootstepOnContext(ctx, strength));
 }

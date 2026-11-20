@@ -8,7 +8,21 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261120-papier";
+export const ASSET_VERSION = "20261121-vogel";
+
+/**
+ * Chapters 1–2 pointer: 64px export of `landmark/bling_grun1.png` (browsers cap cursor size).
+ */
+export const GRUN_BLING_CURSOR = {
+  file: "landmark/bling_grun1_cursor.png",
+  hotspotX: 25,
+  hotspotY: 32,
+} as const;
+
+export function grunBlingCursorCss() {
+  const { file, hotspotX, hotspotY } = GRUN_BLING_CURSOR;
+  return `url(${assetUrl(file)}) ${hotspotX} ${hotspotY}, auto`;
+}
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
@@ -234,19 +248,20 @@ export const GRUN_START_RATIO = 0.1;
  */
 export const GRUN_FOOTSTEPS = {
   enabled: true,
-  volume: 0.55,
+  /** Loud enough to be heard over the BGM and birds (0.55 got masked). */
+  volume: 1.1,
   // Feet land at frames 19 and 34 in the drawing (15 / 20 frames apart, which sounds limping);
   // evened out to 17.5 frames apart, each within ~1.5 frames of the drawn landing.
   stepFrames: [18, 0.5] as const,
 } as const;
 
 /**
- * Chapter 1 BGM (`scene1/sound/#1_bgm_2.wav`, src/lib/bgmLoop.ts). Loops from the book intro until
+ * Chapter 1 BGM (`scene1/sound/#1_bgm_2.mp3`, src/lib/bgmLoop.ts). Loops from the book intro until
  * the page turns to chapter 2 (after the reader's first click).
  */
 export const SCENE1_BGM = {
   enabled: true,
-  file: "sound/#1_bgm_2.wav",
+  file: "sound/#1_bgm_2.mp3",
   volume: 0.65,
   fadeInMs: 2500,
   fadeOutMs: 1500,
@@ -269,16 +284,43 @@ export const SCENE1_AMBIENT = {
 } as const;
 
 /**
- * Bird calls in chapter 1 (`scene1/sound/birds.wav`, src/lib/gappedAmbient.ts): plays the clip
- * once, waits `gapMs`, then plays again. Starts when chapter 1 play begins (after the book intro).
+ * Bird calls in chapter 1 (`scene1/sound/vogel.mp3`, src/lib/gappedAmbient.ts): plays the clip once,
+ * waits `gapMs`, then plays again. Starts when chapter 1 play begins (after the book intro).
  */
 export const SCENE1_BIRDS = {
   enabled: true,
-  file: "sound/birds.wav",
+  file: "sound/vogel.mp3",
   volume: 0.5,
   gapMs: 3000,
   fadeInMs: 800,
   fadeOutMs: 1200,
+} as const;
+
+/**
+ * Worm transformation (`scene1/sound/worme.mp3`, src/lib/wormSound.ts): once when the worm is
+ * clicked and the mitte clip starts (grey → green).
+ */
+export const WORM_TRANSFORM_SOUND = {
+  enabled: true,
+  file: "sound/worme.mp3",
+  volume: 0.75,
+  playbackRate: 1,
+} as const;
+
+/**
+ * Kid transformation (`scene1/sound/kind.mp3`, src/lib/kindSound.ts): once when the kid is clicked
+ * and the mitte clip starts (grey → green).
+ */
+export const KIND_TRANSFORM_SOUND = {
+  enabled: true,
+  /** First hit when the kid is clicked. */
+  file: "sound/kind.mp3",
+  volume: 0.75,
+  playbackRate: 1,
+  /** Plays right after `file` finishes. */
+  file2: "sound/kind2.mp3",
+  volume2: 0.75,
+  playbackRate2: 1,
 } as const;
 
 /**

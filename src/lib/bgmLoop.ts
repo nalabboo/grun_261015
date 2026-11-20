@@ -1,4 +1,8 @@
-import { getAudioContext, getAudioOutput, subscribeAudio } from "@/lib/audioContext";
+import {
+  isAudioRunning,
+  runInAudioUnlockGesture,
+  subscribeAudio,
+} from "@/lib/audioContext";
 
 export type BgmLoopOptions = {
   url: string;
@@ -8,14 +12,14 @@ export type BgmLoopOptions = {
 };
 
 /**
- * Chapter BGM: one file on `AudioBufferSourceNode.loop`, faded in/out on start/stop. Waits until
- * Web Audio is allowed and the file has loaded.
+ * Chapter BGM via HTMLMediaElement (no `createMediaElementSource` — Safari is flaky unless
+ * `play()` runs in the same gesture). Volume / fade use `audio.volume` only.
  */
 export class BgmLoop {
   private options: BgmLoopOptions;
-  private buffer: Promise<AudioBuffer | null> | null = null;
-  private master: GainNode | null = null;
-  private source: AudioBufferSourceNode | null = null;
+  private audio: HTMLAudioElement | null = null;
+  private fadeTimer = 0;
+  private unlockWaitOff: (() => void) | null = null;
   private wanted = false;
   private active = false;
 
@@ -23,95 +27,89 @@ export class BgmLoop {
     this.options = options;
   }
 
-  private async decode(url: string, ctx: AudioContext): Promise<AudioBuffer> {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`bgm fetch ${response.status}: ${url}`);
-    const data = await response.arrayBuffer();
-    return await ctx.decodeAudioData(data.slice(0));
+  private clearUnlockWait() {
+    this.unlockWaitOff?.();
+    this.unlockWaitOff = null;
   }
 
-  private load(ctx: AudioContext) {
-    this.buffer ??= this.decode(this.options.url, ctx).catch((error: unknown) => {
-      console.error(error);
-      return null;
-    });
-    return this.buffer;
-  }
-
-  private stopSource() {
-    const source = this.source;
-    if (!source) return;
-    this.source = null;
-    try {
-      source.stop();
-    } catch {
-      // already stopped
+  private ensureAudio() {
+    if (!this.audio) {
+      const audio = new Audio(this.options.url);
+      audio.loop = true;
+      audio.preload = "auto";
+      this.audio = audio;
     }
-    source.disconnect();
+    return this.audio;
+  }
+
+  private clearFade() {
+    window.clearInterval(this.fadeTimer);
+    this.fadeTimer = 0;
+  }
+
+  private fadeTo(volume: number, durationMs: number, onDone?: () => void) {
+    const audio = this.audio;
+    if (!audio) return;
+    this.clearFade();
+    const from = audio.volume;
+    const start = performance.now();
+    this.fadeTimer = window.setInterval(() => {
+      const t = Math.min(1, (performance.now() - start) / durationMs);
+      audio.volume = from + (volume - from) * t;
+      if (t >= 1) {
+        this.clearFade();
+        onDone?.();
+      }
+    }, 32);
+  }
+
+  private tryPlay() {
+    if (this.active || !this.wanted) return;
+    const audio = this.ensureAudio();
+    this.active = true;
+    audio.volume = 0;
+    const playResult = audio.play();
+    if (playResult !== undefined) {
+      void playResult.catch((error: unknown) => {
+        console.error(error);
+        this.active = false;
+        audio.pause();
+      });
+    }
+    this.fadeTo(this.options.volume, this.options.fadeInMs);
   }
 
   start() {
     this.wanted = true;
-    const ctx = getAudioContext();
-    if (this.active) return;
-    if (!ctx) {
-      const off = subscribeAudio(() => {
-        const next = getAudioContext();
-        if (next?.state === "running") {
-          off();
-          if (this.wanted) this.start();
-        }
-      });
+    if (isAudioRunning()) {
+      this.clearUnlockWait();
+      this.tryPlay();
       return;
     }
-    void this.load(ctx).then((audio) => {
-      if (!audio || !this.wanted || this.active) return;
-      if (ctx.state !== "running") {
-        const retry = () => {
-          if (ctx.state === "running") {
-            ctx.removeEventListener("statechange", retry);
-            if (this.wanted) this.start();
-          }
-        };
-        ctx.addEventListener("statechange", retry);
-        return;
+    this.clearUnlockWait();
+    runInAudioUnlockGesture(() => this.tryPlay());
+    this.unlockWaitOff = subscribeAudio(() => {
+      if (isAudioRunning()) {
+        this.clearUnlockWait();
+        if (this.wanted && !this.active) this.tryPlay();
       }
-      this.active = true;
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0, ctx.currentTime);
-      master.gain.linearRampToValueAtTime(
-        this.options.volume,
-        ctx.currentTime + this.options.fadeInMs / 1000,
-      );
-      master.connect(getAudioOutput(ctx));
-      this.master = master;
-      const source = ctx.createBufferSource();
-      source.buffer = audio;
-      source.loop = true;
-      source.connect(master);
-      source.start(0);
-      this.source = source;
     });
   }
 
   stop() {
     this.wanted = false;
-    this.active = false;
-    const ctx = getAudioContext();
-    const master = this.master;
-    if (!ctx || !master) {
-      this.stopSource();
-      this.master = null;
+    this.clearUnlockWait();
+    const audio = this.audio;
+    if (!audio || !this.active) {
+      this.active = false;
+      audio?.pause();
+      if (audio) audio.currentTime = 0;
       return;
     }
-    const end = ctx.currentTime + this.options.fadeOutMs / 1000;
-    master.gain.cancelScheduledValues(ctx.currentTime);
-    master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
-    master.gain.linearRampToValueAtTime(0, end);
-    window.setTimeout(() => {
-      this.stopSource();
-      master.disconnect();
-    }, this.options.fadeOutMs + 50);
-    this.master = null;
+    this.active = false;
+    this.fadeTo(0, this.options.fadeOutMs, () => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
   }
 }

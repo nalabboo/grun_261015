@@ -25,6 +25,12 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Chapters 1–2: bling_grun1 cursor (SceneStage sets --grun-cursor on <html>). */
+html.grun-cursor-active,
+html.grun-cursor-active body {
+  cursor: var(--grun-cursor, auto);
+}
+
 .scene-stage {
   --scene-h: 100vh;
   --scene-w: 100vw;

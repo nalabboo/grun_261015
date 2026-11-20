@@ -28,12 +28,12 @@ export const PAGE_TURN = {
 } as const;
 
 /**
- * Page-turn sound (`public/scene1/sound/papier.wav`, src/lib/pageFlipSound.ts). One clip per flip.
+ * Page-turn sound (`public/scene1/sound/papier.mp3`, src/lib/pageFlipSound.ts). One clip per flip.
  */
 export const PAGE_TURN_SOUND = {
   enabled: true,
   /** Path under `public/scene1/`. */
-  file: "sound/papier.wav",
+  file: "sound/papier.mp3",
   /** Overall loudness, 0..1 (and above to boost). */
   volume: 0.6,
   /** 1 = natural length (~1.47s); lower = slower / longer. */

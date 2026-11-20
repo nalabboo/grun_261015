@@ -1,9 +1,9 @@
 import { PAGE_TURN_SOUND } from "@/constants/pageTurnConfig";
 import { assetUrl } from "@/constants/sceneConfig";
-import { armAudio, getAudioContext, getAudioOutput } from "@/lib/audioContext";
+import { armAudio, getAudioOutput, whenAudioRunning } from "@/lib/audioContext";
 
 /**
- * Paper page-turn sound from `scene1/sound/papier.wav`, once per PageFlipOverlay run.
+ * Paper page-turn sound from `scene1/sound/papier.mp3`, once per PageFlipOverlay run.
  *
  * Browsers only let a page make sound after the reader has clicked / pressed a key / touched it
  * (scrolling doesn't count). Sound is armed at the reader's first such input on the page.
@@ -35,9 +35,7 @@ export const armPageFlipSound = armAudio;
 /** Plays the page-turn sound (in step with PageFlipOverlay). */
 export function playPageFlipSound() {
   if (!PAGE_TURN_SOUND.enabled) return;
-  const ctx = getAudioContext();
-  if (!ctx || ctx.state !== "running") return;
-
+  whenAudioRunning((ctx) => {
   void getBuffer(ctx).then((audio) => {
     if (!audio || ctx.state !== "running") return;
     const source = ctx.createBufferSource();
@@ -51,5 +49,6 @@ export function playPageFlipSound() {
     const at = ctx.currentTime + 0.02;
     source.start(at);
     source.onended = () => gain.disconnect();
+  });
   });
 }

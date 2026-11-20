@@ -94,6 +94,7 @@ import Chapter2FloatingBubbles from "@/components/scene2/Chapter2FloatingBubbles
 import Chapter2FloatingMarimos from "@/components/scene2/Chapter2FloatingMarimos";
 import Chapter2FloatingNabis from "@/components/scene2/Chapter2FloatingNabis";
 import Chapter2ScrollProgress from "@/components/scene2/Chapter2ScrollProgress";
+import { unlockAudio } from "@/lib/audioContext";
 import Chapter2VogelFlyby from "@/components/scene2/Chapter2VogelFlyby";
 import { CHAPTER2_VOGEL } from "@/constants/chapter2VogelConfig";
 import {
@@ -1016,7 +1017,10 @@ export default function Chapter2Scene({
     <div
       ref={sceneShellRef}
       className={`chapter2-scene chapter2-scene--visible${editor.enabled ? " chapter2-scene--editing" : ""}`}
-      onPointerDownCapture={handleScenePointerDownCapture}
+      onPointerDownCapture={(event) => {
+        unlockAudio();
+        handleScenePointerDownCapture(event);
+      }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

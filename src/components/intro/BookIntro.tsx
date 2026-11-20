@@ -5,7 +5,6 @@ import IntroFloaters from "@/components/intro/IntroFloaters";
 import {
   BOOK_INTRO_FADEOUT_MS,
   INTRO_PAPIER_URL,
-  INTRO_MOND_K_CURSOR_URL,
   INTRO_RICORI1_2,
   INTRO_RICORI1_2_URL,
   INTRO_RICORI1_2SW,
@@ -461,9 +460,6 @@ export default function BookIntro({
   return (
     <div
       className={`book-intro${fadingOut ? " book-intro--out" : ""}${titleDone ? " book-intro--done" : ""}${zooming ? " book-intro--zooming" : ""}${scratchReady ? " book-intro--scratch-ready" : ""}`}
-      style={{
-        cursor: `url(${INTRO_MOND_K_CURSOR_URL}) 32 32, crosshair`,
-      }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           unlockAudio();

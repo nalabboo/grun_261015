@@ -8,11 +8,14 @@
  *
  * Safari is strict: the context is only created inside such an input handler (one made earlier
  * may never be allowed to start), and it is "unlocked" there by playing a tiny silent buffer.
+ * HTML BGM must not `play()` before Web Audio `resume()` — it can leave the context suspended.
  */
 
 let context: AudioContext | null = null;
 let master: GainNode | null = null;
 const listeners = new Set<() => void>();
+/** BGM `HTMLAudioElement.play()` — only after Web Audio is running, or from this queue at gesture end. */
+const gestureRunQueue: Array<() => void> = [];
 
 /** The shared context, or null until the reader's first click / key / touch created it. */
 export function getAudioContext() {
@@ -54,6 +57,10 @@ export function subscribeAudio(listener: () => void) {
   };
 }
 
+export function isAudioRunning() {
+  return context?.state === "running";
+}
+
 // Pointer / mouse up too: the intro calls preventDefault on pointerdown (rubbing), which in
 // Safari stops the click that would otherwise count as the reader's gesture.
 const UNLOCK_EVENTS = [
@@ -68,8 +75,85 @@ const UNLOCK_EVENTS = [
   "touchend",
 ] as const;
 
+const GESTURE_EVENTS = new Set(["pointerdown", "touchstart", "mousedown", "keydown"]);
+
 function detachUnlockListeners() {
   for (const type of UNLOCK_EVENTS) window.removeEventListener(type, unlockAudio, true);
+}
+
+function playSilentUnlock(ctx: AudioContext) {
+  try {
+    const silent = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const source = ctx.createBufferSource();
+    source.buffer = silent;
+    source.connect(ctx.destination);
+    source.start(0);
+    const tap = ctx.createBufferSource();
+    tap.buffer = silent;
+    tap.connect(getAudioOutput(ctx));
+    tap.start(0);
+  } catch {
+    // ignore
+  }
+}
+
+function drainGestureQueue() {
+  while (gestureRunQueue.length > 0) {
+    const fn = gestureRunQueue.shift();
+    try {
+      fn?.();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+/** Queue BGM `play()` until Web Audio is running (do not run Web Audio work here). */
+export function runInAudioUnlockGesture(fn: () => void) {
+  if (isAudioRunning()) {
+    fn();
+    return;
+  }
+  gestureRunQueue.push(fn);
+}
+
+/** Run once Web Audio is allowed (after unlock / resume). */
+export function whenAudioRunning(fn: (ctx: AudioContext) => void) {
+  const ctx = getAudioContext();
+  if (ctx?.state === "running") {
+    fn(ctx);
+    return;
+  }
+  if (!ctx) {
+    const off = subscribeAudio(() => {
+      const next = getAudioContext();
+      if (next?.state === "running") {
+        off();
+        fn(next);
+      }
+    });
+    return;
+  }
+  const onState = () => {
+    if (ctx.state === "running") {
+      ctx.removeEventListener("statechange", onState);
+      fn(ctx);
+    }
+  };
+  ctx.addEventListener("statechange", onState);
+  const off = subscribeAudio(() => {
+    if (ctx.state === "running") {
+      off();
+      ctx.removeEventListener("statechange", onState);
+      fn(ctx);
+    }
+  });
+}
+
+function finishUnlock(ctx: AudioContext) {
+  if (ctx.state === "running") detachUnlockListeners();
+  drainGestureQueue();
+  notify();
 }
 
 /** Switches sound on. Must run inside a click / key / touch handler (Safari). */
@@ -77,24 +161,14 @@ export function unlockAudio() {
   const ctx = createAudioContext();
   if (!ctx) return;
   if (ctx.state === "running") {
-    detachUnlockListeners();
-    notify();
+    finishUnlock(ctx);
     return;
   }
-  // Safari: a silent sound played right inside the gesture unlocks the context (same output path as the rest of the app).
-  try {
-    const silent = ctx.createBuffer(1, 1, ctx.sampleRate);
-    const source = ctx.createBufferSource();
-    source.buffer = silent;
-    source.connect(getAudioOutput(ctx));
-    source.start(0);
-  } catch {
-    // ignore
-  }
-  void ctx.resume().then(() => {
-    if (ctx.state === "running") detachUnlockListeners();
-    notify();
-  });
+  playSilentUnlock(ctx);
+  void ctx
+    .resume()
+    .then(() => finishUnlock(ctx))
+    .catch(() => notify());
   notify();
 }
 
@@ -102,6 +176,7 @@ export function unlockAudio() {
 export function armAudio() {
   if (typeof window === "undefined") return;
   for (const type of UNLOCK_EVENTS) {
-    window.addEventListener(type, unlockAudio, { capture: true, passive: true });
+    const passive = GESTURE_EVENTS.has(type) ? false : true;
+    window.addEventListener(type, unlockAudio, { capture: true, passive });
   }
 }
