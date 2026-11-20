@@ -8,7 +8,7 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261119-kind-mitte2";
+export const ASSET_VERSION = "20261120-nowald";
 
 /** URL for a file under `public/scene1/` (path is relative to that folder). */
 export function assetUrl(relativePath: string) {
@@ -222,6 +222,34 @@ export const WORM_BACKGROUND_DONE_BEFORE_FOCUS_RATIO = 0.4;
 export const WORM_BACKGROUND_FADE_SPAN_RATIO = 1.55;
 
 export const GRUN_START_RATIO = 0.1;
+
+/**
+ * Grun's bare footsteps on grass (src/lib/footstepSound.ts, synthesised). A step sounds when the
+ * walk cycle reaches a frame where a foot lands (`stepFrames`, frames of GRUN_WALK); quieter
+ * when he walks slowly (slowing down to stop).
+ */
+export const GRUN_FOOTSTEPS = {
+  enabled: true,
+  volume: 0.55,
+  // Feet land at frames 19 and 34 in the drawing (15 / 20 frames apart, which sounds limping);
+  // evened out to 17.5 frames apart, each within ~1.5 frames of the drawn landing.
+  stepFrames: [18, 0.5] as const,
+} as const;
+
+/**
+ * Wind ambience through all of chapter 1 (scene1/sound/wind.mp3 — made from wind.wav, 18 dB
+ * louder, 128 kbps). Starts with the book intro — at the reader's first click / rub, as browsers
+ * don't allow sound before that — keeps looping seamlessly (passes overlap by `crossfadeMs`)
+ * through the closing tableau, and fades out when the page turns to chapter 2.
+ */
+export const SCENE1_AMBIENT = {
+  file: "sound/wind.mp3",
+  /** Overall loop loudness (1 = unity; was 1.4 when wind.wav was normalized quieter). */
+  volume: 0.55,
+  fadeInMs: 3000,
+  fadeOutMs: 1500,
+  crossfadeMs: 3000,
+} as const;
 
 /**
  * Chapter 1 scroll indicator on the right edge (ScrollProgress.tsx, `.scroll-progress` in

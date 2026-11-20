@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import GrunCharacter from "@/components/GrunCharacter";
 import ScrollProgress from "@/components/ScrollProgress";
+import { armPageFlipSound } from "@/lib/pageFlipSound";
+import { AmbientLoop } from "@/lib/ambientLoop";
+import { playFootstep } from "@/lib/footstepSound";
 import LayerEditorPanel from "@/components/LayerEditorPanel";
 import WormHitTarget from "@/components/WormHitTarget";
 import AmpelHitTarget from "@/components/AmpelHitTarget";
@@ -32,6 +35,9 @@ import { preloadSceneAssets } from "@/lib/preloadSceneAssets";
 import {
   areWormMossRevealsComplete,
   GRUN_START_RATIO,
+  SCENE1_AMBIENT,
+  GRUN_FOOTSTEPS,
+  assetUrl,
   GRUN_WALK_SPEED_BASE,
   INITIAL_MOSS_PHASES,
   SCENE_REFERENCE_HEIGHT,
@@ -234,6 +240,9 @@ export default function SceneStage() {
   const [bookIntroOpen, setBookIntroOpen] = useState(() =>
     resolveBookIntroOpen(new URLSearchParams(), DEV_START_CHAPTER),
   );
+  // Page-turn sound may only play after a click / key / touch: listen for the first one.
+  useEffect(() => armPageFlipSound(), []);
+
   const bookIntroOpenRef = useRef(bookIntroOpen);
   useEffect(() => {
     bookIntroOpenRef.current = bookIntroOpen;
@@ -292,6 +301,22 @@ export default function SceneStage() {
 
   /** Page turn in progress, towards this chapter (see PageFlipOverlay). */
   const [pageFlipTo, setPageFlipTo] = useState<2 | 3 | null>(null);
+
+  // Wind through chapter 1, from the book intro until the page turns to chapter 2.
+  const windRef = useRef<AmbientLoop | null>(null);
+  const windOn = chapter === 1 && pageFlipTo === null;
+  useEffect(() => {
+    windRef.current ??= new AmbientLoop({
+      url: assetUrl(SCENE1_AMBIENT.file),
+      volume: SCENE1_AMBIENT.volume,
+      fadeInMs: SCENE1_AMBIENT.fadeInMs,
+      fadeOutMs: SCENE1_AMBIENT.fadeOutMs,
+      crossfadeMs: SCENE1_AMBIENT.crossfadeMs,
+    });
+    if (windOn) windRef.current.start();
+    else windRef.current.stop();
+  }, [windOn]);
+  useEffect(() => () => windRef.current?.stop(), []);
   const startPageFlipTo2 = useCallback(() => setPageFlipTo((prev) => prev ?? 2), []);
   const startPageFlipTo3 = useCallback(() => setPageFlipTo((prev) => prev ?? 3), []);
   const handlePageFlipCovered = useCallback(() => {
@@ -800,6 +825,7 @@ export default function SceneStage() {
       return true;
     };
 
+    let stepsPrimed = false;
     const tick = (time: number) => {
       const delta = Math.min((time - lastTime) / 1000, 0.05);
       lastTime = time;
@@ -856,6 +882,27 @@ export default function SceneStage() {
       }
 
       moved = advanceStop(state, delta) || moved;
+
+      // Footsteps: a foot lands when the walk cycle passes one of the step frames.
+      const prevPhase = grunSourceRef.current.timeMs;
+      const phaseStep = state.grunWalkPhaseMs - prevPhase;
+      // (Not on the very first sync of the walk-cycle time at load.)
+      if (stepsPrimed && phaseStep > 0 && phaseStep < GRUN_WALK.loopMs / 2) {
+        const loop = GRUN_WALK.loopMs;
+        const frameMs = loop / GRUN_WALK.frames;
+        for (const frame of GRUN_FOOTSTEPS.stepFrames) {
+          const hit = frame * frameMs;
+          const from = ((prevPhase % loop) + loop) % loop;
+          const to = from + phaseStep;
+          if ((from < hit && to >= hit) || (from < hit + loop && to >= hit + loop)) {
+            // Walk-cycle speed this frame vs normal (1): slow steps are softer.
+            const rate = phaseStep / Math.max(1, delta * 1000);
+            playFootstep(rate);
+          }
+        }
+      }
+
+      stepsPrimed = true;
 
       const grunSource = grunSourceRef.current;
       if (grunSource.timeMs !== state.grunWalkPhaseMs) {

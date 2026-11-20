@@ -27,6 +27,19 @@ export const PAGE_TURN = {
   sheetLiftMax: 0.5,
 } as const;
 
+/**
+ * Page-turn sound (`public/scene1/sound/papier.wav`, src/lib/pageFlipSound.ts). One clip per flip.
+ */
+export const PAGE_TURN_SOUND = {
+  enabled: true,
+  /** Path under `public/scene1/`. */
+  file: "sound/papier.wav",
+  /** Overall loudness, 0..1 (and above to boost). */
+  volume: 0.6,
+  /** 1 = natural length (~1.47s); lower = slower / longer. */
+  playbackRate: 1,
+} as const;
+
 /** The scene page has turned away (and sheets cover the screen): the next chapter mounts. */
 export const PAGE_TURN_COVERED_MS = Math.max(
   PAGE_TURN.leafMs,

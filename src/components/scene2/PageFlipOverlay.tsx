@@ -7,6 +7,7 @@ import {
   PAGE_TURN_TOTAL_MS,
 } from "@/constants/pageTurnConfig";
 import { SCENE2_PAPIER, tableauAssetUrl } from "@/constants/scene2Config";
+import { playPageFlipSound } from "@/lib/pageFlipSound";
 
 type Point = { x: number; y: number };
 
@@ -104,6 +105,7 @@ export default function PageFlipOverlay({ onCovered, onDone }: PageFlipOverlayPr
   const flapRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
+    playPageFlipSound();
     const covered = window.setTimeout(() => callbacks.current.onCovered(), PAGE_TURN_COVERED_MS);
     const done = window.setTimeout(() => callbacks.current.onDone(), PAGE_TURN_TOTAL_MS);
 

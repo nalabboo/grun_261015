@@ -13,6 +13,7 @@ import {
   INTRO_SCRATCH,
   INTRO_ZOOM,
 } from "@/constants/introConfig";
+import { unlockAudio } from "@/lib/audioContext";
 
 type BookIntroProps = {
   onComplete: () => void;
@@ -290,6 +291,7 @@ export default function BookIntro({
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      unlockAudio();
       if (fadingOut) return;
       const pos = pointerInLogo(event.clientX, event.clientY);
       const layers = getLayers();
@@ -443,6 +445,7 @@ export default function BookIntro({
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
+          unlockAudio();
           event.preventDefault();
           beginExit();
         }
