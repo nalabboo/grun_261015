@@ -1296,3 +1296,21 @@ html.grun-cursor-active body {
     filter: brightness(1);
   }
 }
+
+/* Custom cursor (CustomCursor.tsx): the green brush star replaces the mouse pointer everywhere. */
+html.custom-cursor-on,
+html.custom-cursor-on * {
+  cursor: none !important;
+}
+
+.custom-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  background: center / contain no-repeat;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  will-change: transform;
+}
