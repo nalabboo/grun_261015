@@ -22,7 +22,11 @@ import Chapter2Scene from "@/components/scene2/Chapter2Scene";
 import Chapter3Intro from "@/components/scene3/Chapter3Intro";
 import Chapter3Inside from "@/components/scene3/Chapter3Inside";
 import Chapter3Scene from "@/components/scene3/Chapter3Scene";
-import { preloadChapter2BergAssets } from "@/constants/chapter2Config";
+import {
+  chapter2AssetUrl,
+  preloadChapter2BergAssets,
+  SCENE2_BGM,
+} from "@/constants/chapter2Config";
 import NextScene from "@/components/scene2/NextScene";
 import BookIntro from "@/components/intro/BookIntro";
 import PageFlipOverlay, { PageFlipLeaf } from "@/components/scene2/PageFlipOverlay";
@@ -370,8 +374,25 @@ export default function SceneStage() {
       birdsRef.current?.stop();
     }
   }, [chapter1AmbienceOn, bookIntroOpen]);
+  // Chapter 2 BGM: from when chapter 2 shows under the turning pages until the turn to chapter 3.
+  const bgm2Ref = useRef<BgmLoop | null>(null);
+  const chapter2MusicOn = chapter === 2 && pageFlipTo !== 3;
+  useEffect(() => {
+    if (chapter2MusicOn && SCENE2_BGM.enabled) {
+      bgm2Ref.current ??= new BgmLoop({
+        url: chapter2AssetUrl(SCENE2_BGM.file),
+        volume: SCENE2_BGM.volume,
+        fadeInMs: SCENE2_BGM.fadeInMs,
+        fadeOutMs: SCENE2_BGM.fadeOutMs,
+      });
+      bgm2Ref.current.start();
+    } else {
+      bgm2Ref.current?.stop();
+    }
+  }, [chapter2MusicOn]);
   useEffect(
     () => () => {
+      bgm2Ref.current?.stop();
       bgmRef.current?.stop();
       windRef.current?.stop();
       birdsRef.current?.stop();

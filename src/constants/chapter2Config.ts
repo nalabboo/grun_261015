@@ -89,6 +89,18 @@ export function chapter2AssetUrl(file: string) {
   return `/${CHAPTER2_ID}/${path}?v=${CHAPTER2_ASSET_VERSION}`;
 }
 
+/**
+ * Chapter 2 BGM (`scene2/sound/#2_bgm_4.mp3`, src/lib/bgmLoop.ts). Fades in when chapter 2
+ * appears under the turning pages, loops, and fades out when the page turns to chapter 3.
+ */
+export const SCENE2_BGM = {
+  enabled: true,
+  file: "sound/#2_bgm_4.mp3",
+  volume: 0.65,
+  fadeInMs: 2500,
+  fadeOutMs: 1500,
+} as const;
+
 /** Paper backdrop behind berg4 (scene 2-1 base). */
 export const CHAPTER2_PAPIER_BG_URL = chapter2AssetUrl("background/papier.jpg");
 
