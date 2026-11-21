@@ -10,6 +10,8 @@ import { GappedAmbient } from "@/lib/gappedAmbient";
 import { playFootstep } from "@/lib/footstepSound";
 import { unlockAudio } from "@/lib/audioContext";
 import { playKindTransformSound } from "@/lib/kindSound";
+import { playAmpelTransformSound } from "@/lib/ampelSound";
+import { playScene1TableauGigglingSound } from "@/lib/gigglingSound";
 import { playWormTransformSound } from "@/lib/wormSound";
 import LayerEditorPanel from "@/components/LayerEditorPanel";
 import WormHitTarget from "@/components/WormHitTarget";
@@ -270,6 +272,7 @@ export default function SceneStage() {
   );
   const chapterRef = useRef<Chapter>(DEV_START_CHAPTER);
   const chapter1PhaseRef = useRef<Chapter1Phase>("scroll");
+  const tableauGigglingPlayedRef = useRef(false);
   /** White light at the end of chapter 1: blooming in ("in", from `lightX` % across) or clearing. */
   const [exitLight, setExitLight] = useState<{ stage: "in" | "out"; lightX: number } | null>(null);
 
@@ -430,6 +433,7 @@ export default function SceneStage() {
     setChapter(target);
     setChapter1Phase("scroll");
     chapter1PhaseRef.current = "scroll";
+    tableauGigglingPlayedRef.current = false;
     setTableauRevealed(false);
     setChapter2Step(target === 2 ? "play" : null);
     if (target === 3) {
@@ -475,6 +479,13 @@ export default function SceneStage() {
   const handleTableauRevealComplete = useCallback(() => {
     setTableauRevealed(true);
   }, []);
+
+  useEffect(() => {
+    if (chapter !== 1 || chapter1Phase !== "tableau") return;
+    if (tableauGigglingPlayedRef.current) return;
+    tableauGigglingPlayedRef.current = true;
+    playScene1TableauGigglingSound();
+  }, [chapter, chapter1Phase]);
 
   useEffect(() => {
     if (!glReady) return;
@@ -756,7 +767,10 @@ export default function SceneStage() {
     }
   }, []);
 
-  const handleAmpelClick = useCallback(() => setAmpelPhase("g"), []);
+  const handleAmpelClick = useCallback(() => {
+    playAmpelTransformSound();
+    setAmpelPhase("g");
+  }, []);
   /** The traffic light's turn clip has played: grun may walk on. */
   const handleAmpelSwitchComplete = useCallback(() => {
     stateRef.current.ampelGreen = true;

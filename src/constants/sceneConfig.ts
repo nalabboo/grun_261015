@@ -8,7 +8,7 @@ export const SCENE_PERSPECTIVE_RATIO = 1.111;
 export const SCENE_ID = "scene1";
 
 /** Bump when scene assets change to bust browser cache. */
-export const ASSET_VERSION = "20261121-vogel";
+export const ASSET_VERSION = "20261122-laugh";
 
 /**
  * Chapters 1–2 pointer: 64px export of `landmark/bling_grun1.png` (browsers cap cursor size).
@@ -49,6 +49,9 @@ export const IMAGE_SIZES = {
   stern_s4: { file: "himmel/stern_s4.webp", width: 137, height: 204 },
   mond: { file: "himmel/mond.webp", width: 300, height: 301 },
   hinter_test: { file: "himmel/hinter_test3.webp", width: 1376, height: 768 },
+  // berg/hinter_grun_magie*.png (7000x5000) made small: plain paper, and the green paint alone.
+  magie_paper: { file: "berg/hinter_grun_magie1.webp", width: 2800, height: 2000 },
+  magie_paint: { file: "berg/hinter_grun_magie_paint.webp", width: 4096, height: 1903 },
   // character/
   // landmark/
   ampel_b: { file: "landmark/ampel_b.webp", width: 821, height: 1000 },
@@ -308,19 +311,32 @@ export const WORM_TRANSFORM_SOUND = {
 } as const;
 
 /**
- * Kid transformation (`scene1/sound/kind.mp3`, src/lib/kindSound.ts): once when the kid is clicked
- * and the mitte clip starts (grey → green).
+ * Kid transformation (`scene1/sound/kind.mp3` then `laugh.mp3`, src/lib/kindSound.ts): when the
+ * kid is clicked and the mitte clip starts (grey → green).
  */
 export const KIND_TRANSFORM_SOUND = {
   enabled: true,
   /** First hit when the kid is clicked. */
   file: "sound/kind.mp3",
+  /** Wait after click before `file` starts (`file2` still follows when `file` ends). */
+  delayMs: 1000,
   volume: 0.75,
   playbackRate: 1,
   /** Plays right after `file` finishes. */
-  file2: "sound/kind2.mp3",
+  file2: "sound/laugh.mp3",
   volume2: 0.75,
   playbackRate2: 1,
+} as const;
+
+/**
+ * Traffic-light clip (`scene1/sound/ampel_mitte.mp3`, src/lib/ampelSound.ts): once when the
+ * signal is clicked and the red → green turn plays.
+ */
+export const AMPEL_TRANSFORM_SOUND = {
+  enabled: true,
+  file: "sound/ampel_mitte.mp3",
+  volume: 0.75,
+  playbackRate: 1,
 } as const;
 
 /**
@@ -345,11 +361,6 @@ export const GRUN_OFFSET_Y_RATIO = 10 / SCENE_REFERENCE_HEIGHT;
  * position follows the legs, so the feet don't slide.
  */
 /**
- * Grun breathing while he stands still: he grows a little taller (and a touch narrower) and back,
- * feet staying on the ground. Starts `delayMs` after he stops and fades in over `fadeMs`; walking
- * fades it out quickly.
- */
-/**
  * Grun walks while the reader scrolls down (wheel / trackpad, swipe up, ↓ → Space PageDown).
  * Each scroll moves his walk target ahead by `gain` x the scroll distance (1080p px), at most
  * `maxLeadCycles` walk cycles ahead of him, so he stops soon after the scrolling stops. While
@@ -364,16 +375,6 @@ export const SCROLL_WALK = {
   keyStepPx: 300,
   /** Swipe distance multiplier (finger px → scroll px). */
   touchGain: 2,
-} as const;
-
-export const GRUN_IDLE_BREATH = {
-  /** Extra height at the top of a breath (share of his height). */
-  amplitude: 0.012,
-  /** Width change relative to the height change (narrower when taller). */
-  widthRatio: 0.4,
-  periodMs: 3200,
-  delayMs: 250,
-  fadeMs: 600,
 } as const;
 
 export const GRUN_STOP = {
@@ -465,6 +466,21 @@ export function getDepthBrightness(depthPx: number) {
 export const HIMMEL_BACKDROP = {
   parallax: 0.035,
   opacity: 1,
+} as const;
+
+/**
+ * After grun leaves the mountains and the sky turns white, `hinter_grun_magie` (watercolour paper
+ * with green paint) fades in as the whole background, with the sky. Drawn by `MagieBackdrop` in
+ * WebGLWorld.tsx as two layers made small from the 7000x5000 PNGs: the paper
+ * (`hinter_grun_magie1.webp`) and the paint alone (`hinter_grun_magie_paint.webp`, cut from
+ * `paintCrop` of hinter_grun_magie.png). Re-make both WebPs when the PNGs change.
+ */
+export const MAGIE_BACKDROP = {
+  /** How much the background follows the walk (0 = fixed, like the far sky). */
+  parallax: 0.035,
+  opacity: 1,
+  /** Where the paint was cut out of the PNG (share of its width / height, from the top-left). */
+  paintCrop: { left: 0, right: 1, top: 873 / 5000, bottom: 4126 / 5000 },
 } as const;
 
 export const STAR_SKY = {
@@ -1081,6 +1097,19 @@ export const SCENE1_EXIT = {
   startOutRatio: 0.3,
   lightInMs: 1400,
   lightOutMs: 1300,
+} as const;
+
+/**
+ * Chapter 1 closing tableau (`scene1/sound/giggling.mp3`, src/lib/gigglingSound.ts): once when the
+ * parade scene appears after the white flash.
+ */
+export const SCENE1_TABLEAU_GIGGLING = {
+  enabled: true,
+  file: "sound/giggling.mp3",
+  volume: 0.75,
+  playbackRate: 1,
+  /** After tableau phase starts — roughly when the exit white clears (`SCENE1_EXIT.lightOutMs`). */
+  delayMs: SCENE1_EXIT.lightOutMs,
 } as const;
 
 /** Until the traffic light is green, grun's front may not come closer to it (ref px at 1080p). */

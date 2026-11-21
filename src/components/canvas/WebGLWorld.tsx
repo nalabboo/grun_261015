@@ -18,7 +18,6 @@ import {
 } from "react";
 import * as THREE from "three";
 import {
-  GRUN_IDLE_BREATH,
   GRUN_OFFSET_Y_RATIO,
   GRUN_SCALE,
   GRUN_WALK,
@@ -41,6 +40,7 @@ import {
   SCENE_LAYERS,
   STAR_SKY,
   HIMMEL_BACKDROP,
+  MAGIE_BACKDROP,
   type MoonSkyLayout,
   MOON_LOOK,
   MOON_ORBIT,
@@ -456,6 +456,88 @@ function HimmelBackdrop({
         toneMapped={false}
       />
     </mesh>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Magie backdrop: watercolour paper + green paint once the sky is white       */
+/* -------------------------------------------------------------------------- */
+
+function MagieBackdrop({
+  metrics,
+  viewRef,
+  renderOrder,
+}: {
+  metrics: SceneMetrics;
+  viewRef: WorldViewRef;
+  renderOrder: number;
+}) {
+  const paperAsset = IMAGE_SIZES.magie_paper;
+  const paperTexture = useSceneTexture(paperAsset.file);
+  const paintTexture = useSceneTexture(IMAGE_SIZES.magie_paint.file);
+  const paperRef = useRef<THREE.Mesh>(null);
+  const paintRef = useRef<THREE.Mesh>(null);
+  const whiteRef = useRef(0);
+
+  useFrame(() => {
+    const paper = paperRef.current;
+    const paint = paintRef.current;
+    if (!paper || !paint) return;
+    const scroll = viewRef.current.worldScroll;
+    const white = Math.max(whiteRef.current, getBackgroundWhiteProgress(metrics, scroll));
+    whiteRef.current = white;
+    const { width, height } = metrics;
+
+    // One picture covering everything the camera shows of it (like HimmelBackdrop).
+    const parallax = MAGIE_BACKDROP.parallax;
+    const span = width + getMaxScroll(metrics) * parallax;
+    const aspect = paperAsset.width / paperAsset.height;
+    const pictureH = Math.max(height, span / aspect);
+    const pictureW = pictureH * aspect;
+    const left = -scroll * parallax;
+    // Picture centred vertically on the screen.
+    const pictureBottom = height / 2 - pictureH / 2;
+    const opacity = MAGIE_BACKDROP.opacity * white;
+    const visible = white > 0.01;
+
+    (paper.material as THREE.MeshBasicMaterial).opacity = opacity;
+    paper.visible = visible;
+    paper.position.set(left + pictureW / 2, height / 2, 0);
+    paper.scale.set(pictureW, pictureH, 1);
+
+    // The paint sits on the paper where it was cut out of hinter_grun_magie.png.
+    const crop = MAGIE_BACKDROP.paintCrop;
+    const paintW = pictureW * (crop.right - crop.left);
+    const paintH = pictureH * (crop.bottom - crop.top);
+    (paint.material as THREE.MeshBasicMaterial).opacity = opacity;
+    paint.visible = visible;
+    paint.position.set(
+      left + pictureW * crop.left + paintW / 2,
+      pictureBottom + pictureH * (1 - crop.bottom) + paintH / 2,
+      0,
+    );
+    paint.scale.set(paintW, paintH, 1);
+  });
+
+  return (
+    <>
+      {[
+        { ref: paperRef, map: paperTexture, order: renderOrder },
+        { ref: paintRef, map: paintTexture, order: renderOrder + 0.005 },
+      ].map(({ ref, map, order }) => (
+        <mesh key={order} ref={ref} renderOrder={order} frustumCulled={false} visible={false}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={map}
+            transparent
+            opacity={0}
+            depthTest={false}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </>
   );
 }
 
@@ -1152,7 +1234,9 @@ function TransformSprite({
       frames = swFrames;
       index = loopFrameIndex(now, frames.length, clips.sw.durationMs);
     } else if (mitteElapsed < mitteMs) {
-      clipId = "mitte";
+      // Until the transformation frames have loaded, keep the grey loop in its own box (drawing
+      // it in the bigger "mitte" box made the character pop larger for a moment on click).
+      clipId = mitteFrames.length > 0 ? "mitte" : "sw";
       frames = mitteFrames.length > 0 ? mitteFrames : swFrames;
       index =
         mitteFrames.length > 0
@@ -1163,7 +1247,7 @@ function TransformSprite({
         completedRef.current = true;
         onCompleteRef.current();
       }
-      clipId = "g";
+      clipId = gFrames.length > 0 ? "g" : "sw";
       frames = gFrames.length > 0 ? gFrames : swFrames;
       // Start the green loop on its first frame right where the transformation ends.
       const gElapsed = Number.isFinite(mitteElapsed) ? mitteElapsed - mitteMs : now;
@@ -1380,8 +1464,6 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
   const outerRef = useRef<THREE.Group>(null);
   const userRef = useRef<THREE.Group>(null);
   const hasFrameRef = useRef(false);
-  /** Idle breathing: last walk-cycle time seen, when it last changed, and fade-in weight. */
-  const breathRef = useRef({ timeMs: Number.NaN, changedAt: 0, weight: 0 });
 
   const { ctx, texture } = useMemo(() => {
     const canvas = document.createElement("canvas");
@@ -1398,30 +1480,13 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
 
   useEffect(() => () => texture.dispose(), [texture]);
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     const mesh = meshRef.current;
     const outer = outerRef.current;
     if (!mesh || !outer) return;
 
     const source = sourceRef.current;
     const movie = source.movie;
-
-    // Standing still = the walk-cycle time hasn't changed for a moment.
-    const breath = breathRef.current;
-    const now = performance.now();
-    if (source.timeMs !== breath.timeMs) {
-      breath.timeMs = source.timeMs;
-      breath.changedAt = now;
-    }
-    const idleMs = now - breath.changedAt - GRUN_IDLE_BREATH.delayMs;
-    const fadeStep = (delta * 1000) / GRUN_IDLE_BREATH.fadeMs;
-    breath.weight =
-      idleMs > 0
-        ? Math.min(1, breath.weight + fadeStep)
-        : Math.max(0, breath.weight - fadeStep * 4);
-    // 0 → 1 → 0 once per period, starting from rest when he stops.
-    const cycle = idleMs > 0 ? (idleMs % GRUN_IDLE_BREATH.periodMs) / GRUN_IDLE_BREATH.periodMs : 0;
-    const swell = breath.weight * GRUN_IDLE_BREATH.amplitude * (0.5 - 0.5 * Math.cos(cycle * Math.PI * 2));
 
     if (ctx && movie && source.dirty) {
       if (movie.drawAt(source.timeMs, ctx, !hasFrameRef.current)) {
@@ -1443,13 +1508,8 @@ function GrunQuad({ metrics, viewRef, sourceRef, renderOrder }: GrunQuadProps) {
       -offsetY + displayHeight / 2,
       0,
     );
-    // Grow from the feet: scale around the bottom edge.
-    mesh.scale.set(
-      width * (1 - swell * GRUN_IDLE_BREATH.widthRatio),
-      displayHeight * (1 + swell),
-      1,
-    );
-    mesh.position.y = (displayHeight * swell) / 2;
+    mesh.scale.set(width, displayHeight, 1);
+    mesh.position.y = 0;
   });
 
   return (
@@ -1595,6 +1655,7 @@ export default function WebGLWorld({
       {hasMetrics && (
         <>
           <HimmelBackdrop metrics={metrics} viewRef={viewRef} renderOrder={0.08} />
+          <MagieBackdrop metrics={metrics} viewRef={viewRef} renderOrder={0.09} />
           <StarSky metrics={metrics} viewRef={viewRef} renderOrder={0.5} />
           <MoonSky layout={moonSky} metrics={metrics} viewRef={viewRef} renderOrder={0.52} />
           <BergLayer layerKey="berg4" metrics={metrics} viewRef={viewRef} renderOrder={1} />

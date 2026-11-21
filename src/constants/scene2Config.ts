@@ -115,7 +115,7 @@ type TableauItem = {
   clip?: TableauClip;
 };
 
-/** Appearance order: background → grass → kinder1 (with the dog), 2, 3 → grun_v. */
+/** All layers appear together (delayMs 0); background and grass just fade in. */
 export const SCENE2_ITEMS: TableauItem[] = [
   {
     id: "hintergrund",
@@ -137,8 +137,9 @@ export const SCENE2_ITEMS: TableauItem[] = [
     height: 33,
     width: 92,
     z: 1,
-    delayMs: 1400,
-    animation: "grow",
+    delayMs: 0,
+    // No grow effect: the grass fades in with the background.
+    animation: "fade",
     fit: "fill",
   },
   {
@@ -149,7 +150,7 @@ export const SCENE2_ITEMS: TableauItem[] = [
     bottom: 12.32,
     height: 40.81,
     z: 3,
-    delayMs: 2400,
+    delayMs: 0,
     animation: "appear",
   },
   {
@@ -160,7 +161,7 @@ export const SCENE2_ITEMS: TableauItem[] = [
     bottom: 26,
     height: 27.06,
     z: 3,
-    delayMs: 3100,
+    delayMs: 0,
     animation: "appear",
   },
   {
@@ -171,7 +172,7 @@ export const SCENE2_ITEMS: TableauItem[] = [
     bottom: 9,
     height: 33.16,
     z: 4,
-    delayMs: 3800,
+    delayMs: 0,
     animation: "appear",
   },
   {
@@ -182,7 +183,7 @@ export const SCENE2_ITEMS: TableauItem[] = [
     bottom: 13,
     height: 77,
     z: 2,
-    delayMs: 5400,
+    delayMs: 0,
     animation: "hero",
   },
 ];

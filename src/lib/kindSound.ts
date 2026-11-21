@@ -56,13 +56,13 @@ function playClip(
   return { source, duration };
 }
 
-/** Plays kind.mp3, then kind2.mp3 right after (kid grey → green). */
+/** Plays kind.mp3, then laugh.mp3 right after (kid grey → green). */
 export function playKindTransformSound() {
   if (!KIND_TRANSFORM_SOUND.enabled) return;
   whenAudioRunning((ctx) => {
     void Promise.all([getWavBuffer(ctx), getMp3Buffer(ctx)]).then(([wav, mp3]) => {
       if (ctx.state !== "running") return;
-      const t0 = ctx.currentTime + 0.02;
+      const t0 = ctx.currentTime + 0.02 + KIND_TRANSFORM_SOUND.delayMs / 1000;
       if (!wav) {
         if (mp3) {
           playClip(ctx, mp3, KIND_TRANSFORM_SOUND.volume2, KIND_TRANSFORM_SOUND.playbackRate2, t0);
