@@ -5,6 +5,7 @@ import {
   CHAPTER2_NARI_CLIP,
   CHAPTER2_R_CELEMEN1_CLIP,
   CHAPTER2_R_CELEMEN2_CLIP,
+  CHAPTER2_WORM_G_CLIP,
   type Chapter2PropClip,
 } from "@/constants/chapter2PropClips";
 import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
@@ -465,6 +466,7 @@ export const CHAPTER2_WORM_G: Chapter2PropConfig = {
   file: "grun objekt/worm_g.png",
   width: 604,
   height: 700,
+  clip: CHAPTER2_WORM_G_CLIP,
   zIndex: 5,
   stack: "aboveBerg2",
   attachToBergId: "berg2",

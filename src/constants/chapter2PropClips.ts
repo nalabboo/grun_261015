@@ -1,4 +1,5 @@
 import { RICORI_V_CLIP } from "@/constants/scene2Config";
+import { WORM_CLIPS } from "@/constants/sceneConfig";
 
 /**
  * Hand-drawn video clips that replace a chapter 2 prop's still picture (cut from source_videos/
@@ -151,6 +152,24 @@ export const CHAPTER2_GRUN_V_CLIP: Chapter2PropClip = {
     y: 13,
     width: 467,
     height: 720,
+  },
+};
+
+/**
+ * 애벌레 (worm_g.png): chapter 1's green caterpillar loop (`WORM_CLIPS.g`,
+ * public/scene1/landmark/worm_g/). worm_g.png is chapter 1's 604x700 "worm box", so the clip keeps
+ * its chapter 1 placement in it.
+ */
+export const CHAPTER2_WORM_G_CLIP: Chapter2PropClip = {
+  x: WORM_CLIPS.g.x,
+  y: WORM_CLIPS.g.y,
+  width: WORM_CLIPS.g.width,
+  height: WORM_CLIPS.g.height,
+  loop: {
+    dir: WORM_CLIPS.g.dir,
+    scene1: true,
+    frames: WORM_CLIPS.g.frames,
+    durationMs: WORM_CLIPS.g.durationMs,
   },
 };
 

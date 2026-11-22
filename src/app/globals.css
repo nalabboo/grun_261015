@@ -1006,6 +1006,20 @@ html.grun-cursor-active body {
   -webkit-user-drag: none;
 }
 
+/* Chapter 2 green paint over the magie paper (CHAPTER2_MAGIE_PAINT). As wide as the paper,
+   which covers the screen (paper 2800x2000 -> 1.4 : 1). */
+.chapter2-magie-paint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: max(100%, 140vh);
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .chapter2-berg--floor {
   z-index: 0;
 }

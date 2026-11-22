@@ -9,7 +9,9 @@ import {
 } from "@/constants/chapter2PropClips";
 
 /** Which frame of `part` shows `t` ms into it. */
-function frameAt(part: Chapter2ClipPart, t: number) {
+function frameAt(part: Chapter2ClipPart, ms: number) {
+  // A frame's timestamp can be a little before the clip's start time: treat that as frame 0.
+  const t = Math.max(0, ms);
   if (part.holdMs) {
     let end = 0;
     for (let index = 0; index < part.holdMs.length; index++) {

@@ -15,6 +15,8 @@ import {
   CHAPTER2_SCROLL_BERG3_Y,
   CHAPTER2_SCROLL_BERG4_Y,
   CHAPTER2_SUBSCENE_SCROLL_WHEEL_GAIN,
+  CHAPTER2_GELB_PAINT,
+  CHAPTER2_MAGIE_PAINT,
   CHAPTER2_PAPIER_BG_URL,
 } from "@/constants/chapter2Config";
 import { getChapter2ScrollIndicatorProgress } from "@/constants/chapter2ScrollProgress";
@@ -687,6 +689,33 @@ export default function Chapter2Scene({
       ? 1
       : scrollSegments.berg;
 
+  /** 2-2 Nari reveal (0–1); stays 1 once 2-2 has played. */
+  const nariPaintBlend =
+    playbackPhase === "2-2-complete" ||
+    playbackPhase === "2-3-playing" ||
+    playbackPhase === "2-3-complete" ||
+    playbackPhase === "2-4-playing"
+      ? 1
+      : scrollSegments.nari;
+  const renderPaint = (paint: typeof CHAPTER2_MAGIE_PAINT, visibility: number) =>
+    visibility > 0.001 ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={paint.url}
+        alt=""
+        draggable={false}
+        decoding="async"
+        className="chapter2-magie-paint"
+        style={{
+          opacity: paint.opacity * visibility,
+          // As wide as the paper, which covers the screen (paper 2800x2000 → 1.4 : 1).
+          width: "max(100%, 140vh)",
+          aspectRatio: `${paint.width} / ${paint.height}`,
+          transform: `translate(-50%, -50%) translate(${paint.x}vw, ${paint.y}vh) scale(${paint.scale}) rotate(${paint.rotate}deg)`,
+        }}
+      />
+    ) : null;
+
   const motion = Math.hypot(mouseX, mouseY);
   const breathe = 1 + motion * 0.014;
   const parallaxBreathe = breathe + motion * 0.004;
@@ -1036,6 +1065,10 @@ export default function Chapter2Scene({
         decoding="async"
         className="chapter2-papier-bg"
       />
+      {/* Paint on the paper: green while Grun is alone (2-1) → yellow as Nari appears (2-2) → gone
+          as the bergs turn blue (2-3). */}
+      {renderPaint(CHAPTER2_MAGIE_PAINT, 1 - nariPaintBlend)}
+      {renderPaint(CHAPTER2_GELB_PAINT, nariPaintBlend * (1 - subscene23IntroProgress))}
 
       <div
         className="chapter2-stage"

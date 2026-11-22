@@ -5,6 +5,7 @@ import {
   CHAPTER2_NARI_CLIP,
   CHAPTER2_R_CELEMEN1_CLIP,
   CHAPTER2_R_CELEMEN2_CLIP,
+  CHAPTER2_WORM_G_CLIP,
   CHAPTER2_GRUN_V_CLIP,
   chapter2ClipFrameFiles,
   type Chapter2ClipPart,
@@ -34,7 +35,7 @@ export const CHAPTER2_SCROLL_BERG3_Y = 20;
 export const CHAPTER2_SCROLL_BERG4_Y = 40;
 
 /** Bump when `public/scene2/` berg PNGs change (cache bust). */
-export const CHAPTER2_ASSET_VERSION = "20261123-ricori-klein";
+export const CHAPTER2_ASSET_VERSION = "20261123-gelb-paint";
 
 /** Base fit scale (contain + parallax headroom). Transform depth is normalized on top. */
 export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
@@ -123,8 +124,53 @@ export const SCENE2_BGM = {
   fadeOutMs: 1500,
 } as const;
 
-/** Paper backdrop behind berg4 (scene 2-1 base). */
-export const CHAPTER2_PAPIER_BG_URL = chapter2AssetUrl("background/papier.jpg");
+/**
+ * Chapter 2 background behind berg4: chapter 1's magie paper (`scene1/berg/hinter_grun_magie1.webp`)
+ * fills the whole screen. Was background/papier.jpg.
+ */
+export const CHAPTER2_PAPIER_BG_URL = assetUrl("berg/hinter_grun_magie1.webp");
+
+/**
+ * Green paint (`scene1/berg/hinter_grun_magie_paint.webp`) laid over the paper while Grun is there
+ * at the start (2-1); as Nari appears (2-2) it turns into the yellow paint (`CHAPTER2_GELB_PAINT`).
+ *
+ * ★ Paint position — change these numbers and reload:
+ *   - x / y:  move from the centre of the screen (% of the screen width / height; + = right / down)
+ *   - scale:  size (1 = as wide as the paper; the paper covers the screen)
+ *   - rotate: degrees
+ *   - opacity: strength while fully shown (0–1)
+ * At x 0, y 0, scale 1 the paint sits where it is painted on the paper (hinter_grun_magie.png).
+ */
+export const CHAPTER2_MAGIE_PAINT = {
+  url: assetUrl("berg/hinter_grun_magie_paint.webp"),
+  x: 0,
+  y: -32,
+  scale: 1.2,
+  rotate: 0,
+  opacity: 1,
+  /** Paint picture size (px) — its width / height ratio sets how tall it is drawn. */
+  width: 4096,
+  height: 1903,
+};
+
+/**
+ * Yellow paint (`scene2/background/gelb_back_paint.webp`, made from gelb_back.png: its white turned
+ * transparent so only the paint lies on the paper). Replaces the green paint as Nari appears (2-2)
+ * and fades out as the bergs turn blue (2-3). The picture is a whole sheet (like the paper), so at
+ * x 0, y 0, scale 1 it covers the screen the way the paper does.
+ *
+ * ★ Paint position — same numbers as `CHAPTER2_MAGIE_PAINT` (x / y in % of the screen, scale, rotate, opacity).
+ */
+export const CHAPTER2_GELB_PAINT = {
+  url: chapter2AssetUrl("background/gelb_back_paint.webp"),
+  x: 0,
+  y: -28,
+  scale: 1,
+  rotate: 0,
+  opacity: 1,
+  width: 2800,
+  height: 2047,
+};
 
 /** Chapter 2 background berg PNGs under `public/scene2/background/` (1600×300). */
 const CH2_BG_BERG = {
@@ -173,8 +219,6 @@ export type Chapter2BergLayerConfig = {
   scrollAltFile?: string;
   /** Scene 2-3 PNG crossfaded from scrollAlt at intro progress 1. */
   subscene23AltFile?: string;
-  /** Pick one texture at opacity 1 (no stacked alpha crossfade). */
-  opaqueTextureBlend?: boolean;
 };
 
 export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
@@ -204,7 +248,6 @@ export const CHAPTER2_BERG_LAYERS: readonly Chapter2BergLayerConfig[] = [
     file: "background/2_berg3.png",
     scrollAltFile: "background/y2_berg3.png",
     subscene23AltFile: "background/b2_berg3.png",
-    opaqueTextureBlend: true,
     width: CH2_BG_BERG.width,
     height: CH2_BG_BERG.height,
     scaleY: 1.12,
@@ -254,6 +297,8 @@ function loadImage(src: string): Promise<void> {
 export function preloadChapter2BergAssets(): Promise<void> {
   const urls = [
     CHAPTER2_PAPIER_BG_URL,
+    CHAPTER2_MAGIE_PAINT.url,
+    CHAPTER2_GELB_PAINT.url,
     ...CHAPTER2_BERG_LAYERS.flatMap((layer) => [
       chapter2LayerAssetUrl(layer),
       ...(layer.scrollAltFile ? [chapter2AssetUrl(layer.scrollAltFile)] : []),
@@ -266,7 +311,7 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("grun objekt/marimo1.png"),
     chapter2AssetUrl("grun objekt/marimo2.png"),
     chapter2AssetUrl("charactor/nari.png"),
-    ...[CHAPTER2_NARI_CLIP, CHAPTER2_LAUBL_CLIP, CHAPTER2_KOKI_CLIP, CHAPTER2_R_CELEMEN1_CLIP, CHAPTER2_R_CELEMEN2_CLIP, CHAPTER2_GRUN_V_CLIP, ...Object.values(CHAPTER2_GELB_CLIPS)].flatMap(
+    ...[CHAPTER2_NARI_CLIP, CHAPTER2_LAUBL_CLIP, CHAPTER2_KOKI_CLIP, CHAPTER2_R_CELEMEN1_CLIP, CHAPTER2_R_CELEMEN2_CLIP, CHAPTER2_GRUN_V_CLIP, CHAPTER2_WORM_G_CLIP, ...Object.values(CHAPTER2_GELB_CLIPS)].flatMap(
       chapter2ClipAllFrameUrls,
     ),
     chapter2AssetUrl("rot objekt/r_vulkan.png"),
@@ -291,7 +336,6 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("blau objekt/b_moss2.png"),
     chapter2AssetUrl("blau objekt/b_moss3.png"),
     chapter2AssetUrl("blau objekt/b_bubble 2.png"),
-    chapter2AssetUrl("grun objekt/worm_g.png"),
   ];
   return Promise.all(urls.map((src) => loadImage(src))).then(() => undefined);
 }

@@ -18,6 +18,16 @@ import { createBakedLayerTexture } from "@/lib/bakeLayerTexture";
 import { PAPER_GRAIN_TILE_PX } from "@/lib/paperGrain";
 
 const PAPER_TILE_DISPLAY_PX = PAPER_GRAIN_TILE_PX * 0.75;
+
+/**
+ * Berg colour swaps (green → yellow in 2-2, yellow → blue in 2-3). The new berg fades in on top
+ * of the old one, which stays fully opaque below it (the silhouettes match), so the paper never
+ * shows through mid-way. Two colours mixed half-and-half go greyish, so the colour strength rises
+ * by up to `saturateBoost` at the middle of a swap.
+ */
+export const CHAPTER2_BERG_SWAP = {
+  saturateBoost: 0.4,
+};
 const MAX_BAKE_TEXTURE_PX = 4096;
 
 /** Stagger bakes so the main thread can paint raw PNGs first (berg4 → berg3 → berg2). */
@@ -204,9 +214,10 @@ export default function Chapter2BergLayer({
     ? Math.min(1, Math.max(0, scrollBlend))
     : 0;
   const s23 = sub23File ? Math.min(1, Math.max(0, subscene23Blend)) : 0;
-  const baseOpacity = (1 - blend) * (1 - s23);
-  const altOpacity = blend * (1 - s23);
-  const sub23Opacity = blend * s23;
+  // Stacked: each newer texture fades in over the older one, which stays opaque until covered.
+  const sub23Opacity = sub23File ? s23 : 0;
+  const altOpacity = layer.scrollAltFile && sub23Opacity < 1 ? blend : 0;
+  const baseOpacity = altOpacity < 1 && sub23Opacity < 1 ? 1 : 0;
 
   const renderImage = (
     key: string,
@@ -225,7 +236,12 @@ export default function Chapter2BergLayer({
       filterParts.push(`blur(${cssBlurPx.toFixed(2)}px)`);
     }
 
-    if (opacity <= 0.001) return null;
+    const swapMid = Math.max(blend * (1 - blend), s23 * (1 - s23)) * 4;
+    if (swapMid > 0.001) {
+      filterParts.push(`saturate(${(1 + CHAPTER2_BERG_SWAP.saturateBoost * swapMid).toFixed(3)})`);
+    }
+    // Kept in the page while hidden, so it is already decoded when its swap starts (no hitch).
+    const hidden = opacity <= 0.001;
 
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -252,7 +268,8 @@ export default function Chapter2BergLayer({
           filter: filterParts.join(" "),
           transformOrigin: layer.transformOrigin ?? "center center",
           transform: `translate(calc(-50% + ${shiftX + edit.x}px), ${anchoredTranslateY}) scale(${scale * edit.scale}, ${scale * scaleY * edit.scaleY}) rotate(${edit.rotate}deg)`,
-          opacity,
+          opacity: hidden ? 0 : opacity,
+          visibility: hidden ? "hidden" : undefined,
         }}
         onError={() => {
           if (src !== fallbackUrl) {
@@ -271,25 +288,13 @@ export default function Chapter2BergLayer({
     );
   };
 
-  const pointerOnTop = s23 >= 0.5 || (s23 <= 0 && blend >= 0.5);
-
-  if (layer.opaqueTextureBlend) {
-    if (sub23File && s23 >= 0.5) {
-      return renderImage("sub23", sub23.src, sub23.layerAssetUrl, 1, true);
-    }
-    if (layer.scrollAltFile && blend >= 0.5) {
-      return renderImage("alt", alt.src, alt.layerAssetUrl, 1, true);
-    }
-    return renderImage("base", base.src, base.layerAssetUrl, 1, true);
-  }
-
   return (
     <>
-      {renderImage("base", base.src, base.layerAssetUrl, baseOpacity, !pointerOnTop)}
+      {renderImage("base", base.src, base.layerAssetUrl, baseOpacity, blend < 0.5 && s23 < 0.5)}
       {layer.scrollAltFile &&
-        renderImage("alt", alt.src, alt.layerAssetUrl, altOpacity, !pointerOnTop && blend >= 0.5)}
+        renderImage("alt", alt.src, alt.layerAssetUrl, altOpacity, blend >= 0.5 && s23 < 0.5)}
       {sub23File &&
-        renderImage("sub23", sub23.src, sub23.layerAssetUrl, sub23Opacity, pointerOnTop)}
+        renderImage("sub23", sub23.src, sub23.layerAssetUrl, sub23Opacity, s23 >= 0.5)}
     </>
   );
 }
