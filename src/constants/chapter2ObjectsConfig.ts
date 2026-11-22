@@ -1,3 +1,4 @@
+import { CHAPTER2_NARI_CLIP, type Chapter2PropClip } from "@/constants/chapter2PropClips";
 import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
 import {
   CHAPTER2_BERG3_LAYER_Z,
@@ -66,6 +67,8 @@ export type Chapter2PropConfig = {
   layoutAnchor?: "foot" | "top";
   /** CSS transform-origin override. */
   transformOrigin?: string;
+  /** Play this hand-drawn clip instead of the still `file` (see chapter2PropClips.ts). */
+  clip?: Chapter2PropClip;
 };
 
 /** Hidden until scene 2-3 starts (Laubl beat and blau reveals). */
@@ -443,6 +446,8 @@ export const CHAPTER2_NARI: Chapter2PropConfig = {
   blurRatio: getDepthBlurRatio(NARI_DEPTH_PX),
   brightness: getDepthBrightness(NARI_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.nari,
+  // nari1 (appears, spins) once, then nari2 looping — replaces the still nari.png.
+  clip: CHAPTER2_NARI_CLIP,
 };
 
 /** 벌레 */

@@ -1,5 +1,6 @@
 "use client";
 
+import Chapter2ClipCanvas from "@/components/scene2/Chapter2ClipCanvas";
 import { getChapter2BergViewportBlurPx } from "@/constants/chapter2Config";
 import {
   chapter2PropAssetUrl,
@@ -91,6 +92,40 @@ export default function Chapter2PropLayer({
   const scaleX = layout.scale * bergScale * scrollScaleMul;
   const scaleY = layout.scaleY * bergScale * scaleYMul;
 
+  const style: React.CSSProperties = {
+    zIndex: isSelected && editorActive ? 45 : prop.zIndex,
+    height: chapter2StageVh(prop.heightVh),
+    width: "auto",
+    aspectRatio: String(aspect),
+    opacity: scrollOpacity,
+    pointerEvents: editorActive ? "auto" : "none",
+    cursor: editorActive
+      ? editMode === "translate"
+        ? "grab"
+        : "ns-resize"
+      : undefined,
+    filter: filterParts.join(" "),
+    transformOrigin,
+    transform: `translate(calc(-50% + ${shiftX + layout.x + layoutXOffset}px), calc(${layoutAnchorY} + ${shiftY + layout.y + layoutYOffset}px)) scale(${scaleX}, ${scaleY}) rotate(${layout.rotate}deg)`,
+  };
+  const onPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (!editorActive) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect?.();
+    onDragStart?.(event.clientX, event.clientY);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  if (prop.clip) {
+    // Same box (size, place, transform) as the still picture; the clip canvas sits inside it.
+    return (
+      <div className={className} style={style} onPointerDown={onPointerDown}>
+        <Chapter2ClipCanvas clip={prop.clip} boxWidth={prop.width} boxHeight={prop.height} />
+      </div>
+    );
+  }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -99,30 +134,8 @@ export default function Chapter2PropLayer({
       draggable={false}
       className={className}
       decoding="async"
-      style={{
-        zIndex: isSelected && editorActive ? 45 : prop.zIndex,
-        height: chapter2StageVh(prop.heightVh),
-        width: "auto",
-        aspectRatio: String(aspect),
-        opacity: scrollOpacity,
-        pointerEvents: editorActive ? "auto" : "none",
-        cursor: editorActive
-          ? editMode === "translate"
-            ? "grab"
-            : "ns-resize"
-          : undefined,
-        filter: filterParts.join(" "),
-        transformOrigin,
-        transform: `translate(calc(-50% + ${shiftX + layout.x + layoutXOffset}px), calc(${layoutAnchorY} + ${shiftY + layout.y + layoutYOffset}px)) scale(${scaleX}, ${scaleY}) rotate(${layout.rotate}deg)`,
-      }}
-      onPointerDown={(event) => {
-        if (!editorActive) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onSelect?.();
-        onDragStart?.(event.clientX, event.clientY);
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
+      style={style}
+      onPointerDown={onPointerDown}
     />
   );
 }

@@ -1,8 +1,10 @@
-import { chapter2AssetUrl } from "@/constants/chapter2Config";
+import { CHAPTER2_GELB_CLIPS, type Chapter2PropClip } from "@/constants/chapter2PropClips";
 
 export type Chapter2NabiInstance = {
   id: string;
-  src: string;
+  /** Looping clip (wings flap in the drawing itself), in the box of the former still. */
+  clip: Chapter2PropClip;
+  /** Box of the former still picture (px). */
   width: number;
   height: number;
   heightVh: number;
@@ -25,25 +27,12 @@ export type Chapter2NabiInstance = {
   exitAtSubscene24?: boolean;
 };
 
+/** Butterflies (g_nabi1 was removed). */
 export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
   {
-    id: "nabi1",
-    src: chapter2AssetUrl("gelb objekt/g_nabi1.png"),
-    width: 500,
-    height: 461,
-    heightVh: 0.11,
-    zIndex: 7,
-    entryDelay: 0.06,
-    entrySpan: 0.48,
-    entryFrom: { x: -0.14, y: 0.22 },
-    patrol: { x: 0.28, y: 0.34 },
-    flutterPhase: 0,
-    driftRadiusVw: 2.8,
-    keepAfterLaubl: true,
-  },
-  {
     id: "nabi2",
-    src: chapter2AssetUrl("gelb objekt/g_nabi2.png"),
+    // nabi1.mp4 (the former g_nabi2.png).
+    clip: CHAPTER2_GELB_CLIPS.nabi1,
     width: 500,
     height: 461,
     heightVh: 0.1,
@@ -51,14 +40,17 @@ export const CHAPTER2_NABI_INSTANCES: readonly Chapter2NabiInstance[] = [
     entryDelay: 0.2,
     entrySpan: 0.52,
     entryFrom: { x: 1.12, y: 0.48 },
-    patrol: { x: 0.72, y: 0.3 },
+    // Right of Nari (she stands at ~x 0.81), level with her shoulders.
+    patrol: { x: 0.93, y: 0.34 },
     flutterPhase: 1.7,
-    driftRadiusVw: 2.4,
+    driftRadiusVw: 1.6,
+    // Stays through 2-2 / 2-3 (it used to fly off again right after arriving, so it was never seen).
+    keepAfterLaubl: true,
     exitAtSubscene24: true,
   },
   {
     id: "nabi3",
-    src: chapter2AssetUrl("gelb objekt/g_nabi3.png"),
+    clip: CHAPTER2_GELB_CLIPS.nabi3,
     width: 600,
     height: 492,
     heightVh: 0.12,

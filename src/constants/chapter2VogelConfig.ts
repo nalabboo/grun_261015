@@ -1,4 +1,4 @@
-import { chapter2AssetUrl } from "@/constants/chapter2Config";
+import { CHAPTER2_GELB_CLIPS } from "@/constants/chapter2PropClips";
 import {
   CHAPTER2_PROP_FIXED_LAYOUTS,
   CHAPTER2_SPORE4,
@@ -7,9 +7,10 @@ import { getDepthBlurRatio, getDepthBrightness } from "@/constants/sceneConfig";
 
 const SPORE4_DEPTH_PX = 35;
 
-/** 새 (`g_vogel`) — scene 2-2; fly-in tracks scroll nari segment (with Nari). */
+/** 새 (`vogel`) — scene 2-2; fly-in tracks scroll nari segment (with Nari). */
 export const CHAPTER2_VOGEL = {
-  src: chapter2AssetUrl("gelb objekt/g_vogel.png"),
+  /** Looping clip (vogel.mp4), in the box of the former still g_vogel.png (400x411). */
+  clip: CHAPTER2_GELB_CLIPS.vogel,
   width: 400,
   height: 411,
   heightVh: 0.6336,

@@ -1,4 +1,9 @@
 import {
+  CHAPTER2_GELB_CLIPS,
+  CHAPTER2_NARI_CLIP,
+  chapter2ClipAllFrameFiles,
+} from "@/constants/chapter2PropClips";
+import {
   getDepthBlurRatio,
   getDepthBrightness,
   SCENE_LAYERS,
@@ -21,7 +26,7 @@ export const CHAPTER2_SCROLL_BERG3_Y = 20;
 export const CHAPTER2_SCROLL_BERG4_Y = 40;
 
 /** Bump when `public/scene2/` berg PNGs change (cache bust). */
-export const CHAPTER2_ASSET_VERSION = "20261018-scene2-y2-berg";
+export const CHAPTER2_ASSET_VERSION = "20261122-gelb-clips";
 
 /** Base fit scale (contain + parallax headroom). Transform depth is normalized on top. */
 export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
@@ -245,6 +250,9 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("grun objekt/marimo2.png"),
     chapter2AssetUrl("charactor/grun_v.png"),
     chapter2AssetUrl("charactor/nari.png"),
+    ...[CHAPTER2_NARI_CLIP, ...Object.values(CHAPTER2_GELB_CLIPS)].flatMap((clip) =>
+      chapter2ClipAllFrameFiles(clip).map((file) => chapter2AssetUrl(file)),
+    ),
     chapter2AssetUrl("charactor/laubl.png"),
     chapter2AssetUrl("charactor/koki.png"),
     chapter2AssetUrl("rot objekt/r_vulkan.png"),
@@ -272,10 +280,6 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("blau objekt/b_moss3.png"),
     chapter2AssetUrl("blau objekt/b_bubble 2.png"),
     chapter2AssetUrl("grun objekt/worm_g.png"),
-    chapter2AssetUrl("gelb objekt/g_nabi1.png"),
-    chapter2AssetUrl("gelb objekt/g_nabi2.png"),
-    chapter2AssetUrl("gelb objekt/g_nabi3.png"),
-    chapter2AssetUrl("gelb objekt/g_vogel.png"),
   ];
   return Promise.all(urls.map((src) => loadImage(src))).then(() => undefined);
 }

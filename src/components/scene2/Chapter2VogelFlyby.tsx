@@ -1,5 +1,6 @@
 "use client";
 
+import Chapter2ClipCanvas from "@/components/scene2/Chapter2ClipCanvas";
 import { useEffect, useRef } from "react";
 import {
   CHAPTER2_STAGE_HEIGHT,
@@ -132,20 +133,22 @@ export default function Chapter2VogelFlyby({
       style={{ zIndex: CHAPTER2_VOGEL.zIndex, opacity: 0 }}
       aria-hidden
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={CHAPTER2_VOGEL.src}
-        alt=""
-        draggable={false}
-        decoding="async"
+      <div
         className="chapter2-vogel"
         style={{
+          position: "relative",
           height: chapter2StageVh(CHAPTER2_VOGEL.heightVh),
           width: "auto",
           aspectRatio: String(aspect),
           filter: filterParts.join(" "),
         }}
-      />
+      >
+        <Chapter2ClipCanvas
+          clip={CHAPTER2_VOGEL.clip}
+          boxWidth={CHAPTER2_VOGEL.width}
+          boxHeight={CHAPTER2_VOGEL.height}
+        />
+      </div>
     </div>
   );
 }

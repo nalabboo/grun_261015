@@ -1,5 +1,6 @@
 "use client";
 
+import Chapter2ClipCanvas from "@/components/scene2/Chapter2ClipCanvas";
 import { useEffect, useRef } from "react";
 import {
   CHAPTER2_STAGE_HEIGHT,
@@ -107,11 +108,6 @@ export default function Chapter2FloatingNabis({
           const phase = spec.flutterPhase;
 
           const driftPx = (spec.driftRadiusVw / 100) * width;
-          const wingHz = base.entryComplete ? 6.5 : 4.2;
-          const wingAmp = base.entryComplete ? 0.28 : 0.12;
-          const wing = Math.sin(t * wingHz + phase * 2.1);
-          const scaleY = 0.9 + (wing * 0.5 + 0.5) * wingAmp;
-          const scaleX = 1.02 - (wing * 0.5 + 0.5) * (wingAmp * 0.28);
           const driftHz = base.entryComplete ? 0.55 : 0.32;
           const driftHz2 = base.entryComplete ? 0.82 : 0.48;
           const driftX =
@@ -124,11 +120,11 @@ export default function Chapter2FloatingNabis({
               ? Math.cos(t * 0.68 + phase * 0.9) * driftPx * 0.5 +
                 Math.sin(t * 0.42 + phase) * driftPx * 0.32
               : Math.cos(t * 0.24 + phase) * driftPx * 0.12 * opacity;
-          const tilt =
-            Math.sin(t * 1.35 + phase) * (base.entryComplete ? 4 : 2) + wing * 2.5;
+          // The wings flap in the clip itself; only a gentle sway here.
+          const tilt = Math.sin(t * 1.35 + phase) * (base.entryComplete ? 4 : 2);
 
           el.style.opacity = String(opacity);
-          el.style.transform = `translate3d(${baseX + driftX}px, ${baseY + driftY}px, 0) translate(-50%, -50%) rotate(${tilt}deg) scale(${scaleX}, ${scaleY})`;
+          el.style.transform = `translate3d(${baseX + driftX}px, ${baseY + driftY}px, 0) translate(-50%, -50%) rotate(${tilt}deg)`;
         }
       } else {
         for (let i = 0; i < anchorRefs.current.length; i++) {
@@ -161,19 +157,17 @@ export default function Chapter2FloatingNabis({
             className="chapter2-nabi-anchor"
             style={{ zIndex: nabi.zIndex }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={nabi.src}
-              alt=""
-              draggable={false}
-              decoding="async"
+            <div
               className="chapter2-nabi"
               style={{
+                position: "relative",
                 height: chapter2StageVh(nabi.heightVh),
                 width: "auto",
                 aspectRatio: String(aspect),
               }}
-            />
+            >
+              <Chapter2ClipCanvas clip={nabi.clip} boxWidth={nabi.width} boxHeight={nabi.height} />
+            </div>
           </div>
         );
       })}

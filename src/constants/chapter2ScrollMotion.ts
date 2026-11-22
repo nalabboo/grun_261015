@@ -5,7 +5,8 @@ import type {
 } from "@/constants/chapter2ObjectsConfig";
 
 /** Nari fade-in before berg y2 (scroll units). */
-const SCROLL_NARI_LENGTH = 1.9;
+export const CHAPTER2_SCROLL_NARI_LENGTH = 1.9;
+const SCROLL_NARI_LENGTH = CHAPTER2_SCROLL_NARI_LENGTH;
 /** Berg y2 segment — starts after Nari is fully in. */
 const SCROLL_BERG_LENGTH = 1;
 const SCROLL_BERG_START = SCROLL_NARI_LENGTH;
@@ -110,6 +111,8 @@ export function getChapter2PropScrollOpacity(
   segments: Chapter2ScrollSegments,
 ): number {
   if (prop.revealOnScroll) {
+    // A clip (Nari) fades in by itself: show it at full opacity as soon as its turn starts.
+    if (prop.clip) return segments.nari > 0 ? 1 : 0;
     return segments.nari;
   }
   return 1;

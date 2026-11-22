@@ -1,10 +1,32 @@
-import { CHAPTER2_SUBSCENE_SCROLL_MAX } from "@/constants/chapter2ScrollMotion";
+import {
+  CHAPTER2_SCROLL_NARI_LENGTH,
+  CHAPTER2_SUBSCENE_SCROLL_MAX,
+} from "@/constants/chapter2ScrollMotion";
+
+/**
+ * 2-1 → 2-2 timeline after the first scroll, in two parts:
+ *  1. Nari (and the bird flying in with her) fades in right away over `nariSec`, quick at first
+ *     and settling at the end — so the scroll is answered at once.
+ *  2. The rest (berg y2 → grun shrink → spores) follows over `restSec`.
+ * (It used to be one 11.5 s ease-in-out curve; Nari, at its slow start, took ~4.5 s and was barely
+ * visible for the first 2 s.)
+ */
+export const CHAPTER2_SUBSCENE_PLAYBACK_TIMING = {
+  nariSec: 1.4,
+  restSec: 7,
+} as const;
 
 /** One-shot 2-1 → 2-2 timeline length (seconds). */
-export const CHAPTER2_SUBSCENE_PLAYBACK_SEC = 11.5;
+export const CHAPTER2_SUBSCENE_PLAYBACK_SEC =
+  CHAPTER2_SUBSCENE_PLAYBACK_TIMING.nariSec + CHAPTER2_SUBSCENE_PLAYBACK_TIMING.restSec;
 
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
+}
+
+function easeOutCubic(t: number) {
+  const u = clamp01(t);
+  return 1 - (1 - u) ** 3;
 }
 
 function easeInOutCubic(t: number) {
@@ -36,8 +58,13 @@ export function isChapter2PlaybackSubscene23OrLater(
 
 /** Maps playback elapsed time → scroll raw (drives segment order: nari → berg → grun → spore). */
 export function getChapter2PlaybackScrollRaw(elapsedSec: number) {
-  const t = clamp01(elapsedSec / CHAPTER2_SUBSCENE_PLAYBACK_SEC);
-  return easeInOutCubic(t) * CHAPTER2_SUBSCENE_SCROLL_MAX;
+  const { nariSec, restSec } = CHAPTER2_SUBSCENE_PLAYBACK_TIMING;
+  const nariRaw = CHAPTER2_SCROLL_NARI_LENGTH;
+  if (elapsedSec < nariSec) {
+    return easeOutCubic(elapsedSec / nariSec) * nariRaw;
+  }
+  const t = clamp01((elapsedSec - nariSec) / restSec);
+  return nariRaw + easeInOutCubic(t) * (CHAPTER2_SUBSCENE_SCROLL_MAX - nariRaw);
 }
 
 export function isChapter2PlaybackComplete(elapsedSec: number) {
