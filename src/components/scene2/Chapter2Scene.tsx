@@ -814,7 +814,9 @@ export default function Chapter2Scene({
       scrollOpacity *= prop.clip ? (reveal > 0 ? 1 : 0) : reveal;
     }
     if (prop.revealOnSubscene24) {
-      scrollOpacity *= getChapter2KokiRevealOpacity(playbackPhase, subscene24ElapsedSec);
+      const reveal = getChapter2KokiRevealOpacity(playbackPhase, subscene24ElapsedSec);
+      // The Koki clip fades in by itself too.
+      scrollOpacity *= prop.clip ? (reveal > 0 ? 1 : 0) : reveal;
     }
     if (prop.revealWithBerg24Drop) {
       const vulkanReveal = getChapter2RVulkanSubscene24Reveal(

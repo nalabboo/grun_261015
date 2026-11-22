@@ -1,6 +1,9 @@
 import {
+  CHAPTER2_KOKI_CLIP,
   CHAPTER2_LAUBL_CLIP,
   CHAPTER2_NARI_CLIP,
+  CHAPTER2_R_CELEMEN1_CLIP,
+  CHAPTER2_R_CELEMEN2_CLIP,
   type Chapter2PropClip,
 } from "@/constants/chapter2PropClips";
 import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
@@ -611,7 +614,7 @@ export const CHAPTER2_R_VULKAN: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_vulkan,
 };
 
-/** celem1 — enters from bottom-left after volcano (rot objekt/r_celemen1.png). */
+/** celem1 — enters from bottom-left after volcano (celemen1-1 → celemen1-2 clip, in r_celemen1.png's box). */
 export const CHAPTER2_R_CELEMEN1: Chapter2PropConfig = {
   id: "r_celemen1",
   file: "rot objekt/r_celemen1.png",
@@ -620,6 +623,7 @@ export const CHAPTER2_R_CELEMEN1: Chapter2PropConfig = {
   zIndex: 5,
   stack: "midBerg2",
   revealFromBottomLeftAfterVulkan: true,
+  clip: CHAPTER2_R_CELEMEN1_CLIP,
   parallax: 17,
   heightVh: 0.32,
   depthPx: R_CELEMEN1_DEPTH_PX,
@@ -637,6 +641,7 @@ export const CHAPTER2_R_CELEMEN2: Chapter2PropConfig = {
   zIndex: 2,
   stack: "midBerg2",
   revealRiseDuringCelem1Enter: true,
+  clip: CHAPTER2_R_CELEMEN2_CLIP,
   parallax: 16,
   heightVh: 0.34,
   depthPx: R_CELEMEN2_DEPTH_PX,
@@ -817,7 +822,7 @@ export const CHAPTER2_R_OBST6: Chapter2PropConfig = {
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.r_obst6,
 };
 
-/** 코키 — scene 2-4 first beat (charactor/koki.png). */
+/** 코키 — scene 2-4 first beat (koki1 → koki2 clip, in koki.png's 500x683 box). */
 export const CHAPTER2_KOKI: Chapter2PropConfig = {
   id: "koki",
   file: "charactor/koki.png",
@@ -826,6 +831,7 @@ export const CHAPTER2_KOKI: Chapter2PropConfig = {
   zIndex: 4,
   stack: "aboveBerg2",
   revealOnSubscene24: true,
+  clip: CHAPTER2_KOKI_CLIP,
   parallax: 20,
   heightVh: 0.28,
   depthPx: KOKI_DEPTH_PX,

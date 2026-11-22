@@ -1,21 +1,27 @@
-"""Extracts the looping butterflies and bird of chapter 2 ("gelb objekt") and removes the blue screen.
+"""Extracts chapter 2's blue-screen prop clips (butterflies, bird, salamander) and removes the screen.
 
   ../source_videos/nabi1.mp4 -> public/scene2/gelb objekt/nabi1/   replaces g_nabi2.png (same butterfly)
   ../source_videos/nabi3.mp4 -> public/scene2/gelb objekt/nabi3/   replaces g_nabi3.png
   ../source_videos/vogel.mp4 -> public/scene2/gelb objekt/vogel/   replaces g_vogel.png
+  ../source_videos/celemen1-1.mp4 -> public/scene2/rot objekt/celemen1-1/   replaces r_celemen1.png:
+  ../source_videos/celemen1-2.mp4 -> public/scene2/rot objekt/celemen1-2/   entrance once, then loop
+  ../source_videos/celemen2-1.mp4 -> public/scene2/rot objekt/celemen2-1/   replaces r_celemen2.png:
+  ../source_videos/celemen2-2.mp4 -> public/scene2/rot objekt/celemen2-2/   entrance once, then loop
 
 - Keyed on "blueness" = B - max(R, G): the screen scores ~165 (butterflies) / ~217 (bird), while the
   drawings, even their pale-blue / teal wing spots, stay below ~20-40. Edge pixels are un-mixed from
   the screen colour and leftover blue spill is pulled down, so no blue fringe stays.
-- Each clip is placed in the box of the still it replaces (its 500x461 / 600x492 / 400x411 canvas):
-  the video frame that best matches the still's silhouette sets the scale and offset (IoU). All
+- Each clip is placed in the box of the still it replaces (its 500x461 / 600x492 / 400x411 /
+  1435x962 / 1305x857 canvas): the video frame that best matches the still's silhouette sets the scale and offset (IoU). All
   frames share one canvas = everything the motion covers; its placement in still-box px is printed
   for `CHAPTER2_GELB_CLIPS` in src/constants/chapter2PropClips.ts.
+- A clip with an `intro` (plays once, then `loop`): both videos share one camera / canvas, so the
+  same placement and one shared box are used for both.
 - Saved at `out_scale` x still px (the butterflies are small on screen).
 
 Requires:  pip install imageio-ffmpeg numpy pillow scipy
 Run:       python3 scripts/extract_gelb.py            (all)
-           python3 scripts/extract_gelb.py vogel      (some)
+           python3 scripts/extract_gelb.py vogel      (some; celemen1-2 = the salamander)
 """
 import json
 import os
@@ -31,13 +37,18 @@ from scipy import ndimage
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIDEO_DIR = os.environ.get("GRUN_VIDEO_DIR", os.path.join(os.path.dirname(ROOT), "source_videos"))
-GELB_DIR = os.path.join(ROOT, "public/scene2/gelb objekt")
+SCENE2_DIR = os.path.join(ROOT, "public/scene2")
 
 CLIPS = {
-    # still: the picture the clip replaces; step: keep every n-th video frame.
-    "nabi1": {"video": "nabi1.mp4", "still": "g_nabi2.png", "fps": 60, "step": 2, "out_scale": 0.6},
-    "nabi3": {"video": "nabi3.mp4", "still": "g_nabi3.png", "fps": 60, "step": 2, "out_scale": 0.6},
-    "vogel": {"video": "vogel.mp4", "still": "g_vogel.png", "fps": 24, "step": 1, "out_scale": 1.5},
+    # folder: under public/scene2 (still and output); still: the picture the clip replaces;
+    # step: keep every n-th video frame; intro (optional): video played once before the loop.
+    "nabi1": {"folder": "gelb objekt", "video": "nabi1.mp4", "still": "g_nabi2.png", "fps": 60, "step": 2, "out_scale": 0.6},
+    "nabi3": {"folder": "gelb objekt", "video": "nabi3.mp4", "still": "g_nabi3.png", "fps": 60, "step": 2, "out_scale": 0.6},
+    "vogel": {"folder": "gelb objekt", "video": "vogel.mp4", "still": "g_vogel.png", "fps": 24, "step": 1, "out_scale": 1.5},
+    "celemen1-2": {"folder": "rot objekt", "intro": "celemen1-1.mp4", "video": "celemen1-2.mp4",
+                   "still": "r_celemen1.png", "fps": 24, "step": 1, "out_scale": 0.5},  # shown ~450 px tall (1080p)
+    "celemen2-2": {"folder": "rot objekt", "intro": "celemen2-1.mp4", "video": "celemen2-2.mp4",
+                   "still": "r_celemen2.png", "fps": 24, "step": 1, "out_scale": 0.3},  # layout scale 0.5: ~180 px tall
 }
 # Share of the screen's blueness: at or below `SOLID` -> opaque, at or above `CLEAR` -> clear.
 SOLID = 0.3
@@ -118,25 +129,34 @@ def load_frames(ffmpeg: str, video: str, step: int):
 
 
 def extract(name: str, spec: dict, ffmpeg: str):
-    raws = load_frames(ffmpeg, spec["video"], spec["step"])
+    parts = {}
+    if "intro" in spec:
+        parts["intro"] = (spec["intro"][:-4], load_frames(ffmpeg, spec["intro"], spec["step"]))
+    parts["loop"] = (name, load_frames(ffmpeg, spec["video"], spec["step"]))
+    first_raw = next(iter(parts.values()))[1][0]
     # Screen colour: the median of the frame border.
-    border = np.concatenate([raws[0][:8].reshape(-1, 3), raws[0][-8:].reshape(-1, 3),
-                             raws[0][:, :8].reshape(-1, 3), raws[0][:, -8:].reshape(-1, 3)])
+    border = np.concatenate([first_raw[:8].reshape(-1, 3), first_raw[-8:].reshape(-1, 3),
+                             first_raw[:, :8].reshape(-1, 3), first_raw[:, -8:].reshape(-1, 3)])
     screen = np.median(border, axis=0)
-    keyed = [key_frame(raw, screen) for raw in raws]
+    keyed = {part: (folder, [key_frame(raw, screen) for raw in raws]) for part, (folder, raws) in parts.items()}
 
-    still = Image.open(os.path.join(GELB_DIR, spec["still"]))
+    still = Image.open(os.path.join(SCENE2_DIR, spec["folder"], spec["still"]))
     target = np.asarray(still)[..., 3] > 128
     # The frame that matches the still best sets the placement.
     best = None
-    for index in range(0, len(keyed), max(1, len(keyed) // 12)):
-        result = register(keyed[index], target)
-        if best is None or result[0] > best[0][0]:
-            best = (result, index)
+    for part, (_, ims) in keyed.items():
+        for index in range(0, len(ims), max(1, len(ims) // 12)):
+            result = register(ims[index], target)
+            if best is None or result[0] > best[0][0]:
+                best = (result, f"{part} {index}")
     (iou, scale, dx, dy), at = best
     print(f"{name}: frame {at} matches {spec['still']} (iou {iou:.3f}), scale {scale:.4f}, origin ({dx}, {dy})")
+    if "intro" in keyed:
+        a = np.asarray(keyed["intro"][1][-1])[..., 3] > 128
+        b = np.asarray(keyed["loop"][1][0])[..., 3] > 128
+        print(f"{name}: intro last vs loop first overlap {(a & b).sum() / (a | b).sum():.3f}")
 
-    union = np.logical_or.reduce([np.asarray(im)[..., 3] > 8 for im in keyed])
+    union = np.logical_or.reduce([np.asarray(im)[..., 3] > 8 for _, ims in keyed.values() for im in ims])
     x0, y0, x1, y1 = bbox(union)
     box = [np.floor(x0 * scale + dx), np.floor(y0 * scale + dy),
            np.ceil(x1 * scale + dx), np.ceil(y1 * scale + dy)]
@@ -144,23 +164,24 @@ def extract(name: str, spec: dict, ffmpeg: str):
     out_w = round((box[2] - box[0]) * spec["out_scale"])
     out_h = round((box[3] - box[1]) * spec["out_scale"])
 
-    out_dir = os.path.join(GELB_DIR, name)
-    shutil.rmtree(out_dir, ignore_errors=True)
-    os.makedirs(out_dir)
-    for index, im in enumerate(keyed):
-        small = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
-        canvas = Image.new("RGBA", (out_w, out_h))
-        canvas.paste(small, (round((dx - box[0]) * spec["out_scale"]), round((dy - box[1]) * spec["out_scale"])), small)
-        canvas.save(os.path.join(out_dir, f"frame_{index:02d}.webp"), quality=90, method=6)
-
     fps = spec["fps"] / spec["step"]
-    return {
+    result = {
         "x": int(box[0]),
         "y": int(box[1]),
         "width": int(box[2] - box[0]),
         "height": int(box[3] - box[1]),
-        "loop": {"dir": f"gelb objekt/{name}", "frames": len(keyed), "durationMs": round(len(keyed) * 1000 / fps)},
     }
+    for part, (folder, ims) in keyed.items():
+        out_dir = os.path.join(SCENE2_DIR, spec["folder"], folder)
+        shutil.rmtree(out_dir, ignore_errors=True)
+        os.makedirs(out_dir)
+        for index, im in enumerate(ims):
+            small = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+            canvas = Image.new("RGBA", (out_w, out_h))
+            canvas.paste(small, (round((dx - box[0]) * spec["out_scale"]), round((dy - box[1]) * spec["out_scale"])), small)
+            canvas.save(os.path.join(out_dir, f"frame_{index:02d}.webp"), quality=90, method=6)
+        result[part] = {"dir": f"{spec['folder']}/{folder}", "frames": len(ims), "durationMs": round(len(ims) * 1000 / fps)}
+    return result
 
 
 def main():

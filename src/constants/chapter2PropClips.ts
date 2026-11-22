@@ -70,6 +70,45 @@ export const CHAPTER2_LAUBL_CLIP: Chapter2PropClip = {
 };
 
 /**
+ * 코키 (scripts/extract_charactor.py koki): koki1.mp4 = fades in, dances round and settles
+ * (once, when Koki appears in 2-4); koki2.mp4 = idle loop with the sleeves swaying, afterwards.
+ */
+export const CHAPTER2_KOKI_CLIP: Chapter2PropClip = {
+  x: -136,
+  y: -25,
+  width: 770,
+  height: 696,
+  intro: { dir: "charactor/koki1", frames: 73, durationMs: 3042 },
+  loop: { dir: "charactor/koki2", frames: 45, durationMs: 1500 },
+};
+
+/**
+ * 셀레맨1 (scripts/extract_gelb.py celemen1-2, blue screen): celemen1-1.mp4 = plays once when it
+ * slides in (2-4), celemen1-2.mp4 = loop afterwards; in r_celemen1.png's 1435x962 box.
+ */
+export const CHAPTER2_R_CELEMEN1_CLIP: Chapter2PropClip = {
+  x: -20,
+  y: -33,
+  width: 1398,
+  height: 1012,
+  intro: { dir: "rot objekt/celemen1-1", frames: 73, durationMs: 3042 },
+  loop: { dir: "rot objekt/celemen1-2", frames: 73, durationMs: 3042 },
+};
+
+/**
+ * 셀레맨2 (scripts/extract_gelb.py celemen2-2, blue screen): celemen2-1.mp4 = plays once when it
+ * rises in (2-4), celemen2-2.mp4 = loop afterwards; in r_celemen2.png's 1305x857 box.
+ */
+export const CHAPTER2_R_CELEMEN2_CLIP: Chapter2PropClip = {
+  x: -9,
+  y: -87,
+  width: 1372,
+  height: 989,
+  intro: { dir: "rot objekt/celemen2-1", frames: 73, durationMs: 3042 },
+  loop: { dir: "rot objekt/celemen2-2", frames: 73, durationMs: 3042 },
+};
+
+/**
  * 노랑 소품 (scripts/extract_gelb.py, blue screen): looping butterflies and bird, each placed in
  * the box of the still it replaces — nabi1.mp4 → g_nabi2.png (500x461), nabi3.mp4 → g_nabi3.png
  * (600x492), vogel.mp4 → g_vogel.png (400x411). nabi3 flies about inside its video, hence its

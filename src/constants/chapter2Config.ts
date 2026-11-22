@@ -1,7 +1,10 @@
 import {
   CHAPTER2_GELB_CLIPS,
+  CHAPTER2_KOKI_CLIP,
   CHAPTER2_LAUBL_CLIP,
   CHAPTER2_NARI_CLIP,
+  CHAPTER2_R_CELEMEN1_CLIP,
+  CHAPTER2_R_CELEMEN2_CLIP,
   chapter2ClipAllFrameFiles,
 } from "@/constants/chapter2PropClips";
 import {
@@ -27,7 +30,7 @@ export const CHAPTER2_SCROLL_BERG3_Y = 20;
 export const CHAPTER2_SCROLL_BERG4_Y = 40;
 
 /** Bump when `public/scene2/` berg PNGs change (cache bust). */
-export const CHAPTER2_ASSET_VERSION = "20261122-laubl-clip";
+export const CHAPTER2_ASSET_VERSION = "20261123-celemen2-clip";
 
 /** Base fit scale (contain + parallax headroom). Transform depth is normalized on top. */
 export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
@@ -251,14 +254,10 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("grun objekt/marimo2.png"),
     chapter2AssetUrl("charactor/grun_v.png"),
     chapter2AssetUrl("charactor/nari.png"),
-    ...[CHAPTER2_NARI_CLIP, CHAPTER2_LAUBL_CLIP, ...Object.values(CHAPTER2_GELB_CLIPS)].flatMap((clip) =>
+    ...[CHAPTER2_NARI_CLIP, CHAPTER2_LAUBL_CLIP, CHAPTER2_KOKI_CLIP, CHAPTER2_R_CELEMEN1_CLIP, CHAPTER2_R_CELEMEN2_CLIP, ...Object.values(CHAPTER2_GELB_CLIPS)].flatMap((clip) =>
       chapter2ClipAllFrameFiles(clip).map((file) => chapter2AssetUrl(file)),
     ),
-    chapter2AssetUrl("charactor/laubl.png"),
-    chapter2AssetUrl("charactor/koki.png"),
     chapter2AssetUrl("rot objekt/r_vulkan.png"),
-    chapter2AssetUrl("rot objekt/r_celemen1.png"),
-    chapter2AssetUrl("rot objekt/r_celemen2.png"),
     chapter2AssetUrl("rot objekt/r_blume1.png"),
     chapter2AssetUrl("rot objekt/r_blume2.png"),
     chapter2AssetUrl("rot objekt/r_blume3.png"),

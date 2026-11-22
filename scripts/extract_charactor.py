@@ -4,6 +4,8 @@
          ../source_videos/nari2.mp4   -> public/scene2/charactor/nari2/    idle loop afterwards
   laubl: ../source_videos/lauble1.mp4 -> public/scene2/charactor/laubl1/   entrance, plays once
          ../source_videos/laubl2.mp4  -> public/scene2/charactor/laubl2/   idle loop afterwards
+  koki:  ../source_videos/koki1.mp4   -> public/scene2/charactor/koki1/    entrance, plays once
+         ../source_videos/koki2.mp4   -> public/scene2/charactor/koki2/    idle loop afterwards
 
 - Plain white background (like extract_ampel.py): only white connected to the outside becomes
   transparent. The background is a very even white (252-253, noise <= ~5 away), while their pale
@@ -12,7 +14,7 @@
   only, and the character flickered. Tiny faint specks of dust in the background are dropped.
 - The entrance fades in from white: see `fix_fade_in`.
 - Both clips are placed in the box of the still they replace (nari.png 455x600, laubl.png
-  700x1046): the entrance's last frame is lined up with the still, the loop's first frame with the
+  700x1046, koki.png 500x683): the entrance's last frame is lined up with the still, the loop's first frame with the
   entrance's last frame (bounding boxes, then IoU). Frames share one canvas = the content of both
   clips; its placement in box px is printed for the clip in src/constants/chapter2PropClips.ts.
 
@@ -50,6 +52,12 @@ CHARACTERS = {
         "intro": {"name": "laubl1", "video": "lauble1.mp4", "step": 1, "fps": 24},
         "loop": {"name": "laubl2", "video": "laubl2.mp4", "step": 1, "fps": 24},
         "out_scale": 0.55,  # laubl.png (1046 px tall) is shown ~420 px tall on a 1080p screen
+    },
+    "koki": {
+        "still": "koki.png",
+        "intro": {"name": "koki1", "video": "koki1.mp4", "step": 1, "fps": 24},
+        "loop": {"name": "koki2", "video": "koki2.mp4", "step": 2, "fps": 60},
+        "out_scale": 0.8,
     },
 }
 SCREEN = np.array([252.5, 252.5, 252.5])
