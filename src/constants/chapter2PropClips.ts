@@ -44,7 +44,7 @@ export type Chapter2PropClip = {
 };
 
 /**
- * 나리 (scripts/extract_nari.py): nari1.mp4 = she fades in, spins round and settles (once, when
+ * 나리 (scripts/extract_charactor.py nari): nari1.mp4 = she fades in, spins round and settles (once, when
  * she appears in 2-2); nari2.mp4 = idle loop with the cape swaying, afterwards.
  */
 export const CHAPTER2_NARI_CLIP: Chapter2PropClip = {
@@ -54,6 +54,19 @@ export const CHAPTER2_NARI_CLIP: Chapter2PropClip = {
   height: 630,
   intro: { dir: "charactor/nari1", frames: 73, durationMs: 3042 },
   loop: { dir: "charactor/nari2", frames: 37, durationMs: 1233 },
+};
+
+/**
+ * 라우블 (scripts/extract_charactor.py laubl): lauble1.mp4 = fades in, spins round and settles
+ * (once, when Laubl appears in 2-3); laubl2.mp4 = idle loop with the hair blowing, afterwards.
+ */
+export const CHAPTER2_LAUBL_CLIP: Chapter2PropClip = {
+  x: -65,
+  y: -38,
+  width: 980,
+  height: 1088,
+  intro: { dir: "charactor/laubl1", frames: 73, durationMs: 3042 },
+  loop: { dir: "charactor/laubl2", frames: 73, durationMs: 3042 },
 };
 
 /**

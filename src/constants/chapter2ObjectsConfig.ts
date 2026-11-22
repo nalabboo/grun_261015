@@ -1,4 +1,8 @@
-import { CHAPTER2_NARI_CLIP, type Chapter2PropClip } from "@/constants/chapter2PropClips";
+import {
+  CHAPTER2_LAUBL_CLIP,
+  CHAPTER2_NARI_CLIP,
+  type Chapter2PropClip,
+} from "@/constants/chapter2PropClips";
 import type { Chapter2BergEditTransform } from "@/constants/chapter2Layout";
 import {
   CHAPTER2_BERG3_LAYER_Z,
@@ -482,6 +486,8 @@ export const CHAPTER2_LAUBL: Chapter2PropConfig = {
   blurRatio: 0,
   brightness: getDepthBrightness(LAUBL_DEPTH_PX),
   defaultLayout: CHAPTER2_PROP_FIXED_LAYOUTS.laubl,
+  // lauble1 (appears, spins) once, then laubl2 looping — replaces the still laubl.png.
+  clip: CHAPTER2_LAUBL_CLIP,
 };
 
 export const CHAPTER2_STEIN1: Chapter2PropConfig = {

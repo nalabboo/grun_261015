@@ -809,7 +809,9 @@ export default function Chapter2Scene({
     let layoutYOffset = 0;
     let layoutXOffset = 0;
     if (prop.revealOnSubscene23) {
-      scrollOpacity *= getChapter2LaublRevealOpacity(playbackPhase, subscene23ElapsedSec);
+      const reveal = getChapter2LaublRevealOpacity(playbackPhase, subscene23ElapsedSec);
+      // A clip (Laubl) fades in by itself: full opacity as soon as its turn starts.
+      scrollOpacity *= prop.clip ? (reveal > 0 ? 1 : 0) : reveal;
     }
     if (prop.revealOnSubscene24) {
       scrollOpacity *= getChapter2KokiRevealOpacity(playbackPhase, subscene24ElapsedSec);

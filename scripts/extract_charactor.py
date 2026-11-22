@@ -1,24 +1,30 @@
-"""Extracts Nari's entrance and idle loop for chapter 2 and removes the white background.
+"""Extracts chapter 2 characters' entrance + idle loop videos and removes the white background.
 
-  ../source_videos/nari1.mp4 -> public/scene2/charactor/nari1/   entrance, plays once (24 fps)
-  ../source_videos/nari2.mp4 -> public/scene2/charactor/nari2/   idle loop afterwards (60 fps -> 30)
+  nari:  ../source_videos/nari1.mp4   -> public/scene2/charactor/nari1/    entrance, plays once
+         ../source_videos/nari2.mp4   -> public/scene2/charactor/nari2/    idle loop afterwards
+  laubl: ../source_videos/lauble1.mp4 -> public/scene2/charactor/laubl1/   entrance, plays once
+         ../source_videos/laubl2.mp4  -> public/scene2/charactor/laubl2/   idle loop afterwards
 
 - Plain white background (like extract_ampel.py): only white connected to the outside becomes
-  transparent, so her white dress and legs stay. Semi-transparent pixels are "un-mixed" from white,
-  so nari1's opening fade from white becomes a fade from transparent.
-- Both clips are placed in the "nari box": the 455x600 canvas of nari.png (the still that
-  `CHAPTER2_NARI` used). nari1's last frame is lined up with nari.png, and nari2's first frame with
-  nari1's last frame (bounding boxes, then IoU). Frames share one canvas = the content of both
-  clips; its placement in box px is printed for `CHAPTER2_NARI_CLIP` in
-  src/constants/chapter2ObjectsConfig.ts.
+  transparent. The background is a very even white (252-253, noise <= ~5 away), while their pale
+  skin / dress is cream or grey-white (25-35+ away), so the limits are tight (`CLEAR` / `SOLID`):
+  with wider ones a forehead touching the background between hair keyed half away in some frames
+  only, and the character flickered. Tiny faint specks of dust in the background are dropped.
+- The entrance fades in from white: see `fix_fade_in`.
+- Both clips are placed in the box of the still they replace (nari.png 455x600, laubl.png
+  700x1046): the entrance's last frame is lined up with the still, the loop's first frame with the
+  entrance's last frame (bounding boxes, then IoU). Frames share one canvas = the content of both
+  clips; its placement in box px is printed for the clip in src/constants/chapter2PropClips.ts.
 
 Requires:  pip install imageio-ffmpeg numpy pillow scipy
-Run:       python3 scripts/extract_nari.py
+Run:       python3 scripts/extract_charactor.py            (all, ~4 min each)
+           python3 scripts/extract_charactor.py laubl      (some)
 """
 import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 
 import imageio_ffmpeg
@@ -29,21 +35,31 @@ from scipy import ndimage
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIDEO_DIR = os.environ.get("GRUN_VIDEO_DIR", os.path.join(os.path.dirname(ROOT), "source_videos"))
 OUT_ROOT = os.path.join(ROOT, "public/scene2/charactor")
-NARI_STILL = os.path.join(OUT_ROOT, "nari.png")
 
-CLIPS = [
-    # name, video, keep every `step`-th frame, source fps
-    {"name": "nari1", "video": "nari1.mp4", "step": 1, "fps": 24, "fade_in": True},
-    {"name": "nari2", "video": "nari2.mp4", "step": 2, "fps": 60},
-]
+CHARACTERS = {
+    # still: the picture the clips replace; intro / loop: name (= output folder), video, keep
+    # every `step`-th frame, source fps; out_scale: output px per still px.
+    "nari": {
+        "still": "nari.png",
+        "intro": {"name": "nari1", "video": "nari1.mp4", "step": 1, "fps": 24},
+        "loop": {"name": "nari2", "video": "nari2.mp4", "step": 2, "fps": 60},
+        "out_scale": 1.0,  # nari.png is shown at ~0.9x on a 1080p screen
+    },
+    "laubl": {
+        "still": "laubl.png",
+        "intro": {"name": "laubl1", "video": "lauble1.mp4", "step": 1, "fps": 24},
+        "loop": {"name": "laubl2", "video": "laubl2.mp4", "step": 1, "fps": 24},
+        "out_scale": 0.55,  # laubl.png (1046 px tall) is shown ~420 px tall on a 1080p screen
+    },
+}
 SCREEN = np.array([252.5, 252.5, 252.5])
-# The background is a very even white (252-253, noise <= ~5 away), while her pale skin / dress
-# is cream (~225, 25+ away). Tight limits keep the skin solid: with 40 / 8 her forehead keyed
-# half away in some frames (it touches the background between hair flowers), so she flickered.
 SOLID = 18.0
 CLEAR = 6.0
-# Output px per nari-box px (same as nari.png, shown at ~0.9x on a 1080p screen).
-OUT_SCALE = 1.0
+# Background specks: parts smaller than this (video px), or fainter than `SPECK_ALPHA` and smaller
+# than `SPECK_FAINT_AREA`, are dropped.
+SPECK_AREA = 60
+SPECK_ALPHA = 0.6
+SPECK_FAINT_AREA = 2000
 # Fade-in frames weaker than this (0..1) borrow a stronger frame's silhouette (see fix_fade_in).
 SOLID_FADE = 0.35
 
@@ -58,6 +74,15 @@ def key_frame(img: Image.Image) -> Image.Image:
         has_screen = ndimage.maximum(alpha <= 0.0, labels, np.arange(1, count + 1))
         keep = np.concatenate([[False], np.asarray(has_screen, bool)])
         alpha = np.where(keep[labels], alpha, 1.0)
+
+    # Drop dust specks in the background.
+    labels, count = ndimage.label(alpha > 0.02)
+    if count > 1:
+        index = np.arange(1, count + 1)
+        area = ndimage.sum(np.ones_like(alpha), labels, index)
+        peak = ndimage.maximum(alpha, labels, index)
+        drop = (area < SPECK_AREA) | ((peak < SPECK_ALPHA) & (area < SPECK_FAINT_AREA))
+        alpha = np.where(np.concatenate([[False], drop])[labels], 0.0, alpha)
 
     matte = Image.fromarray((alpha * 255).astype(np.uint8))
     matte = matte.filter(ImageFilter.GaussianBlur(0.6))
@@ -106,7 +131,7 @@ def register(source_img: Image.Image, target: np.ndarray):
     return best
 
 
-def load_clip(ffmpeg: str, clip: dict):
+def load_clip(ffmpeg: str, clip: dict, fade_in: bool):
     with tempfile.TemporaryDirectory() as tmp:
         subprocess.run(
             [ffmpeg, "-loglevel", "error", "-i", os.path.join(VIDEO_DIR, clip["video"]),
@@ -116,21 +141,23 @@ def load_clip(ffmpeg: str, clip: dict):
         names = sorted(os.listdir(tmp))[:: clip["step"]]
         raws = [np.asarray(Image.open(os.path.join(tmp, n)).convert("RGB")).astype(np.float32) for n in names]
     keyed = [key_frame(Image.fromarray(raw.astype(np.uint8))) for raw in raws]
-    if clip.get("fade_in"):
+    if fade_in:
         keyed = fix_fade_in(raws, keyed)
     return keyed
 
 
 def fix_fade_in(raws, keyed):
-    """The clip opens by fading in from white (frame = w * picture + (1 - w) * white) while Nari
-    starts to move. Keying those pale frames directly punches holes in her face, so for each fade
+    """The entrance opens by fading in from white (frame = w * picture + (1 - w) * white) while the
+    character starts to move. Keying those pale frames directly punches holes in her face, so for each fade
     frame: estimate w (how far it is from white, compared with the first frame after the fade),
     take the white back out to get the full-strength picture, key that, and use w as opacity."""
     ink = [np.abs(SCREEN - raw).sum(-1) for raw in raws]
     # First frame that is (nearly) as strong as the next ones = the fade is over.
+    # (Blank white frames at the very start look "steady" too: skip anything near the first frame.)
+    blank = ink[0].mean()
     full = next(
         i for i in range(1, len(raws) - 2)
-        if ink[i].mean() > 0.5 * ink[i + 2].mean()
+        if ink[i].mean() > 4 * blank
         and ink[i].mean() >= 0.97 * ink[i + 2].mean()
     )
     region = np.asarray(keyed[full])[..., 3] > 200
@@ -166,25 +193,29 @@ def fix_fade_in(raws, keyed):
     return out
 
 
-def main():
-    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-    frames = {clip["name"]: load_clip(ffmpeg, clip) for clip in CLIPS}
-
-    # nari1 (video px) -> nari box.
-    still = np.asarray(Image.open(NARI_STILL))[..., 3] > 128
-    iou1, s1, dx1, dy1 = register(frames["nari1"][-1], still)
-    print(f"nari1 last -> nari.png: iou {iou1:.3f}, scale {s1:.4f}, origin ({dx1}, {dy1})")
-
-    # nari2 (video px) -> nari1 (video px), then -> nari box.
-    last1 = np.asarray(frames["nari1"][-1])[..., 3] > 128
-    iou2, s2, dx2, dy2 = register(frames["nari2"][0], last1)
-    print(f"nari2 first -> nari1 last: iou {iou2:.3f}, scale {s2:.4f}, origin ({dx2}, {dy2})")
-    place = {
-        "nari1": (s1, dx1, dy1),
-        "nari2": (s2 * s1, dx2 * s1 + dx1, dy2 * s1 + dy1),
+def extract(spec: dict, ffmpeg: str):
+    intro, loop = spec["intro"], spec["loop"]
+    out_scale = spec["out_scale"]
+    frames = {
+        intro["name"]: load_clip(ffmpeg, intro, fade_in=True),
+        loop["name"]: load_clip(ffmpeg, loop, fade_in=False),
     }
 
-    # Shared content box (nari-box px) over both clips.
+    # Entrance (video px) -> still box.
+    still = np.asarray(Image.open(os.path.join(OUT_ROOT, spec["still"])))[..., 3] > 128
+    iou1, s1, dx1, dy1 = register(frames[intro["name"]][-1], still)
+    print(f"{intro['name']} last -> {spec['still']}: iou {iou1:.3f}, scale {s1:.4f}, origin ({dx1}, {dy1})")
+
+    # Loop (video px) -> entrance (video px), then -> still box.
+    last1 = np.asarray(frames[intro["name"]][-1])[..., 3] > 128
+    iou2, s2, dx2, dy2 = register(frames[loop["name"]][0], last1)
+    print(f"{loop['name']} first -> {intro['name']} last: iou {iou2:.3f}, scale {s2:.4f}, origin ({dx2}, {dy2})")
+    place = {
+        intro["name"]: (s1, dx1, dy1),
+        loop["name"]: (s2 * s1, dx2 * s1 + dx1, dy2 * s1 + dy1),
+    }
+
+    # Shared content box (still-box px) over both clips.
     x0 = y0 = float("inf")
     x1 = y1 = float("-inf")
     for name, ims in frames.items():
@@ -194,28 +225,34 @@ def main():
         x0, y0 = min(x0, bx0 * scale + ox), min(y0, by0 * scale + oy)
         x1, y1 = max(x1, bx1 * scale + ox), max(y1, by1 * scale + oy)
     x0, y0, x1, y1 = np.floor(x0), np.floor(y0), np.ceil(x1), np.ceil(y1)
-    out_w, out_h = round((x1 - x0) * OUT_SCALE), round((y1 - y0) * OUT_SCALE)
+    out_w, out_h = round((x1 - x0) * out_scale), round((y1 - y0) * out_scale)
 
     result = {"x": int(x0), "y": int(y0), "width": int(x1 - x0), "height": int(y1 - y0)}
-    for clip in CLIPS:
+    for part, clip in (("intro", intro), ("loop", loop)):
         name = clip["name"]
         scale, ox, oy = place[name]
         out_dir = os.path.join(OUT_ROOT, name)
         shutil.rmtree(out_dir, ignore_errors=True)
         os.makedirs(out_dir)
-        k = scale * OUT_SCALE
+        k = scale * out_scale
         for index, im in enumerate(frames[name]):
             small = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
             canvas = Image.new("RGBA", (out_w, out_h))
-            canvas.paste(small, (round((ox - x0) * OUT_SCALE), round((oy - y0) * OUT_SCALE)), small)
+            canvas.paste(small, (round((ox - x0) * out_scale), round((oy - y0) * out_scale)), small)
             canvas.save(os.path.join(out_dir, f"frame_{index:02d}.webp"), quality=90, method=6)
         fps = clip["fps"] / clip["step"]
-        result[name] = {
+        result[part] = {
             "dir": f"charactor/{name}",
             "frames": len(frames[name]),
             "durationMs": round(len(frames[name]) * 1000 / fps),
         }
-    print(json.dumps(result, indent=2))
+    return result
+
+
+def main():
+    names = sys.argv[1:] or list(CHARACTERS)
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    print(json.dumps({name: extract(CHARACTERS[name], ffmpeg) for name in names}, indent=2))
 
 
 if __name__ == "__main__":
