@@ -5,13 +5,17 @@ import {
   CHAPTER2_NARI_CLIP,
   CHAPTER2_R_CELEMEN1_CLIP,
   CHAPTER2_R_CELEMEN2_CLIP,
-  chapter2ClipAllFrameFiles,
+  CHAPTER2_GRUN_V_CLIP,
+  chapter2ClipFrameFiles,
+  type Chapter2ClipPart,
+  type Chapter2PropClip,
 } from "@/constants/chapter2PropClips";
 import {
   getDepthBlurRatio,
   getDepthBrightness,
   SCENE_LAYERS,
   SCENE_REFERENCE_HEIGHT,
+  assetUrl,
 } from "@/constants/sceneConfig";
 import {
   CHAPTER2_BERG4_LAYOUT_DEFAULT,
@@ -30,7 +34,7 @@ export const CHAPTER2_SCROLL_BERG3_Y = 20;
 export const CHAPTER2_SCROLL_BERG4_Y = 40;
 
 /** Bump when `public/scene2/` berg PNGs change (cache bust). */
-export const CHAPTER2_ASSET_VERSION = "20261123-celemen2-clip";
+export const CHAPTER2_ASSET_VERSION = "20261123-ricori-klein";
 
 /** Base fit scale (contain + parallax headroom). Transform depth is normalized on top. */
 export const CHAPTER2_BERG_DISPLAY_SCALE = 1.14;
@@ -96,6 +100,15 @@ export const CHAPTER2_BERG4_FIXED_LAYOUT = CHAPTER2_BERG4_LAYOUT_DEFAULT;
 export function chapter2AssetUrl(file: string) {
   const path = file.split("/").map(encodeURIComponent).join("/");
   return `/${CHAPTER2_ID}/${path}?v=${CHAPTER2_ASSET_VERSION}`;
+}
+
+/** Frame URLs of one part of a clip (chapter 1's own URLs for a `scene1` part). */
+export function chapter2ClipFrameUrls(part: Chapter2ClipPart) {
+  return chapter2ClipFrameFiles(part).map((file) => (part.scene1 ? assetUrl(file) : chapter2AssetUrl(file)));
+}
+
+export function chapter2ClipAllFrameUrls(clip: Chapter2PropClip) {
+  return [clip.intro, clip.loop, clip.once].flatMap((part) => (part ? chapter2ClipFrameUrls(part) : []));
 }
 
 /**
@@ -252,10 +265,9 @@ export function preloadChapter2BergAssets(): Promise<void> {
     chapter2AssetUrl("grun objekt/spore4.png"),
     chapter2AssetUrl("grun objekt/marimo1.png"),
     chapter2AssetUrl("grun objekt/marimo2.png"),
-    chapter2AssetUrl("charactor/grun_v.png"),
     chapter2AssetUrl("charactor/nari.png"),
-    ...[CHAPTER2_NARI_CLIP, CHAPTER2_LAUBL_CLIP, CHAPTER2_KOKI_CLIP, CHAPTER2_R_CELEMEN1_CLIP, CHAPTER2_R_CELEMEN2_CLIP, ...Object.values(CHAPTER2_GELB_CLIPS)].flatMap((clip) =>
-      chapter2ClipAllFrameFiles(clip).map((file) => chapter2AssetUrl(file)),
+    ...[CHAPTER2_NARI_CLIP, CHAPTER2_LAUBL_CLIP, CHAPTER2_KOKI_CLIP, CHAPTER2_R_CELEMEN1_CLIP, CHAPTER2_R_CELEMEN2_CLIP, CHAPTER2_GRUN_V_CLIP, ...Object.values(CHAPTER2_GELB_CLIPS)].flatMap(
+      chapter2ClipAllFrameUrls,
     ),
     chapter2AssetUrl("rot objekt/r_vulkan.png"),
     chapter2AssetUrl("rot objekt/r_blume1.png"),

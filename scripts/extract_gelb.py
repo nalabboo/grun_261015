@@ -7,6 +7,8 @@
   ../source_videos/celemen1-2.mp4 -> public/scene2/rot objekt/celemen1-2/   entrance once, then loop
   ../source_videos/celemen2-1.mp4 -> public/scene2/rot objekt/celemen2-1/   replaces r_celemen2.png:
   ../source_videos/celemen2-2.mp4 -> public/scene2/rot objekt/celemen2-2/   entrance once, then loop
+  ../source_videos/ricori_klein.mp4 -> public/scene2/charactor/ricori_klein/   Grun shrinking (once):
+      a pink screen (`key: "magenta"`, as scripts/extract_tableau.py), placed in grun_v.png's box
 
 - Keyed on "blueness" = B - max(R, G): the screen scores ~165 (butterflies) / ~217 (bird), while the
   drawings, even their pale-blue / teal wing spots, stay below ~20-40. Edge pixels are un-mixed from
@@ -49,6 +51,8 @@ CLIPS = {
                    "still": "r_celemen1.png", "fps": 24, "step": 1, "out_scale": 0.5},  # shown ~450 px tall (1080p)
     "celemen2-2": {"folder": "rot objekt", "intro": "celemen2-1.mp4", "video": "celemen2-2.mp4",
                    "still": "r_celemen2.png", "fps": 24, "step": 1, "out_scale": 0.3},  # layout scale 0.5: ~180 px tall
+    "ricori_klein": {"folder": "charactor", "video": "ricori_klein.mp4", "still": "grun_v.png",
+                     "fps": 24, "step": 1, "out_scale": 1.0, "key": "magenta"},
 }
 # Share of the screen's blueness: at or below `SOLID` -> opaque, at or above `CLEAR` -> clear.
 SOLID = 0.3
@@ -79,6 +83,33 @@ def key_frame(rgb: np.ndarray, screen: np.ndarray) -> Image.Image:
     out[..., 2] = np.minimum(out[..., 2], cap)
 
     rgba = np.dstack([out, alpha * 255.0]).round().astype(np.uint8)
+    rgba[alpha <= 0.0] = 0
+    return Image.fromarray(rgba)
+
+
+# Pink screen (key "magenta"): magenta-ness = min(R, B) - G; the screen scores ~110, drawn pinks
+# (cheeks, skin) keep a lot of green and score below ~30 (values as in scripts/extract_tableau.py).
+MAGENTA_SOLID = 35.0
+MAGENTA_CLEAR = 95.0
+
+
+def key_frame_magenta(rgb: np.ndarray, screen: np.ndarray) -> Image.Image:
+    magenta = np.minimum(rgb[..., 0], rgb[..., 2]) - rgb[..., 1]
+    alpha = np.clip((MAGENTA_CLEAR - magenta) / (MAGENTA_CLEAR - MAGENTA_SOLID), 0.0, 1.0)
+    matte = Image.fromarray((alpha * 255).astype(np.uint8))
+    matte = matte.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.6))
+    alpha = np.asarray(matte).astype(np.float32) / 255.0
+
+    edge = (alpha > 0.0) & (alpha < 1.0)
+    a = np.maximum(alpha, 1e-3)[..., None]
+    out = np.where(edge[..., None], (rgb - (1.0 - a) * screen) / a, rgb)
+    # Pink spill along the edge: red / blue may not rise above green there.
+    edge_zone = (alpha < 0.98)[..., None]
+    limit = out[..., 1:2] + 8.0
+    out[..., 0:1] = np.where(edge_zone, np.minimum(out[..., 0:1], limit), out[..., 0:1])
+    out[..., 2:3] = np.where(edge_zone, np.minimum(out[..., 2:3], limit), out[..., 2:3])
+
+    rgba = np.dstack([np.clip(out, 0, 255), alpha * 255.0]).round().astype(np.uint8)
     rgba[alpha <= 0.0] = 0
     return Image.fromarray(rgba)
 
@@ -138,7 +169,8 @@ def extract(name: str, spec: dict, ffmpeg: str):
     border = np.concatenate([first_raw[:8].reshape(-1, 3), first_raw[-8:].reshape(-1, 3),
                              first_raw[:, :8].reshape(-1, 3), first_raw[:, -8:].reshape(-1, 3)])
     screen = np.median(border, axis=0)
-    keyed = {part: (folder, [key_frame(raw, screen) for raw in raws]) for part, (folder, raws) in parts.items()}
+    key = key_frame_magenta if spec.get("key") == "magenta" else key_frame
+    keyed = {part: (folder, [key(raw, screen) for raw in raws]) for part, (folder, raws) in parts.items()}
 
     still = Image.open(os.path.join(SCENE2_DIR, spec["folder"], spec["still"]))
     target = np.asarray(still)[..., 3] > 128

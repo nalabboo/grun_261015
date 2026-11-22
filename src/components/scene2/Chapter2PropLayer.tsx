@@ -38,6 +38,8 @@ type Props = {
   onDragStart?: (clientX: number, clientY: number) => void;
   /** Dim overlay hole on grun_v (초록이). */
   greenSpotlightCharacterTarget?: boolean;
+  /** Loop the clip's `once` part instead of its loop (grun_v after Koki appears). */
+  clipLoopOnce?: boolean;
 };
 
 export default function Chapter2PropLayer({
@@ -58,6 +60,7 @@ export default function Chapter2PropLayer({
   onSelect,
   onDragStart,
   greenSpotlightCharacterTarget = false,
+  clipLoopOnce = false,
 }: Props) {
   const src = chapter2PropAssetUrl(prop.file);
   const aspect = prop.width / prop.height;
@@ -121,7 +124,13 @@ export default function Chapter2PropLayer({
     // Same box (size, place, transform) as the still picture; the clip canvas sits inside it.
     return (
       <div className={className} style={style} onPointerDown={onPointerDown}>
-        <Chapter2ClipCanvas clip={prop.clip} boxWidth={prop.width} boxHeight={prop.height} />
+        <Chapter2ClipCanvas
+          clip={prop.clip}
+          boxWidth={prop.width}
+          boxHeight={prop.height}
+          scale={scrollScaleMul}
+          loopOnce={clipLoopOnce}
+        />
       </div>
     );
   }

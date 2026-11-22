@@ -1,4 +1,5 @@
 import {
+  CHAPTER2_GRUN_V_CLIP,
   CHAPTER2_KOKI_CLIP,
   CHAPTER2_LAUBL_CLIP,
   CHAPTER2_NARI_CLIP,
@@ -428,6 +429,7 @@ export const CHAPTER2_GRUN_V: Chapter2PropConfig = {
   file: "charactor/grun_v.png",
   width: 500,
   height: 750,
+  clip: CHAPTER2_GRUN_V_CLIP,
   zIndex: 2,
   stack: "midBerg2",
   parallax: 20,

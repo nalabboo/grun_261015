@@ -1,3 +1,5 @@
+import { RICORI_V_CLIP } from "@/constants/scene2Config";
+
 /**
  * Hand-drawn video clips that replace a chapter 2 prop's still picture (cut from source_videos/
  * by scripts/*.py). A clip plays `intro` (if any) once from when the prop first appears, then
@@ -17,7 +19,7 @@
  */
 export const CHAPTER2_CLIP_COLOR = {
   /** Colour strength. */
-  saturate: 1.2,
+  saturate: 1.35,
   /** Light / dark difference (deepens the greyish darks). */
   contrast: 1.08,
   brightness: 1,
@@ -26,10 +28,22 @@ export const CHAPTER2_CLIP_COLOR = {
 export type Chapter2ClipColor = Partial<typeof CHAPTER2_CLIP_COLOR>;
 
 export type Chapter2ClipPart = {
-  /** Folder under public/scene2/. */
+  /** Folder under public/scene2/ (public/scene1/ with `scene1`). */
   dir: string;
   frames: number;
   durationMs: number;
+  /** Frames from chapter 1 (same files and cache as there, so nothing is loaded twice). */
+  scene1?: boolean;
+  /** How long each frame shows (ms) when they differ (hand-drawn clips); else evenly spread. */
+  holdMs?: readonly number[];
+};
+
+/** A part with its own box (still-box px), e.g. `once`. */
+export type Chapter2ClipBoxedPart = Chapter2ClipPart & {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 };
 
 export type Chapter2PropClip = {
@@ -39,6 +53,8 @@ export type Chapter2PropClip = {
   height: number;
   intro?: Chapter2ClipPart;
   loop: Chapter2ClipPart;
+  /** Plays one time whenever the prop starts to shrink, then back to `loop` (grun_v). */
+  once?: Chapter2ClipBoxedPart;
   /** Overrides `CHAPTER2_CLIP_COLOR` for this clip. */
   color?: Chapter2ClipColor;
 };
@@ -109,6 +125,36 @@ export const CHAPTER2_R_CELEMEN2_CLIP: Chapter2PropClip = {
 };
 
 /**
+ * 초록이 (grun_v.png): the same ricori_v.mp4 loop the chapter 1 closing tableau plays
+ * (`RICORI_V_CLIP`, public/scene1/character/ricori_v/, 11 drawings, 2.5 s), placed in grun_v.png's
+ * 500x750 box (head and feet lined up, iou 0.93; the arms differ as they swing).
+ */
+export const CHAPTER2_GRUN_V_CLIP: Chapter2PropClip = {
+  x: -25,
+  y: 11,
+  width: 542,
+  height: 729,
+  loop: {
+    dir: RICORI_V_CLIP.dir,
+    scene1: true,
+    frames: RICORI_V_CLIP.holdMs.length,
+    durationMs: RICORI_V_CLIP.holdMs.reduce((sum, ms) => sum + ms, 0),
+    holdMs: RICORI_V_CLIP.holdMs,
+  },
+  // Whenever Grun starts to shrink (2-2, 2-3 and 2-4), ricori_klein.mp4 plays once
+  // (scripts/extract_gelb.py ricori_klein, pink screen; lined up with grun_v.png, iou 0.985).
+  once: {
+    dir: "charactor/ricori_klein",
+    frames: 73,
+    durationMs: 3042,
+    x: 13,
+    y: 13,
+    width: 467,
+    height: 720,
+  },
+};
+
+/**
  * 노랑 소품 (scripts/extract_gelb.py, blue screen): looping butterflies and bird, each placed in
  * the box of the still it replaces — nabi1.mp4 → g_nabi2.png (500x461), nabi3.mp4 → g_nabi3.png
  * (600x492), vogel.mp4 → g_vogel.png (400x411). nabi3 flies about inside its video, hence its
@@ -139,10 +185,6 @@ export const CHAPTER2_GELB_CLIPS = {
 } satisfies Record<string, Chapter2PropClip>;
 
 /** Every frame file of a clip (intro and loop). */
-export function chapter2ClipAllFrameFiles(clip: Chapter2PropClip) {
-  return [...(clip.intro ? chapter2ClipFrameFiles(clip.intro) : []), ...chapter2ClipFrameFiles(clip.loop)];
-}
-
 export function chapter2ClipFrameFiles(part: Chapter2ClipPart) {
   return Array.from(
     { length: part.frames },

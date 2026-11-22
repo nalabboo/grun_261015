@@ -1013,6 +1013,8 @@ export default function Chapter2Scene({
           clickMarimoGreenSpotlight &&
           prop.id === CHAPTER2_GREEN_SPOTLIGHT_CHARACTER_PROP_ID
         }
+        // From Koki's entrance (2-4) on, Grun keeps the glum ricori_klein loop.
+        clipLoopOnce={prop.id === "grun_v" && playbackPhase === "2-4-playing" && subscene24ElapsedSec > 0}
       />
     );
   };
